@@ -176,14 +176,14 @@ export async function checkProfileForChanges(profileId: string, sharedIgClient?:
     if (!currentFollowing) return changes;
 
     // Build sets for comparison
-    const previousUsernames = new Set(profile.followingList.map(f => f.username));
-    const currentUsernames = new Set(currentFollowing.map(f => f.username));
+    const previousUsernames = new Set(profile.followingList.map((f: any) => f.username));
+    const currentUsernames = new Set(currentFollowing.map((f: any) => f.username));
 
     // Find new follows (in current, not in previous)
-    const newFollows = currentFollowing.filter(u => !previousUsernames.has(u.username));
+    const newFollows = currentFollowing.filter((u: any) => !previousUsernames.has(u.username));
 
     // Find unfollows (in previous, not in current)
-    const unfollows = profile.followingList.filter(u => !currentUsernames.has(u.username));
+    const unfollows = profile.followingList.filter((u: any) => !currentUsernames.has(u.username));
 
     console.log(`[Monitoring] @${profile.username}: ${newFollows.length} new follows, ${unfollows.length} unfollows`);
 
@@ -350,7 +350,7 @@ export async function runMonitoringBatch(): Promise<{
         include: { profiles: true },
     });
 
-    const allProfiles = activeSets.flatMap(set => set.profiles);
+    const allProfiles = activeSets.flatMap((set: any) => set.profiles);
     console.log(`[Monitoring] Starting batch check for ${allProfiles.length} profiles`);
 
     if (allProfiles.length === 0) {
