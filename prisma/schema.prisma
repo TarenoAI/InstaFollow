@@ -1,0 +1,93 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// Profile Set - a collection of monitored profiles
+model ProfileSet {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profiles    MonitoredProfile[]
+}
+
+// A profile being monitored for changes
+model MonitoredProfile {
+  id              String   @id @default(cuid())
+  username        String
+  fullName        String?
+  profilePicUrl   String?
+  isPrivate       Boolean  @default(false)
+  isVerified      Boolean  @default(false)
+  followerCount   Int?
+  followingCount  Int?
+  lastCheckedAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  setId           String
+  set             ProfileSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  // The current list of accounts this profile follows
+  followingList   FollowingEntry[]
+  
+  // History of changes detected
+  changes         ChangeEvent[]
+
+  @@unique([setId, username])
+}
+
+// Current following list entry for a monitored profile
+model FollowingEntry {
+  id              String   @id @default(cuid())
+  username        String
+  fullName        String?
+  profilePicUrl   String?
+  isPrivate       Boolean  @default(false)
+  isVerified      Boolean  @default(false)
+  addedAt         DateTime @default(now())
+
+  profileId       String
+  profile         MonitoredProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, username])
+}
+
+// Change event - when someone follows or unfollows
+model ChangeEvent {
+  id              String   @id @default(cuid())
+  type            String   // "FOLLOW" or "UNFOLLOW"
+  
+  // The target user who was followed/unfollowed
+  targetUsername  String
+  targetFullName  String?
+  targetPicUrl    String?
+  
+  // Timestamp of detection
+  detectedAt      DateTime @default(now())
+  
+  // Whether this change has been processed (sent to n8n)
+  processed       Boolean  @default(false)
+  processedAt     DateTime?
+
+  profileId       String
+  profile         MonitoredProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+// App configuration (n8n webhook URL, etc.)
+model AppConfig {
+  id              String   @id @default("app_config")
+  n8nWebhookUrl   String?
+  checkIntervalMs Int      @default(1800000) // 30 minutes default
+  delayBetweenProfilesMs Int @default(45000) // 45 seconds between profiles
+  updatedAt       DateTime @updatedAt
+}

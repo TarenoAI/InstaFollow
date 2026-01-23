@@ -1,0 +1,21 @@
+{
+  "sets": [
+    {
+      "id": "mkrakzqkg08mbwtm1xt",
+      "name": "Influencer",
+      "profiles": [
+        {
+          "username": "instagram",
+          "full_name": "Instagram",
+          "profile_pic_url": "https://scontent-fra3-2.cdninstagram.com/v/t51.2885-19/550891366_18667771684001321_1383210656577177067_n.jpg?stp=dst-jpg_e0_s150x150_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLmRqYW5nby4xMDgwLmMyIn0&_nc_ht=scontent-fra3-2.cdninstagram.com&_nc_cat=1&_nc_oc=Q6cZ2QFSOA5SB2XwY9ZnmLvkVNmeeSjak6jIbfnJ9AVxdAVlgsmSuYDLzpQvNsYnJzt_oWRJLrrf5l83LrqJR3BWyHU_&_nc_ohc=ekxGWw-bTsIQ7kNvwE6IryF&_nc_gid=rPAp7nKqsLb9dV9xIjM9uA&edm=AEF8tYYBAAAA&ccb=7-5&ig_cache_key=GGbv1SApFvlLPVJCAOtF0XrDJjITbmNDAQAB1501500j-ccb7-5&oh=00_AfqJ2R6hhylzdC0tV4zPDYsG_YDDiJ9TO5UQ8JrHhVy1sA&oe=6979B331&_nc_sid=1e20d2",
+          "is_private": false,
+          "is_verified": true,
+          "follower_count": 698904678,
+          "following_count": 183
+        }
+      ],
+      "createdAt": "2026-01-23T19:46:59.180Z",
+      "updatedAt": "2026-01-23T19:47:19.521Z"
+    }
+  ]
+}
