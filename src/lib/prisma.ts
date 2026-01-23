@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { PrismaLibSQL } from '@prisma/adapter-libsql';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { createClient } from '@libsql/client';
 
 const prismaClientSingleton = () => {
@@ -13,7 +13,7 @@ const prismaClientSingleton = () => {
             url: tursoUrl,
             authToken: tursoAuthToken,
         });
-        const adapter = new PrismaLibSQL(libsql);
+        const adapter = new PrismaLibSql(libsql as any);
         return new PrismaClient({ adapter });
     }
 
