@@ -1,8 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaLibSQL } from '@prisma/adapter-libsql';
 import { createClient } from '@libsql/client';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
-import Database from 'better-sqlite3';
 
 const prismaClientSingleton = () => {
     // Check if we are running with Turso (Production/Vercel)
@@ -20,7 +18,15 @@ const prismaClientSingleton = () => {
     }
 
     // Fallback to local SQLite (Development)
+    // We dynamically require better-sqlite3 to avoid build issues on Vercel Edge/Serverless environments
+    // where local SQLite is not used.
     console.log('📂 Connecting to local SQLite...');
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
+
     const sqlite = new Database('dev.db');
     const adapter = new PrismaBetterSqlite3(sqlite);
     return new PrismaClient({ adapter });
