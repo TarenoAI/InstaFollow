@@ -53,11 +53,11 @@ export async function getSets(): Promise<SetInfo[]> {
         orderBy: { createdAt: 'desc' },
     });
 
-    return sets.map(set => ({
+    return sets.map((set: any) => ({
         id: set.id,
         name: set.name,
         isActive: set.isActive,
-        profiles: set.profiles.map(p => ({
+        profiles: set.profiles.map((p: any) => ({
             id: p.id,
             username: p.username,
             fullName: p.fullName,
