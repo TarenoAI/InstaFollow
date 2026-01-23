@@ -269,7 +269,7 @@ export async function getRecentChanges(limit: number = 50, profileId?: string) {
         take: limit,
     });
 
-    return changes.map(c => ({
+    return changes.map((c: any) => ({
         id: c.id,
         type: c.type as 'FOLLOW' | 'UNFOLLOW',
         sourceUsername: c.profile.username,
@@ -290,7 +290,7 @@ export async function getProfileFollowing(profileId: string) {
         orderBy: { username: 'asc' },
     });
 
-    return following.map(f => ({
+    return following.map((f: any) => ({
         username: f.username,
         fullName: f.fullName,
         profilePicUrl: f.profilePicUrl,
