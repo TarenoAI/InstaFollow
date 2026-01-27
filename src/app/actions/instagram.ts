@@ -1,6 +1,6 @@
 'use server';
 
-import { IgApiClient } from 'instagram-private-api';
+import { getInstagramClient, loadInstagramCredentials } from '@/lib/instagram-client';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -34,22 +34,9 @@ interface FetchResult {
 }
 
 // Load credentials from environment variables (for Vercel) or local fallback
+// Use centralized loader
 async function loadCredentials(): Promise<Credentials | null> {
-  // Priority 1: Environment Variables (Vercel)
-  if (process.env.INSTAGRAM_USERNAME && process.env.INSTAGRAM_PASSWORD) {
-    return {
-      username: process.env.INSTAGRAM_USERNAME,
-      password: process.env.INSTAGRAM_PASSWORD
-    };
-  }
-
-  // Priority 2: Local config.json (Local dev)
-  try {
-    const data = await fs.readFile(CONFIG_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return null;
-  }
+  return loadInstagramCredentials();
 }
 
 // Save credentials to config file
@@ -79,50 +66,9 @@ export async function hasCredentials(): Promise<boolean> {
 // Fetch following list for a target username
 export async function fetchFollowing(targetUsername: string): Promise<FetchResult> {
   try {
-    const credentials = await loadCredentials();
-
-    if (!credentials || !credentials.username || !credentials.password) {
-      return { success: false, error: 'Bitte zuerst Instagram-Anmeldedaten in den Einstellungen hinterlegen.' };
-    }
-
-    const ig = new IgApiClient();
-    ig.state.generateDevice(credentials.username);
-
-    // Priority 0: Session Restoration (Bypasses Login Challenge)
-    if (process.env.INSTAGRAM_SESSION) {
-      try {
-        await ig.state.deserialize(JSON.parse(process.env.INSTAGRAM_SESSION));
-        console.log('✅ Restored session from INSTAGRAM_SESSION');
-
-        // Optional: verify session is still valid by checking current user
-        // await ig.account.currentUser(); 
-      } catch (sessionError) {
-        console.error('Failed to restore session:', sessionError);
-        // Fallback to normal login below
-      }
-    }
-
-    // Only login if NOT using session or if session restore failed (and we have no cookies)
-    // We check if we have a session ID token which indicates active session
-    const hasSession = await ig.state.serialize().then(s => s.authorization);
-
-    if (!hasSession) {
-      try {
-        await ig.account.login(credentials.username, credentials.password);
-      } catch (loginError: unknown) {
-        const errorMessage = loginError instanceof Error ? loginError.message : String(loginError);
-        // ... existing error handlers ...
-        if (errorMessage.includes('challenge_required')) {
-          return { success: false, error: 'Instagram Challenge! Bitte nutze INSTAGRAM_SESSION Env Var.' };
-        }
-        if (errorMessage.includes('bad_password')) {
-          return { success: false, error: 'Falsches Passwort. Bitte überprüfe deine Anmeldedaten.' };
-        }
-        if (errorMessage.includes('invalid_user')) {
-          return { success: false, error: 'Benutzername nicht gefunden. Bitte überprüfe deine Anmeldedaten.' };
-        }
-        return { success: false, error: `Login fehlgeschlagen: ${errorMessage}` };
-      }
+    const ig = await getInstagramClient();
+    if (!ig) {
+      return { success: false, error: 'Instagram-Anmeldung fehlgeschlagen. Bitte prüfe die Anmeldedaten.' };
     }
 
     // Search for target user
@@ -140,11 +86,10 @@ export async function fetchFollowing(targetUsername: string): Promise<FetchResul
         is_private: searchResults.is_private,
       };
 
-      // Get full user info for following count
+      // Get full user info for following count (required for actual list access)
       const userInfo = await ig.user.info(searchResults.pk);
       targetInfo.following_count = userInfo.following_count;
       targetInfo.is_private = userInfo.is_private;
-
     } catch {
       return { success: false, error: `Benutzer "${targetUsername}" wurde nicht gefunden.` };
     }
@@ -185,7 +130,7 @@ export async function fetchFollowing(targetUsername: string): Promise<FetchResul
         items = await followingFeed.items();
         processItems(items);
 
-        // Safety break if list gets too massive to prevent Vercel timeout (optional safety)
+        // Safety break if list gets too massive
         if (following.length > 5000) {
           console.log('Safety limit reached (5000)');
           break;
@@ -193,11 +138,10 @@ export async function fetchFollowing(targetUsername: string): Promise<FetchResul
       }
     } catch (fetchError: unknown) {
       const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-      return { success: false, error: `Fehler beim Abrufen: ${errorMessage}`, targetInfo };
+      return { success: false, error: `Fehler beim Abrufen der Liste: ${errorMessage}`, targetInfo };
     }
 
     return { success: true, following, targetInfo };
-
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     return { success: false, error: `Unerwarteter Fehler: ${errorMessage}` };

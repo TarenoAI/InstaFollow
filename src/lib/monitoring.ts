@@ -1,11 +1,8 @@
 'use server';
 
 import { prisma } from './prisma';
+import { getInstagramClient, humanDelay, getProfileCheckDelay, getMaxProfilesPerSession, safeApiCall } from './instagram-client';
 import { IgApiClient } from 'instagram-private-api';
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const CONFIG_PATH = path.join(process.cwd(), 'config.json');
 
 interface Credentials {
     username: string;
@@ -38,101 +35,7 @@ interface ChangeDetected {
     detectedAt: Date;
 }
 
-// Cached Instagram client for batch operations
-let cachedIgClient: IgApiClient | null = null;
-let clientLastUsed: number = 0;
-const CLIENT_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
-
-// Helper: Random delay to simulate human behavior
-async function humanDelay(minMs: number, maxMs: number): Promise<void> {
-    const delay = minMs + Math.random() * (maxMs - minMs);
-    console.log(`[Anti-Bot] Waiting ${Math.round(delay / 1000)}s...`);
-    await new Promise(resolve => setTimeout(resolve, delay));
-}
-
-// Load Instagram credentials
-async function loadCredentials(): Promise<Credentials | null> {
-    // Priority 1: Environment Variables (Vercel)
-    if (process.env.INSTAGRAM_USERNAME && process.env.INSTAGRAM_PASSWORD) {
-        return {
-            username: process.env.INSTAGRAM_USERNAME,
-            password: process.env.INSTAGRAM_PASSWORD
-        };
-    }
-
-    // Priority 2: Local config.json (Local dev)
-    try {
-        const data = await fs.readFile(CONFIG_PATH, 'utf-8');
-        return JSON.parse(data);
-    } catch {
-        return null;
-    }
-}
-
-// Create or reuse Instagram client (session caching)
-async function getInstagramClient(): Promise<IgApiClient | null> {
-    const now = Date.now();
-
-    // Reuse cached client if still valid
-    if (cachedIgClient && (now - clientLastUsed) < CLIENT_CACHE_DURATION) {
-        console.log('[Anti-Bot] Reusing cached Instagram session');
-        clientLastUsed = now;
-        return cachedIgClient;
-    }
-
-    const credentials = await loadCredentials();
-    if (!credentials) {
-        console.error('[Monitoring] No Instagram credentials configured');
-        return null;
-    }
-
-    const ig = new IgApiClient();
-    ig.state.generateDevice(credentials.username);
-
-    // Priority 0: Session Restoration (Bypasses Login Challenge)
-    if (process.env.INSTAGRAM_SESSION) {
-        try {
-            await ig.state.deserialize(JSON.parse(process.env.INSTAGRAM_SESSION));
-            console.log('[Anti-Bot] ✅ Restored session from INSTAGRAM_SESSION');
-        } catch (sessionError) {
-            console.error('[Anti-Bot] Failed to restore session:', sessionError);
-        }
-    }
-
-    // Check if we have a valid session (either restored or existing)
-    let hasSession = false;
-    try {
-        const state = await ig.state.serialize();
-        hasSession = !!state.authorization;
-    } catch {
-        hasSession = false;
-    }
-
-    if (!hasSession) {
-        try {
-            console.log('[Anti-Bot] Creating new Instagram session via Password...');
-            const igNew = new IgApiClient();
-            igNew.state.generateDevice(credentials.username);
-            await humanDelay(1000, 2000);
-            await igNew.account.login(credentials.username, credentials.password);
-
-            // We must replace the instance or merge state. Easier to replace.
-            cachedIgClient = igNew;
-            clientLastUsed = now;
-            return igNew;
-        } catch (error) {
-            console.error('[Monitoring] Instagram login failed:', error);
-            cachedIgClient = null;
-            return null;
-        }
-    } else {
-        cachedIgClient = ig;
-        clientLastUsed = now;
-    }
-
-    console.log('[Anti-Bot] Instagram session ready');
-    return ig;
-}
+// Use centralized client from instagram-client.ts
 
 // Fetch following list with anti-bot measures
 async function fetchFollowingList(ig: IgApiClient, username: string): Promise<FollowingUser[] | null> {
@@ -151,7 +54,7 @@ async function fetchFollowingList(ig: IgApiClient, username: string): Promise<Fo
         let pageCount = 0;
 
         do {
-            const page = await followingFeed.items();
+            const page = await safeApiCall(() => followingFeed.items());
             pageCount++;
 
             for (const user of page) {
@@ -167,9 +70,9 @@ async function fetchFollowingList(ig: IgApiClient, username: string): Promise<Fo
 
             console.log(`[Monitoring] Fetched page ${pageCount}, total: ${following.length} following`);
 
-            // Delay between pagination pages (key anti-bot measure!)
+            // Longer delay between pagination pages (key anti-bot measure!)
             if (followingFeed.isMoreAvailable()) {
-                await humanDelay(2000, 4000);
+                await humanDelay(3000, 6000);
             }
 
         } while (followingFeed.isMoreAvailable());
@@ -390,9 +293,15 @@ export async function runMonitoringBatch(): Promise<{
         return result;
     }
 
-    // Get delay setting
-    const config = await prisma.appConfig.findUnique({ where: { id: 'app_config' } });
-    const delayMs = config?.delayBetweenProfilesMs ?? 45000; // Default 45s
+    // Get safe rate limit settings
+    const { min: delayMin, max: delayMax } = getProfileCheckDelay();
+    const maxProfiles = getMaxProfilesPerSession();
+
+    // Limit profiles to check
+    const profilesToCheck = allProfiles.slice(0, maxProfiles);
+    if (allProfiles.length > maxProfiles) {
+        console.log(`[Monitoring] ⚠️ Limiting to ${maxProfiles} profiles (${allProfiles.length} total) for safety`);
+    }
 
     // Create ONE shared Instagram session for the entire batch
     const sharedIgClient = await getInstagramClient();
@@ -401,7 +310,7 @@ export async function runMonitoringBatch(): Promise<{
         return result;
     }
 
-    for (const profile of allProfiles) {
+    for (const profile of profilesToCheck) {
         try {
             // Ensure profile is initialized (using shared session)
             await initializeProfile(profile.id, sharedIgClient);
@@ -411,10 +320,9 @@ export async function runMonitoringBatch(): Promise<{
             result.changesDetected.push(...changes);
             result.profilesChecked++;
 
-            // Wait before next profile to avoid rate limiting
-            if (allProfiles.indexOf(profile) < allProfiles.length - 1) {
-                // Random delay between 45s and 75s (more human-like)
-                await humanDelay(delayMs, delayMs + 30000);
+            // Wait before next profile (60-120 seconds for safety)
+            if (profilesToCheck.indexOf(profile) < profilesToCheck.length - 1) {
+                await humanDelay(delayMin, delayMax);
             }
         } catch (error) {
             const errorMsg = `Error checking @${profile.username}: ${error}`;
@@ -449,9 +357,8 @@ export async function markChangesAsProcessed(changeIds: string[]) {
     });
 }
 
-// Clear the cached session (useful for testing or manual reset)
-export async function clearInstagramSession() {
-    cachedIgClient = null;
-    clientLastUsed = 0;
-    console.log('[Anti-Bot] Instagram session cache cleared');
+// Use centralized session clearing
+export async function clearMonitorInstagramSession() {
+    const { clearInstagramSession } = require('./instagram-client');
+    clearInstagramSession();
 }

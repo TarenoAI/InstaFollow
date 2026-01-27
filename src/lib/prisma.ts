@@ -1,34 +1,34 @@
+
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
-import { PrismaLibSql } from '@prisma/adapter-libsql';
-import { createClient } from '@libsql/client';
 
 const prismaClientSingleton = () => {
-    // Check if we are running with Turso (Production/Vercel)
     const tursoUrl = process.env.TURSO_DATABASE_URL;
     const tursoAuthToken = process.env.TURSO_AUTH_TOKEN;
+    const localUrl = process.env.DATABASE_URL || 'file:dev.db';
 
-    if (tursoUrl && tursoUrl.includes('libsql')) {
-        console.log('🔌 Connecting to Turso Database...');
-        const libsql = createClient({
-            url: tursoUrl,
-            authToken: tursoAuthToken,
+    const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+
+    const hasTurso = !!(tursoUrl && tursoUrl !== 'undefined' && tursoUrl.length > 0);
+    const useTurso = hasTurso && (isVercel || tursoUrl?.includes('libsql'));
+
+    if (useTurso) {
+        console.log(`🚀 [Prisma] Connecting to Turso Hub...`);
+        const { PrismaLibSql } = require('@prisma/adapter-libsql');
+
+        // Pass the config object to the factory
+        const adapter = new PrismaLibSql({
+            url: tursoUrl!,
+            authToken: tursoAuthToken
         });
-        const adapter = new PrismaLibSql(libsql as any);
         return new PrismaClient({ adapter });
     }
 
-    // Fallback to local SQLite (Development)
-    // We dynamically require better-sqlite3 to avoid build issues on Vercel Edge/Serverless environments
-    // where local SQLite is not used.
-    console.log('📂 Connecting to local SQLite...');
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    console.log(`📂 [Prisma] Connecting to local SQLite [${localUrl}]`);
     const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 
-    const sqlite = new Database('dev.db');
-    const adapter = new PrismaBetterSqlite3(sqlite);
+    // Pass the config object to the factory
+    const adapter = new PrismaBetterSqlite3({ url: localUrl });
     return new PrismaClient({ adapter });
 };
 

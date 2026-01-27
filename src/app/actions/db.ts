@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { IgApiClient } from 'instagram-private-api';
+import { getInstagramClient } from '@/lib/instagram-client';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -29,30 +29,7 @@ export interface SetInfo {
     updatedAt: Date;
 }
 
-// ============ CREDENTIALS ============
-interface Credentials {
-    username: string;
-    password: string;
-}
-
-// Load Instagram credentials
-async function loadCredentials(): Promise<Credentials | null> {
-    // Priority 1: Environment Variables (Vercel)
-    if (process.env.INSTAGRAM_USERNAME && process.env.INSTAGRAM_PASSWORD) {
-        return {
-            username: process.env.INSTAGRAM_USERNAME,
-            password: process.env.INSTAGRAM_PASSWORD
-        };
-    }
-
-    // Priority 2: Local config.json (Local dev)
-    try {
-        const data = await fs.readFile(CONFIG_PATH, 'utf-8');
-        return JSON.parse(data);
-    } catch {
-        return null;
-    }
-}
+// Instagram credentials handled by instagram-client.ts
 
 // ============ SETS ============
 
@@ -169,15 +146,11 @@ export async function addProfileToSet(setId: string, username: string): Promise<
     }
 
     // Fetch profile info from Instagram
-    const credentials = await loadCredentials();
-    if (!credentials) {
-        return { success: false, error: 'Keine Instagram-Anmeldedaten konfiguriert.' };
-    }
-
     try {
-        const ig = new IgApiClient();
-        ig.state.generateDevice(credentials.username);
-        await ig.account.login(credentials.username, credentials.password);
+        const ig = await getInstagramClient();
+        if (!ig) {
+            return { success: false, error: 'Instagram-Anmeldung fehlgeschlagen. Bitte prüfe die Anmeldedaten.' };
+        }
 
         const searchResult = await ig.user.searchExact(cleanUsername);
         const userInfo = await ig.user.info(searchResult.pk);
