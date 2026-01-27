@@ -19,6 +19,7 @@ import {
   saveCredentials,
   fetchFollowing
 } from './actions/instagram';
+import { checkAppPassword } from './actions/auth';
 
 // Helper function to proxy Instagram images through our API to avoid CORS issues
 function proxyImageUrl(url: string): string {
@@ -761,10 +762,35 @@ export default function Home() {
   const [selectedProfileUsername, setSelectedProfileUsername] = useState('');
   const [showProfileDetails, setShowProfileDetails] = useState(false);
 
+  // Auth State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [appPassInput, setAppPassInput] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
   useEffect(() => {
+    // Check if already authenticated in this session
+    const savedAuth = sessionStorage.getItem('app_authenticated');
+    if (savedAuth === 'true') {
+      setIsAuthenticated(true);
+    }
+    setIsAuthLoading(false);
+
     checkCredentials();
     loadSets();
   }, []);
+
+  const handleLogin = async () => {
+    if (!appPassInput.trim()) return;
+
+    const result = await checkAppPassword(appPassInput);
+    if (result.success) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('app_authenticated', 'true');
+    } else {
+      setAuthError('Falsches Passwort.');
+    }
+  };
 
   const checkCredentials = async () => {
     const configured = await hasCredentials();
@@ -822,6 +848,58 @@ export default function Home() {
 
     setLoading(false);
   };
+
+  if (isAuthLoading) {
+    return <div className="min-h-screen flex items-center justify-center">
+      <div className="spinner w-12 h-12" />
+    </div>;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-[var(--background)]">
+        <div className="glass-card p-10 w-full max-w-md animate-scale-in text-center">
+          <div className="w-16 h-16 rounded-2xl bg-[var(--accent)] mx-auto mb-6 flex items-center justify-center shadow-lg shadow-[var(--accent)]/20">
+            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold mb-2 gradient-text">InstaFollows</h1>
+          <p className="text-[var(--text-muted)] mb-8">Geschützter Bereich. Bitte Passwort eingeben.</p>
+
+          <div className="space-y-4">
+            <input
+              type="password"
+              className="input-field text-center text-lg tracking-widest"
+              placeholder="••••••••"
+              value={appPassInput}
+              onChange={(e) => {
+                setAppPassInput(e.target.value);
+                setAuthError('');
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              autoFocus
+            />
+
+            {authError && (
+              <p className="text-[var(--error)] text-sm">{authError}</p>
+            )}
+
+            <button
+              onClick={handleLogin}
+              className="btn-primary w-full py-4 text-lg font-semibold"
+            >
+              Anmelden
+            </button>
+          </div>
+
+          <p className="mt-8 text-xs text-[var(--text-muted)]">
+            Powered by TarenoAI
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-6 md:p-12">
