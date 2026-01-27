@@ -52,6 +52,15 @@ async function humanDelay(minMs: number, maxMs: number): Promise<void> {
 
 // Load Instagram credentials
 async function loadCredentials(): Promise<Credentials | null> {
+    // Priority 1: Environment Variables (Vercel)
+    if (process.env.INSTAGRAM_USERNAME && process.env.INSTAGRAM_PASSWORD) {
+        return {
+            username: process.env.INSTAGRAM_USERNAME,
+            password: process.env.INSTAGRAM_PASSWORD
+        };
+    }
+
+    // Priority 2: Local config.json (Local dev)
     try {
         const data = await fs.readFile(CONFIG_PATH, 'utf-8');
         return JSON.parse(data);
