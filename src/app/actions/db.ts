@@ -113,8 +113,8 @@ export async function createSet(name: string): Promise<{ success: boolean; set?:
             },
         };
     } catch (error) {
-        console.error('Error creating set:', error);
-        return { success: false, error: 'Fehler beim Erstellen des Sets.' };
+        console.error('Error creating set:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+        return { success: false, error: 'Fehler beim Erstellen des Sets. Bitte prüfe die Logs.' };
     }
 }
 

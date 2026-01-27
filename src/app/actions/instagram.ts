@@ -77,7 +77,7 @@ export async function hasCredentials(): Promise<boolean> {
 }
 
 // Fetch following list for a target username
-export async function fetchFollowing(targetUsername: string, maxCount: number = 50): Promise<FetchResult> {
+export async function fetchFollowing(targetUsername: string): Promise<FetchResult> {
   try {
     const credentials = await loadCredentials();
 
@@ -145,23 +145,8 @@ export async function fetchFollowing(targetUsername: string, maxCount: number = 
     try {
       let items = await followingFeed.items();
 
-      for (const item of items) {
-        if (following.length >= maxCount) break;
-        following.push({
-          pk: item.pk.toString(),
-          username: item.username,
-          full_name: item.full_name,
-          profile_pic_url: item.profile_pic_url,
-          is_private: item.is_private,
-          is_verified: item.is_verified,
-        });
-      }
-
-      // Fetch more if needed and available
-      while (following.length < maxCount && followingFeed.isMoreAvailable()) {
-        items = await followingFeed.items();
-        for (const item of items) {
-          if (following.length >= maxCount) break;
+      const processItems = (feedItems: any[]) => {
+        for (const item of feedItems) {
           following.push({
             pk: item.pk.toString(),
             username: item.username,
@@ -171,10 +156,24 @@ export async function fetchFollowing(targetUsername: string, maxCount: number = 
             is_verified: item.is_verified,
           });
         }
+      };
+
+      processItems(items);
+
+      // Fetch all remaining items
+      while (followingFeed.isMoreAvailable()) {
+        items = await followingFeed.items();
+        processItems(items);
+
+        // Safety break if list gets too massive to prevent Vercel timeout (optional safety)
+        if (following.length > 5000) {
+          console.log('Safety limit reached (5000)');
+          break;
+        }
       }
     } catch (fetchError: unknown) {
       const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-      return { success: false, error: `Fehler beim Abrufen der abonnierten Konten: ${errorMessage}`, targetInfo };
+      return { success: false, error: `Fehler beim Abrufen: ${errorMessage}`, targetInfo };
     }
 
     return { success: true, following, targetInfo };

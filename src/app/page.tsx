@@ -750,7 +750,6 @@ export default function Home() {
   const [error, setError] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [credentialsConfigured, setCredentialsConfigured] = useState(false);
-  const [maxCount, setMaxCount] = useState(50);
 
   // Sets state
   const [sets, setSets] = useState<SetInfo[]>([]);
@@ -827,8 +826,9 @@ export default function Home() {
     setTargetInfo(null);
 
     try {
+      // Dynamic import to avoid server-side issues
       const { fetchFollowing } = await import('./actions/instagram');
-      const result = await fetchFollowing(usernameToFetch.trim().replace('@', ''), maxCount);
+      const result = await fetchFollowing(usernameToFetch.trim().replace('@', ''));
 
       if (result.success && result.following) {
         setFollowing(result.following);
@@ -984,16 +984,6 @@ export default function Home() {
                   />
                 </div>
                 <div className="flex gap-3">
-                  <select
-                    className="input-field w-32"
-                    value={maxCount}
-                    onChange={(e) => setMaxCount(Number(e.target.value))}
-                  >
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={200}>200</option>
-                  </select>
                   <button
                     onClick={() => handleFetch()}
                     disabled={loading || !credentialsConfigured}
