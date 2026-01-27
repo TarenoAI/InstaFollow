@@ -86,29 +86,52 @@ async function getInstagramClient(): Promise<IgApiClient | null> {
         return null;
     }
 
+    const ig = new IgApiClient();
+    ig.state.generateDevice(credentials.username);
+
+    // Priority 0: Session Restoration (Bypasses Login Challenge)
+    if (process.env.INSTAGRAM_SESSION) {
+        try {
+            await ig.state.deserialize(JSON.parse(process.env.INSTAGRAM_SESSION));
+            console.log('[Anti-Bot] ✅ Restored session from INSTAGRAM_SESSION');
+        } catch (sessionError) {
+            console.error('[Anti-Bot] Failed to restore session:', sessionError);
+        }
+    }
+
+    // Check if we have a valid session (either restored or existing)
+    let hasSession = false;
     try {
-        console.log('[Anti-Bot] Creating new Instagram session...');
-        const ig = new IgApiClient();
+        const state = await ig.state.serialize();
+        hasSession = !!state.authorization;
+    } catch {
+        hasSession = false;
+    }
 
-        // Generate consistent device ID based on username
-        ig.state.generateDevice(credentials.username);
+    if (!hasSession) {
+        try {
+            console.log('[Anti-Bot] Creating new Instagram session via Password...');
+            const igNew = new IgApiClient();
+            igNew.state.generateDevice(credentials.username);
+            await humanDelay(1000, 2000);
+            await igNew.account.login(credentials.username, credentials.password);
 
-        // Small delay before login to seem more human
-        await humanDelay(1000, 2000);
-
-        await ig.account.login(credentials.username, credentials.password);
-
-        // Cache the client
+            // We must replace the instance or merge state. Easier to replace.
+            cachedIgClient = igNew;
+            clientLastUsed = now;
+            return igNew;
+        } catch (error) {
+            console.error('[Monitoring] Instagram login failed:', error);
+            cachedIgClient = null;
+            return null;
+        }
+    } else {
         cachedIgClient = ig;
         clientLastUsed = now;
-
-        console.log('[Anti-Bot] Instagram session created and cached');
-        return ig;
-    } catch (error) {
-        console.error('[Monitoring] Instagram login failed:', error);
-        cachedIgClient = null;
-        return null;
     }
+
+    console.log('[Anti-Bot] Instagram session ready');
+    return ig;
 }
 
 // Fetch following list with anti-bot measures

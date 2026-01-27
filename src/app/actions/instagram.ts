@@ -88,21 +88,41 @@ export async function fetchFollowing(targetUsername: string): Promise<FetchResul
     const ig = new IgApiClient();
     ig.state.generateDevice(credentials.username);
 
-    // Login
-    try {
-      await ig.account.login(credentials.username, credentials.password);
-    } catch (loginError: unknown) {
-      const errorMessage = loginError instanceof Error ? loginError.message : String(loginError);
-      if (errorMessage.includes('challenge_required')) {
-        return { success: false, error: 'Instagram erfordert eine Verifizierung. Bitte melde dich zuerst in der Instagram-App an.' };
+    // Priority 0: Session Restoration (Bypasses Login Challenge)
+    if (process.env.INSTAGRAM_SESSION) {
+      try {
+        await ig.state.deserialize(JSON.parse(process.env.INSTAGRAM_SESSION));
+        console.log('✅ Restored session from INSTAGRAM_SESSION');
+
+        // Optional: verify session is still valid by checking current user
+        // await ig.account.currentUser(); 
+      } catch (sessionError) {
+        console.error('Failed to restore session:', sessionError);
+        // Fallback to normal login below
       }
-      if (errorMessage.includes('bad_password')) {
-        return { success: false, error: 'Falsches Passwort. Bitte überprüfe deine Anmeldedaten.' };
+    }
+
+    // Only login if NOT using session or if session restore failed (and we have no cookies)
+    // We check if we have a session ID token which indicates active session
+    const hasSession = await ig.state.serialize().then(s => s.authorization);
+
+    if (!hasSession) {
+      try {
+        await ig.account.login(credentials.username, credentials.password);
+      } catch (loginError: unknown) {
+        const errorMessage = loginError instanceof Error ? loginError.message : String(loginError);
+        // ... existing error handlers ...
+        if (errorMessage.includes('challenge_required')) {
+          return { success: false, error: 'Instagram Challenge! Bitte nutze INSTAGRAM_SESSION Env Var.' };
+        }
+        if (errorMessage.includes('bad_password')) {
+          return { success: false, error: 'Falsches Passwort. Bitte überprüfe deine Anmeldedaten.' };
+        }
+        if (errorMessage.includes('invalid_user')) {
+          return { success: false, error: 'Benutzername nicht gefunden. Bitte überprüfe deine Anmeldedaten.' };
+        }
+        return { success: false, error: `Login fehlgeschlagen: ${errorMessage}` };
       }
-      if (errorMessage.includes('invalid_user')) {
-        return { success: false, error: 'Benutzername nicht gefunden. Bitte überprüfe deine Anmeldedaten.' };
-      }
-      return { success: false, error: `Login fehlgeschlagen: ${errorMessage}` };
     }
 
     // Search for target user
