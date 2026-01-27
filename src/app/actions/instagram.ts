@@ -33,8 +33,17 @@ interface FetchResult {
   };
 }
 
-// Load credentials from config file
+// Load credentials from environment variables (for Vercel) or local fallback
 async function loadCredentials(): Promise<Credentials | null> {
+  // Priority 1: Environment Variables (Vercel)
+  if (process.env.INSTAGRAM_USERNAME && process.env.INSTAGRAM_PASSWORD) {
+    return {
+      username: process.env.INSTAGRAM_USERNAME,
+      password: process.env.INSTAGRAM_PASSWORD
+    };
+  }
+
+  // Priority 2: Local config.json (Local dev)
   try {
     const data = await fs.readFile(CONFIG_PATH, 'utf-8');
     return JSON.parse(data);
@@ -45,6 +54,14 @@ async function loadCredentials(): Promise<Credentials | null> {
 
 // Save credentials to config file
 export async function saveCredentials(username: string, password: string): Promise<{ success: boolean; error?: string }> {
+  // If we are on Vercel, we can't write to the file system
+  if (process.env.VERCEL) {
+    return {
+      success: false,
+      error: 'Auf Vercel können Anmeldedaten nicht über die UI gespeichert werden. Bitte nutze Environment Variables (INSTAGRAM_USERNAME & INSTAGRAM_PASSWORD).'
+    };
+  }
+
   try {
     await fs.writeFile(CONFIG_PATH, JSON.stringify({ username, password }), 'utf-8');
     return { success: true };
