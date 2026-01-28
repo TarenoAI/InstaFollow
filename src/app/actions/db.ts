@@ -129,11 +129,17 @@ export async function toggleSetActive(setId: string): Promise<{ success: boolean
 // ============ PROFILES ============
 
 // Add a profile to a set
+// NOTE: We only add the username to the DB. The VPS worker will fetch full details on next cron run.
 export async function addProfileToSet(setId: string, username: string): Promise<{ success: boolean; profile?: ProfileInfo; error?: string }> {
     const cleanUsername = username.trim().replace('@', '').toLowerCase();
 
     if (!cleanUsername) {
         return { success: false, error: 'Bitte gib einen Benutzernamen ein.' };
+    }
+
+    // Basic validation: only letters, numbers, underscores, periods
+    if (!/^[a-zA-Z0-9._]+$/.test(cleanUsername)) {
+        return { success: false, error: 'Ungültiger Benutzername.' };
     }
 
     // Check if profile already exists in set
@@ -145,25 +151,17 @@ export async function addProfileToSet(setId: string, username: string): Promise<
         return { success: false, error: 'Dieses Profil ist bereits im Set.' };
     }
 
-    // Fetch profile info from Instagram
+    // Simply add to database - VPS worker will fetch details later
     try {
-        const ig = await getInstagramClient();
-        if (!ig) {
-            return { success: false, error: 'Instagram-Anmeldung fehlgeschlagen. Bitte prüfe die Anmeldedaten.' };
-        }
-
-        const searchResult = await safeApiCall(() => ig.user.searchExact(cleanUsername));
-        const userInfo = await safeApiCall(() => ig.user.info(searchResult.pk));
-
         const profile = await prisma.monitoredProfile.create({
             data: {
-                username: userInfo.username,
-                fullName: userInfo.full_name,
-                profilePicUrl: userInfo.profile_pic_url,
-                isPrivate: userInfo.is_private,
-                isVerified: userInfo.is_verified,
-                followerCount: userInfo.follower_count,
-                followingCount: userInfo.following_count,
+                username: cleanUsername,
+                fullName: cleanUsername, // Will be updated by VPS
+                profilePicUrl: null,
+                isPrivate: false,
+                isVerified: false,
+                followerCount: 0,
+                followingCount: 0, // 0 triggers initial full scrape on VPS
                 setId,
             },
         });
@@ -183,12 +181,8 @@ export async function addProfileToSet(setId: string, username: string): Promise<
             },
         };
     } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage.includes('User not found')) {
-            return { success: false, error: `Benutzer "${cleanUsername}" nicht gefunden.` };
-        }
         console.error('Error adding profile:', error);
-        return { success: false, error: `Fehler beim Abrufen: ${errorMessage}` };
+        return { success: false, error: 'Fehler beim Hinzufügen des Profils.' };
     }
 }
 

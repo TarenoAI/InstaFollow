@@ -55,6 +55,11 @@ model FollowingEntry {
   isPrivate       Boolean  @default(false)
   isVerified      Boolean  @default(false)
   addedAt         DateTime @default(now())
+  
+  // Position tracking for smart unfollow detection
+  position        Int      @default(0)    // Position in the following list (0 = top/newest)
+  lastSeenAt      DateTime @default(now()) // When this entry was last seen in a scrape
+  missedScans     Int      @default(0)    // How many scans this entry was missing from
 
   profileId       String
   profile         MonitoredProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
@@ -65,7 +70,7 @@ model FollowingEntry {
 // Change event - when someone follows or unfollows
 model ChangeEvent {
   id              String   @id @default(cuid())
-  type            String   // "FOLLOW" or "UNFOLLOW"
+  type            String   // "FOLLOW" or "UNFOLLOW" or "PENDING_UNFOLLOW"
   
   // The target user who was followed/unfollowed
   targetUsername  String
@@ -74,6 +79,10 @@ model ChangeEvent {
   
   // Timestamp of detection
   detectedAt      DateTime @default(now())
+  
+  // Confirmation status for unfollows
+  isConfirmed     Boolean  @default(true)  // true for FOLLOW, needs confirmation for UNFOLLOW
+  confirmedAt     DateTime?
   
   // Whether this change has been processed (sent to n8n)
   processed       Boolean  @default(false)
