@@ -1,6 +1,6 @@
 'use server';
 
-import { getInstagramClient, loadInstagramCredentials } from '@/lib/instagram-client';
+import { getInstagramClient, loadInstagramCredentials, safeApiCall } from '@/lib/instagram-client';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -76,7 +76,7 @@ export async function fetchFollowing(targetUsername: string): Promise<FetchResul
     let targetInfo: FetchResult['targetInfo'];
 
     try {
-      const searchResults = await ig.user.searchExact(targetUsername);
+      const searchResults = await safeApiCall(() => ig.user.searchExact(targetUsername));
       targetUserId = searchResults.pk.toString();
       targetInfo = {
         username: searchResults.username,
@@ -87,7 +87,7 @@ export async function fetchFollowing(targetUsername: string): Promise<FetchResul
       };
 
       // Get full user info for following count (required for actual list access)
-      const userInfo = await ig.user.info(searchResults.pk);
+      const userInfo = await safeApiCall(() => ig.user.info(searchResults.pk));
       targetInfo.following_count = userInfo.following_count;
       targetInfo.is_private = userInfo.is_private;
     } catch {

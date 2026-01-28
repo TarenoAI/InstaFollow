@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { getInstagramClient } from '@/lib/instagram-client';
+import { getInstagramClient, safeApiCall } from '@/lib/instagram-client';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -152,8 +152,8 @@ export async function addProfileToSet(setId: string, username: string): Promise<
             return { success: false, error: 'Instagram-Anmeldung fehlgeschlagen. Bitte prüfe die Anmeldedaten.' };
         }
 
-        const searchResult = await ig.user.searchExact(cleanUsername);
-        const userInfo = await ig.user.info(searchResult.pk);
+        const searchResult = await safeApiCall(() => ig.user.searchExact(cleanUsername));
+        const userInfo = await safeApiCall(() => ig.user.info(searchResult.pk));
 
         const profile = await prisma.monitoredProfile.create({
             data: {
