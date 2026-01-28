@@ -546,13 +546,35 @@ async function main() {
                                 args: [`v4_${Date.now()}_${i}`, currentFollowing[i], i, profileId]
                             });
                         }
+
+                        // Aktualisiere auch Profilinfos (Follower, Bild, etc.)
+                        const followerNum = parseInt(monitoredProfileInfo.followerCount.replace(/[,.KMB]/g, '') || '0');
+                        await db.execute({
+                            sql: `UPDATE MonitoredProfile SET 
+                                  followingCount = ?, 
+                                  followerCount = ?,
+                                  fullName = ?,
+                                  profilePicUrl = ?,
+                                  isVerified = ?,
+                                  lastCheckedAt = datetime('now') 
+                                  WHERE id = ?`,
+                            args: [
+                                currentCount,
+                                followerNum,
+                                monitoredProfileInfo.fullName || username,
+                                monitoredProfileInfo.profilePicUrl || null,
+                                monitoredProfileInfo.isVerified ? 1 : 0,
+                                profileId
+                            ]
+                        });
+                    } else {
+                        // Keine neuen/entfernten Follows, nur Count updaten
+                        await db.execute({
+                            sql: "UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now') WHERE id = ?",
+                            args: [currentCount, profileId]
+                        });
                     }
                 }
-
-                await db.execute({
-                    sql: "UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now') WHERE id = ?",
-                    args: [currentCount, profileId]
-                });
             } else {
                 console.log('   ✅ Keine Änderung');
                 await db.execute({
