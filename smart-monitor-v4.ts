@@ -179,7 +179,7 @@ async function getProfileInfo(page: Page, username: string, takeScreenshot: bool
 }
 
 /**
- * Holt die Following-Liste
+ * Holt die Following-Liste (verbessert für VPS mit mehr Scrolls & längeren Delays)
  */
 async function getFollowingList(page: Page, username: string): Promise<string[]> {
     try {
@@ -187,20 +187,22 @@ async function getFollowingList(page: Page, username: string): Promise<string[]>
             waitUntil: 'domcontentloaded',
             timeout: 30000
         });
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(4000); // Längere Wartezeit für VPS
         await dismissPopups(page);
 
         await page.click('a[href*="following"]', { timeout: 10000 });
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(4000); // Längere Wartezeit für Modal
 
         const following = new Set<string>();
         let noNewCount = 0;
+        const maxScrolls = 80; // Erhöht von 30 auf 80 für vollständigeres Scraping
+        const maxNoNewCount = 12; // Erhöht von 5 auf 12
 
-        for (let scroll = 0; scroll < 30 && noNewCount < 5; scroll++) {
+        for (let scroll = 0; scroll < maxScrolls && noNewCount < maxNoNewCount; scroll++) {
             const users = await page.evaluate(() => {
                 return Array.from(document.querySelectorAll('a'))
                     .map(a => a.getAttribute('href'))
-                    .filter(h => h && h.match(/^\/[a-zA-Z0-9._]+\/?$/))
+                    .filter(h => h && h.match(/^\/[a-zA-Z0-9._-]+\/?$/))
                     .filter(h => !['explore', 'reels', 'p', 'direct', 'accounts', 'stories'].some(x => h!.includes(x)))
                     .map(h => h!.replace(/\//g, ''));
             });
@@ -211,10 +213,22 @@ async function getFollowingList(page: Page, username: string): Promise<string[]>
             if (following.size === prevSize) noNewCount++;
             else noNewCount = 0;
 
-            console.log(`   Scroll ${scroll + 1}: ${following.size} gefunden`);
-            await page.evaluate(() => window.scrollBy(0, 800));
-            await humanDelay(1500, 2500);
+            // Logge nur jeden 5. Scroll um Log-Spam zu reduzieren
+            if (scroll % 5 === 0 || following.size !== prevSize) {
+                console.log(`   Scroll ${scroll + 1}/${maxScrolls}: ${following.size} gefunden`);
+            }
+
+            // Haupt-Scroll
+            await page.evaluate(() => window.scrollBy(0, 600));
+            await humanDelay(2500, 4000); // Längere Delays für Lazy Loading
+
+            // Zusätzlicher Touch-Scroll für besseres Laden (wie in mobile-scrape-full.ts)
+            await page.mouse.move(200, 400);
+            await page.mouse.wheel(0, 300);
+            await humanDelay(1000, 1500);
         }
+
+        console.log(`   ✅ Scraping beendet: ${following.size} Following nach ${Math.min(noNewCount, maxNoNewCount) >= maxNoNewCount ? 'keine neuen Einträge' : maxScrolls + ' Scrolls'}`);
 
         following.delete(username);
         return Array.from(following);
