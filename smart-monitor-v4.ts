@@ -463,6 +463,18 @@ async function main() {
                 const currentFollowing = await getFollowingList(page, username);
                 console.log(`   📋 ${currentFollowing.length} Following gescrapt`);
 
+                // Diagnose-Logs für Scraping-Quote
+                const scrapeQuote = currentCount > 0 ? ((currentFollowing.length / currentCount) * 100).toFixed(1) : '100';
+                console.log(`   📈 Scraping-Quote: ${currentFollowing.length}/${currentCount} (${scrapeQuote}%)`);
+
+                if (currentFollowing.length < currentCount * 0.8) {
+                    console.log(`   ⚠️ DIAGNOSE: Weniger als 80% gescrapt!`);
+                    console.log(`      Mögliche Ursachen:`);
+                    console.log(`      1. Instagram Lazy-Loading Limits`);
+                    console.log(`      2. Gelöschte/Deaktivierte Accounts in der Zählung`);
+                    console.log(`      3. Netzwerk-Latenz auf VPS`);
+                }
+
                 if (currentFollowing.length > 0) {
                     const oldRows = await db.execute({
                         sql: "SELECT username FROM FollowingEntry WHERE profileId = ?",
@@ -475,19 +487,51 @@ async function main() {
 
                     console.log(`   ➕ Neu: ${addedUsernames.length} | ➖ Entfolgt: ${removedUsernames.length}`);
 
+                    // === INITIALER SCRAPE: Direkt in DB speichern ohne Profilinfos ===
+                    if (oldFollowing.size === 0) {
+                        console.log(`\n   🆕 INITIALER SCRAPE - Speichere ${currentFollowing.length} Einträge direkt in Turso...`);
+
+                        // Batch-Insert für bessere Performance
+                        const batchSize = 50;
+                        for (let batch = 0; batch < Math.ceil(currentFollowing.length / batchSize); batch++) {
+                            const start = batch * batchSize;
+                            const end = Math.min(start + batchSize, currentFollowing.length);
+
+                            for (let i = start; i < end; i++) {
+                                await db.execute({
+                                    sql: `INSERT INTO FollowingEntry (id, username, position, profileId, addedAt, lastSeenAt, missedScans) 
+                                          VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
+                                    args: [`v4_${Date.now()}_${i}`, currentFollowing[i], i, profileId]
+                                });
+                            }
+                            console.log(`      💾 Batch ${batch + 1}: ${end}/${currentFollowing.length} gespeichert`);
+                        }
+
+                        // Nur den Count aktualisieren, kein Twitter-Post bei initialem Scrape
+                        await db.execute({
+                            sql: `UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now') WHERE id = ?`,
+                            args: [currentCount, profileId]
+                        });
+
+                        console.log(`   ✅ Initialer Scrape abgeschlossen - Weiter zum nächsten Profil\n`);
+                        await humanDelay(5000, 10000);
+                        continue; // Zum nächsten Profil!
+                    }
+
+                    // === ECHTER CHANGE: Profilinfos laden und tweeten ===
                     if (addedUsernames.length > 0 || removedUsernames.length > 0) {
-                        // Lade Profil-Infos mit Screenshots
                         console.log('\n   📊 Lade Profilinfos mit Screenshots...');
 
                         const monitoredProfileInfo = await getProfileInfo(page, username, true);
                         if (!monitoredProfileInfo) continue;
 
-                        // Verarbeite FOLLOWS
+                        // Verarbeite FOLLOWS (max 10 um Zeit zu sparen)
                         if (addedUsernames.length > 0) {
-                            console.log(`\n   🆕 Verarbeite ${addedUsernames.length} neue Follows...`);
+                            const maxToProcess = Math.min(addedUsernames.length, 10);
+                            console.log(`\n   🆕 Verarbeite ${maxToProcess} von ${addedUsernames.length} neuen Follows...`);
                             const addedProfiles: ProfileInfo[] = [];
 
-                            for (const targetUsername of addedUsernames) {
+                            for (const targetUsername of addedUsernames.slice(0, maxToProcess)) {
                                 console.log(`      → @${targetUsername}`);
                                 const info = await getProfileInfo(page, targetUsername, true);
                                 if (info) addedProfiles.push(info);
@@ -495,34 +539,32 @@ async function main() {
                             }
 
                             if (addedProfiles.length > 0) {
-                                // Tweet formatieren
                                 const tweetText = formatTweetText('FOLLOW', monitoredProfileInfo, addedProfiles);
 
-                                // Twitter Post
                                 const tweetUrl = await postToTwitter(
                                     browser,
                                     tweetText,
                                     monitoredProfileInfo.screenshotPath
                                 );
 
-                                // Webhook senden
                                 await sendWebhook({
                                     event: 'FOLLOW',
                                     monitoredProfile: monitoredProfileInfo,
                                     targets: addedProfiles,
                                     timestamp: new Date().toISOString(),
-                                    summary: `${monitoredProfileInfo.username} folgt ${addedProfiles.length} neuen Personen`,
+                                    summary: `${monitoredProfileInfo.username} folgt ${addedUsernames.length} neuen Personen`,
                                     tweetUrl: tweetUrl || undefined
                                 });
                             }
                         }
 
-                        // Verarbeite UNFOLLOWS
+                        // Verarbeite UNFOLLOWS (max 10 um Zeit zu sparen)
                         if (removedUsernames.length > 0) {
-                            console.log(`\n   ❌ Verarbeite ${removedUsernames.length} Entfolgungen...`);
+                            const maxToProcess = Math.min(removedUsernames.length, 10);
+                            console.log(`\n   ❌ Verarbeite ${maxToProcess} von ${removedUsernames.length} Entfolgungen...`);
                             const removedProfiles: ProfileInfo[] = [];
 
-                            for (const targetUsername of removedUsernames) {
+                            for (const targetUsername of removedUsernames.slice(0, maxToProcess)) {
                                 console.log(`      → @${targetUsername}`);
                                 const info = await getProfileInfo(page, targetUsername, true);
                                 if (info) removedProfiles.push(info);
@@ -543,7 +585,7 @@ async function main() {
                                     monitoredProfile: monitoredProfileInfo,
                                     targets: removedProfiles,
                                     timestamp: new Date().toISOString(),
-                                    summary: `${monitoredProfileInfo.username} folgt ${removedProfiles.length} Personen nicht mehr`,
+                                    summary: `${monitoredProfileInfo.username} folgt ${removedUsernames.length} Personen nicht mehr`,
                                     tweetUrl: tweetUrl || undefined
                                 });
                             }
@@ -561,7 +603,7 @@ async function main() {
                             });
                         }
 
-                        // Aktualisiere auch Profilinfos (Follower, Bild, etc.)
+                        // Aktualisiere auch Profilinfos
                         const followerNum = parseInt(monitoredProfileInfo.followerCount.replace(/[,.KMB]/g, '') || '0');
                         await db.execute({
                             sql: `UPDATE MonitoredProfile SET 
