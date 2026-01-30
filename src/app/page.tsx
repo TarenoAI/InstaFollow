@@ -1149,7 +1149,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
               : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
               }`}
           >
-            📜 Abonniert
+            📜 Abonniert {followingList.length > 0 && <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--accent)]/20">({followingList.length})</span>}
             {activeTab === 'list' && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] rounded-t-full"></span>
             )}
@@ -1161,7 +1161,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
               : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
               }`}
           >
-            🕘 Verlauf
+            🕘 Verlauf {historyList.length > 0 && <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--accent)]/20">({historyList.length})</span>}
             {activeTab === 'history' && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] rounded-t-full"></span>
             )}
