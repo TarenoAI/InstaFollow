@@ -7,13 +7,11 @@ const prismaClientSingleton = () => {
     const tursoAuthToken = process.env.TURSO_AUTH_TOKEN;
     const localUrl = process.env.DATABASE_URL || 'file:dev.db';
 
-    const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+    // Verwende Turso wenn URL gesetzt ist (unabhängig von Vercel)
+    const hasTurso = !!(tursoUrl && tursoUrl !== 'undefined' && tursoUrl.length > 0 && tursoUrl.includes('turso'));
 
-    const hasTurso = !!(tursoUrl && tursoUrl !== 'undefined' && tursoUrl.length > 0);
-    const useTurso = hasTurso && (isVercel || tursoUrl?.includes('libsql'));
-
-    if (useTurso) {
-        console.log(`🚀 [Prisma] Connecting to Turso Hub...`);
+    if (hasTurso) {
+        console.log(`🚀 [Prisma] Connecting to Turso: ${tursoUrl?.substring(0, 30)}...`);
         const { PrismaLibSql } = require('@prisma/adapter-libsql');
 
         // Pass the config object to the factory
