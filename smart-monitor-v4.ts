@@ -602,6 +602,15 @@ async function main() {
                                     summary: `${monitoredProfileInfo.username} folgt ${addedUsernames.length} neuen Personen`,
                                     tweetUrl: tweetUrl || undefined
                                 });
+
+                                // ChangeEvents in DB speichern
+                                for (const target of addedProfiles) {
+                                    await db.execute({
+                                        sql: `INSERT INTO ChangeEvent (id, type, targetUsername, detectedAt, isConfirmed, processed, profileId) 
+                                              VALUES (?, 'FOLLOW', ?, datetime('now'), 1, 0, ?)`,
+                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, profileId]
+                                    });
+                                }
                             }
                         }
 
@@ -635,6 +644,15 @@ async function main() {
                                     summary: `${monitoredProfileInfo.username} folgt ${removedUsernames.length} Personen nicht mehr`,
                                     tweetUrl: tweetUrl || undefined
                                 });
+
+                                // ChangeEvents in DB speichern
+                                for (const target of removedProfiles) {
+                                    await db.execute({
+                                        sql: `INSERT INTO ChangeEvent (id, type, targetUsername, detectedAt, isConfirmed, processed, profileId) 
+                                              VALUES (?, 'UNFOLLOW', ?, datetime('now'), 1, 0, ?)`,
+                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, profileId]
+                                    });
+                                }
                             }
                         }
 

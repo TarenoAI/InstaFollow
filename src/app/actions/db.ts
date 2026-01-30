@@ -301,6 +301,14 @@ export async function getRecentChanges(limit: number = 50, profileId?: string) {
     }));
 }
 
+// Get profile details
+export async function getProfileDetails(profileId: string) {
+    return await prisma.monitoredProfile.findUnique({
+        where: { id: profileId },
+        include: { sets: true }
+    });
+}
+
 // Get following list for a profile
 export async function getProfileFollowing(profileId: string) {
     const following = await prisma.followingEntry.findMany({

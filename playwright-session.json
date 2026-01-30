@@ -5,7 +5,7 @@
       "value": "L49M1_3qNVqAqE9_9s6uPU",
       "domain": ".instagram.com",
       "path": "/",
-      "expires": 1804366019.928526,
+      "expires": 1804367682.008391,
       "httpOnly": false,
       "secure": true,
       "sameSite": "Lax"
@@ -25,7 +25,7 @@
       "value": "68228218929",
       "domain": ".instagram.com",
       "path": "/",
-      "expires": 1777582019.928578,
+      "expires": 1777583682.00844,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -45,7 +45,7 @@
       "value": "390x664",
       "domain": ".instagram.com",
       "path": "/",
-      "expires": 1770410737,
+      "expires": 1770412419,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -82,7 +82,7 @@
     },
     {
       "name": "rur",
-      "value": "\"LDC\\05468228218929\\0541801342019:01fec246b7592fc760a10e41fdd833767432249f56f86003c5150e876ebf236e454e1932\"",
+      "value": "\"LDC\\05468228218929\\0541801343682:01febf6f8ce2477c9c20c475d61ebb3771f84029ac6a54e92b52d656dc78f2b08d971a7d\"",
       "domain": ".instagram.com",
       "path": "/",
       "expires": -1,
@@ -101,19 +101,19 @@
         },
         {
           "name": "chatd-deviceid",
-          "value": "c14a5490-246f-46b4-8e43-d1d3ac7cf510"
+          "value": "1a762a11-7a68-4511-af60-4c1a6d39e126"
         },
         {
           "name": "ig_direct_icon_rebrand_nux",
           "value": "true"
         },
         {
-          "name": "pigeon_state",
-          "value": "{\"lastDeviceInfoTime\":1769716877685}"
+          "name": "IGSession",
+          "value": "p2t6kp:1769809545308"
         },
         {
-          "name": "IGSession",
-          "value": "p2t6kp:1769807882299"
+          "name": "pigeon_state",
+          "value": "{\"lastDeviceInfoTime\":1769716877685}"
         },
         {
           "name": "fr",
@@ -125,7 +125,7 @@
         },
         {
           "name": "Session",
-          "value": "vwxpsy:1769806117299"
+          "value": "92u250:1769807780308"
         },
         {
           "name": "has_interop_upgraded",
@@ -152,12 +152,12 @@
           "value": "1769805934009"
         },
         {
-          "name": "ig_web_boost_interstitial_nux_viewed",
-          "value": "false"
-        },
-        {
           "name": "_oz_bandwidthAndTTFBSamples",
           "value": "{\"b\":[{\"b\":201662,\"s\":1769606620591,\"t\":196},{\"b\":207940,\"s\":1769606620911,\"t\":145},{\"b\":217146,\"s\":1769606620976,\"t\":65},{\"b\":205285,\"s\":1769606621496,\"t\":443},{\"b\":201569,\"s\":1769606621866,\"t\":370}],\"t\":[{\"s\":1769606619622,\"t\":32.3999999910593,\"l\":32.3999999910593,\"b\":818},{\"s\":1769606619636,\"t\":39.599999994039536,\"l\":39.79999999701977,\"b\":818},{\"s\":1769606620766,\"t\":31.200000002980232,\"l\":1166,\"b\":985467},{\"s\":1769606620802,\"t\":33.599999994039536,\"l\":33.79999999701977,\"b\":818},{\"s\":1769606621053,\"t\":34.099999994039536,\"l\":284.20000000298023,\"b\":589134}]}"
+        },
+        {
+          "name": "ig_web_boost_interstitial_nux_viewed",
+          "value": "false"
         },
         {
           "name": "signal_flush_timestamp",

@@ -5,14 +5,16 @@ import {
   getSets,
   createSet,
   deleteSet,
+  toggleSetActive,
   addProfileToSet as addToSetDb,
   removeProfileFromSet,
+  getProfileFollowing,
+  getRecentChanges,
+  getProfileDetails,
   SetInfo,
   ProfileInfo,
   getAppConfig,
   saveN8nWebhookUrl,
-  getRecentChanges,
-  getProfileFollowing
 } from './actions/db';
 import {
   hasCredentials,
@@ -914,7 +916,7 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
                       ) : (
                         <>
                           <p className="text-xs text-[var(--text-muted)] truncate">
-                            {profile.followingCount?.toLocaleString() || 0} Following
+                            {profile.followerCount?.toLocaleString() || 0} Follower • {profile.followingCount?.toLocaleString() || 0} Following
                           </p>
                           {profile.lastCheckedAt && (
                             <p className="text-xs text-[var(--success)] flex items-center gap-1 mt-0.5 animate-fade-in">
@@ -1020,6 +1022,7 @@ interface ProfileDetailsModalProps {
 
 function ProfileDetailsModal({ isOpen, onClose, profileId, username }: ProfileDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'list' | 'history'>('list');
+  const [profile, setProfile] = useState<any>(null);
   const [followingList, setFollowingList] = useState<any[]>([]);
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1035,7 +1038,11 @@ function ProfileDetailsModal({ isOpen, onClose, profileId, username }: ProfileDe
     setLoading(true);
     try {
       if (activeTab === 'list') {
-        const list = await getProfileFollowing(profileId);
+        const [prof, list] = await Promise.all([
+          getProfileDetails(profileId),
+          getProfileFollowing(profileId)
+        ]);
+        setProfile(prof);
         setFollowingList(list);
       } else {
         const history = await getRecentChanges(100, profileId);
@@ -1052,68 +1059,133 @@ function ProfileDetailsModal({ isOpen, onClose, profileId, username }: ProfileDe
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="glass-card w-full max-w-2xl h-[80vh] flex flex-col mx-4 animate-scale-in"
+        className="glass-card w-full max-w-2xl h-[85vh] flex flex-col mx-4 animate-scale-in overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
-          <h2 className="text-xl font-bold">Details für @{username}</h2>
-          <button onClick={onClose} className="p-2 hover:bg-[var(--card-hover)] rounded-full">
+        {/* Header Section */}
+        <div className="relative p-8 pb-6 border-b border-[var(--border)] bg-gradient-to-br from-[var(--card)] to-[var(--background)]">
+          <button
+            onClick={onClose}
+            className="absolute top-6 right-6 p-2 hover:bg-[var(--card-hover)] rounded-full transition-colors z-10"
+          >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+              <img
+                src={proxyImageUrl(profile?.profilePicUrl)}
+                alt={username}
+                className="relative w-24 h-24 rounded-full border-4 border-[var(--background)] shadow-xl object-cover"
+                onError={(e) => (e.currentTarget.src = "/placeholder-avatar.png")}
+              />
+            </div>
+
+            <div className="flex-1 text-center sm:text-left pt-2">
+              <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
+                <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[var(--foreground)] to-[var(--text-muted)]">
+                  @{username}
+                </h2>
+                {profile?.isVerified && (
+                  <svg className="w-6 h-6 text-blue-500 fill-current" viewBox="0 0 24 24">
+                    <path d="M22.5 12.5c0-1.58-.88-2.95-2.18-3.66.54-1.27.3-2.76-.71-3.77s-2.5-1.25-3.77-.71c-.71-1.3-2.08-2.18-3.66-2.18s-2.95.88-3.66 2.18c-1.27-.54-2.76-.3-3.77.71s-1.25 2.5-.71 3.77c-1.3.71-2.18 2.08-2.18 3.66s.88 2.95 2.18 3.66c-.54 1.27-.3 2.76.71 3.77s2.5 1.25 3.77.71c.71 1.3 2.08-2.18 3.66-2.18s2.95-.88 3.66-2.18c1.27.54 2.76.3 3.77-.71s1.25-2.5.71-3.77c1.3-.71 2.18-2.08 2.18-3.66zM10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                  </svg>
+                )}
+              </div>
+              <p className="text-[var(--text-muted)] mb-4">{profile?.fullName || username}</p>
+
+              <div className="flex items-center justify-center sm:justify-start gap-6">
+                <div className="text-center sm:text-left">
+                  <p className="font-bold text-lg leading-none">{profile?.followerCount?.toLocaleString() || '0'}</p>
+                  <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Follower</p>
+                </div>
+                <div className="text-center sm:text-left">
+                  <p className="font-bold text-lg leading-none">{profile?.followingCount?.toLocaleString() || (followingList.length > 0 ? followingList.length : '0')}</p>
+                  <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Abonniert</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="flex border-b border-[var(--border)]">
+        {/* Tabs */}
+        <div className="flex px-8 border-b border-[var(--border)] bg-[var(--card)]/30">
           <button
             onClick={() => setActiveTab('list')}
-            className={`flex-1 py-4 text-sm font-medium transition-colors ${activeTab === 'list'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--foreground)]'
+            className={`relative py-4 px-2 text-sm font-semibold transition-all ${activeTab === 'list'
+              ? 'text-[var(--accent)]'
               : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
               }`}
           >
-            📜 Abonniert ({followingList.length > 0 ? followingList.length : '...'})
+            📜 Abonniert
+            {activeTab === 'list' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] rounded-t-full"></span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex-1 py-4 text-sm font-medium transition-colors ${activeTab === 'history'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--foreground)]'
+            className={`relative py-4 px-2 ml-8 text-sm font-semibold transition-all ${activeTab === 'history'
+              ? 'text-[var(--accent)]'
               : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
               }`}
           >
-            🕒 Verlauf
+            🕘 Verlauf
+            {activeTab === 'history' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] rounded-t-full"></span>
+            )}
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-[var(--background)]">
           {loading ? (
-            <div className="flex justify-center py-12">
-              <div className="spinner w-8 h-8" />
+            <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+              <div className="spinner w-10 h-10 mb-4" />
+              <p className="text-[var(--text-muted)] text-sm">Lade Daten...</p>
             </div>
           ) : (
             <>
               {activeTab === 'list' && (
                 <div className="space-y-4">
                   {followingList.length === 0 ? (
-                    <p className="text-center text-[var(--text-muted)] py-8">Noch keine Daten geladen.</p>
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-[var(--border)] flex items-center justify-center mb-4 opacity-50">
+                        <svg className="w-8 h-8 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-semibold mb-1">Keine Following-Daten</h3>
+                      <p className="text-[var(--text-muted)] max-w-xs">
+                        Scrape das Profil, um die Liste der abonnierten Accounts zu sehen.
+                      </p>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {followingList.map((user) => (
-                        <div key={user.username} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
-                          <img
-                            src={proxyImageUrl(user.profilePicUrl)}
-                            alt={user.username}
-                            className="w-10 h-10 rounded-full object-cover"
-                            onError={(e) => (e.currentTarget.src = "/placeholder-avatar.png")}
-                          />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1">
-                              <p className="font-medium truncate">{user.username}</p>
+                        <div key={user.username} className="group relative flex items-center gap-4 p-4 rounded-2xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--accent)]/50 transition-all hover:shadow-lg hover:shadow-[var(--accent)]/5 transition-colors overflow-hidden">
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[var(--accent)]/5 to-transparent blur-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+                          <div className="relative">
+                            <img
+                              src={proxyImageUrl(user.profilePicUrl)}
+                              alt={user.username}
+                              className="w-12 h-12 rounded-full object-cover ring-2 ring-[var(--border)] group-hover:ring-[var(--accent)]/30 transition-all"
+                              onError={(e) => (e.currentTarget.src = "/placeholder-avatar.png")}
+                            />
+                          </div>
+
+                          <div className="relative min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <p className="font-semibold truncate text-[var(--foreground)]">@{user.username}</p>
                               {user.isVerified && (
-                                <span className="text-[var(--accent)] text-[10px]">✓</span>
+                                <svg className="w-3.5 h-3.5 text-blue-500 fill-current" viewBox="0 0 24 24">
+                                  <path d="M22.5 12.5c0-1.58-.88-2.95-2.18-3.66.54-1.27.3-2.76-.71-3.77s-2.5-1.25-3.77-.71c-.71-1.3-2.08-2.18-3.66-2.18s-2.95.88-3.66 2.18c-1.27-.54-2.76-.3-3.77.71s-1.25 2.5-.71 3.77c-1.3.71-2.18 2.08-2.18 3.66s.88 2.95 2.18 3.66c-.54 1.27-.3 2.76.71 3.77s2.5 1.25 3.77.71c.71 1.3 2.08 2.18 3.66 2.18s2.95-.88 3.66-2.18c1.27.54 2.76.3 3.77-.71s1.25-2.5.71-3.77c1.3-.71 2.18-2.08 2.18-3.66zM10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                                </svg>
                               )}
                             </div>
-                            <p className="text-xs text-[var(--text-muted)] truncate">{user.fullName}</p>
+                            <p className="text-xs text-[var(--text-muted)] truncate font-medium">{user.fullName}</p>
                           </div>
                         </div>
                       ))}
@@ -1123,28 +1195,40 @@ function ProfileDetailsModal({ isOpen, onClose, profileId, username }: ProfileDe
               )}
 
               {activeTab === 'history' && (
-                <div className="space-y-4">
+                <div className="space-y-4 text-left">
                   {historyList.length === 0 ? (
-                    <p className="text-center text-[var(--text-muted)] py-8">Keine Änderungen im Verlauf.</p>
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-[var(--border)] flex items-center justify-center mb-4 opacity-50">
+                        <svg className="w-8 h-8 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-semibold mb-1">Keine Historie</h3>
+                      <p className="text-[var(--text-muted)] max-w-xs">
+                        Sobald Änderungen erkannt werden, erscheinen sie hier im Verlauf.
+                      </p>
+                    </div>
                   ) : (
                     historyList.map((change) => (
-                      <div key={change.id} className="flex items-center gap-4 p-4 rounded-xl bg-[var(--card)] border border-[var(--border)]">
-                        <div className={`p-2 rounded-full ${change.type === 'FOLLOW' ? 'bg-[var(--success)]/20 text-[var(--success)]' : 'bg-[var(--error)]/20 text-[var(--error)]'
+                      <div key={change.id} className="group flex items-center gap-5 p-5 rounded-2xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-lg transition-all">
+                        <div className={`relative p-3 rounded-2xl flex items-center justify-center ${change.type === 'FOLLOW'
+                          ? 'bg-[var(--success)]/10 text-[var(--success)] ring-1 ring-[var(--success)]/20 shadow-[0_0_15px_-3px_rgba(var(--success-rgb),0.3)]'
+                          : 'bg-[var(--error)]/10 text-[var(--error)] ring-1 ring-[var(--error)]/20 shadow-[0_0_15px_-3px_rgba(var(--error-rgb),0.3)]'
                           }`}>
                           {change.type === 'FOLLOW' ? (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                            <svg className="w-5 h-5 font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                             </svg>
                           ) : (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
+                            <svg className="w-5 h-5 font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
                             </svg>
                           )}
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm">
+                          <p className="font-semibold text-[var(--foreground)]">
                             <span className={change.type === 'FOLLOW' ? 'text-[var(--success)]' : 'text-[var(--error)]'}>
-                              {change.type === 'FOLLOW' ? 'Gefolgt:' : 'Entfolgt:'}
+                              {change.type === 'FOLLOW' ? 'Neuer Follow:' : 'Entfolgt:'}
                             </span>
                             {' '}
                             <span className="font-semibold">{change.targetUsername}</span>
