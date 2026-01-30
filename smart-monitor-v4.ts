@@ -253,20 +253,31 @@ async function getFollowingList(page: Page, username: string): Promise<string[]>
 
         await page.click('a[href*="following"]', { timeout: 10000 });
         await page.waitForTimeout(4000);
+        await dismissPopups(page);
 
         // DOM-basierte Sammlung als Backup
         const domFollowing = new Set<string>();
         let noNewCount = 0;
-        const maxScrolls = 60;
-        const maxNoNewCount = 15;
+        const maxScrolls = 120; // Mehr Scrolls für große Listen
+        const maxNoNewCount = 20; // Mehr Versuche bevor wir aufgeben
+
+        // Finde den Dialog/Container für das Scrolling
+        const scrollContainer = await page.$('[role="dialog"] div[style*="overflow"], [role="dialog"] ul, div[style*="overflow-y"]');
 
         for (let scroll = 0; scroll < maxScrolls && noNewCount < maxNoNewCount; scroll++) {
+            // Sammle alle sichtbaren Usernames
             const users = await page.evaluate(() => {
-                return Array.from(document.querySelectorAll('a'))
-                    .map(a => a.getAttribute('href'))
-                    .filter(h => h && h.match(/^\/[a-zA-Z0-9._-]+\/?$/))
-                    .filter(h => !['explore', 'reels', 'p', 'direct', 'accounts', 'stories'].some(x => h!.includes(x)))
-                    .map(h => h!.replace(/\//g, ''));
+                const links: string[] = [];
+                document.querySelectorAll('a[role="link"]').forEach(a => {
+                    const href = a.getAttribute('href');
+                    if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/)) {
+                        const username = href.replace(/\//g, '');
+                        if (!['explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search'].includes(username)) {
+                            links.push(username);
+                        }
+                    }
+                });
+                return links;
             });
 
             const prevSize = domFollowing.size;
@@ -280,10 +291,32 @@ async function getFollowingList(page: Page, username: string): Promise<string[]>
                 console.log(`   Scroll ${scroll + 1}/${maxScrolls}: DOM=${domFollowing.size} | API=${apiFollowing.size}`);
             }
 
-            await page.evaluate(() => window.scrollBy(0, 500));
-            await humanDelay(2000, 3500);
-            await page.mouse.wheel(0, 300);
-            await humanDelay(1000, 1500);
+            // Verschiedene Scroll-Strategien
+            try {
+                if (scrollContainer) {
+                    // Scrolle innerhalb des Dialogs
+                    await scrollContainer.evaluate((el: Element) => {
+                        el.scrollTop += 500;
+                    });
+                } else {
+                    // Fallback: Keyboard scrolling (Page Down)
+                    await page.keyboard.press('End'); // Scrollt zum Ende der Liste
+                    await page.waitForTimeout(200);
+                    await page.keyboard.press('ArrowDown');
+                    await page.keyboard.press('ArrowDown');
+                    await page.keyboard.press('ArrowDown');
+                }
+            } catch {
+                // Fallback: Mouse wheel
+                await page.mouse.wheel(0, 500);
+            }
+
+            await humanDelay(1500, 2500);
+
+            // Alle 20 Scrolls: Extra warten für Lazy Loading
+            if (scroll % 20 === 19) {
+                await page.waitForTimeout(3000);
+            }
         }
 
         // Response Handler entfernen
@@ -300,6 +333,10 @@ async function getFollowingList(page: Page, username: string): Promise<string[]>
             const additional = apiFollowing.size - domFollowing.size;
             console.log(`   📡 API-Interception fand ${additional} zusätzliche Accounts!`);
         }
+
+        // Dialog schließen
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(500);
 
         return Array.from(combined);
     } catch (err: any) {
@@ -543,6 +580,24 @@ async function main() {
                     console.log(`      1. Instagram Lazy-Loading Limits`);
                     console.log(`      2. Gelöschte/Deaktivierte Accounts in der Zählung`);
                     console.log(`      3. Netzwerk-Latenz auf VPS`);
+                }
+
+                // ⚠️ KRITISCH: Wenn weniger als 90% gescrapt, keine Changes verarbeiten!
+                const MIN_SCRAPE_QUOTA = 0.90;
+                if (currentFollowing.length < currentCount * MIN_SCRAPE_QUOTA) {
+                    console.log(`   🚫 ABBRUCH: Nur ${currentFollowing.length}/${currentCount} gescrapt (${scrapeQuote}%)`);
+                    console.log(`      Benötigt: mindestens ${Math.ceil(currentCount * MIN_SCRAPE_QUOTA)} (90%)`);
+                    console.log(`      ➡️ Keine Changes werden verarbeitet um falsche Unfollows zu vermeiden!`);
+                    console.log(`      ➡️ Nur den Count aktualisieren, kein Post.\n`);
+
+                    // Nur Count aktualisieren, NICHT die FollowingEntry-Liste!
+                    await db.execute({
+                        sql: `UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now') WHERE id = ?`,
+                        args: [currentCount, profileId]
+                    });
+
+                    await humanDelay(5000, 10000);
+                    continue; // Zum nächsten Profil
                 }
 
                 if (currentFollowing.length > 0) {
