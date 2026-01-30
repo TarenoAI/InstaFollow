@@ -265,9 +265,9 @@ export async function monitorAllActiveProfiles(): Promise<MonitoringResult[]> {
         // Lade alle aktiven Profile
         const profiles = await prisma.monitoredProfile.findMany({
             where: {
-                set: { isActive: true }
+                sets: { some: { isActive: true } }
             },
-            include: { set: true }
+            include: { sets: true }
         });
 
         if (profiles.length === 0) {
