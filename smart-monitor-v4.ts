@@ -482,25 +482,25 @@ async function sendWebhook(payload: WebhookPayload) {
 }
 
 /**
- * Formatiert den Tweet-Text
+ * Formatiert den Tweet-Text im Stil von @takiprazzi
+ * Zeigt ALLE Accounts, nicht nur 3!
  */
 function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, targets: ProfileInfo[]): string {
     const emoji = event === 'FOLLOW' ? '👉' : '👀';
     const actionEmoji = event === 'FOLLOW' ? '✅' : '❌';
-    const action = event === 'FOLLOW' ? 'folgt jetzt' : 'folgt nicht mehr';
+    const action = event === 'FOLLOW'
+        ? `folgt jetzt ${targets.length} ${targets.length === 1 ? 'Person' : 'Personen'}`
+        : `folgt nicht mehr ${targets.length} ${targets.length === 1 ? 'Person' : 'Personen'}`;
 
-    let text = `${emoji} ${profile.fullName} (@${profile.username}) ${action} ${targets.length} ${targets.length === 1 ? 'Person' : 'Personen'}:\n\n`;
+    let text = `${emoji} ${profile.username} (${profile.fullName}) ${action}:\n\n`;
 
-    for (const target of targets.slice(0, 3)) { // Max 3 um Tweet-Limit zu respektieren
+    // ALLE Targets anzeigen - Twitter erlaubt bis zu 280 Zeichen, aber Threads sind möglich
+    for (const target of targets) {
         text += `${actionEmoji} ${target.username} (${target.fullName})\n`;
         text += `🔗 instagram.com/${target.username}\n\n`;
     }
 
-    if (targets.length > 3) {
-        text += `... und ${targets.length - 3} weitere`;
-    }
-
-    return text;
+    return text.trim();
 }
 
 // === MAIN ===
