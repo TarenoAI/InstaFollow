@@ -204,8 +204,9 @@ async function getProfileInfo(page: Page, username: string, takeScreenshot: bool
 /**
  * Holt die Following-Liste mit API-Interception für 100% Erfassung
  * Fängt Instagram's API-Responses ab während gescrollt wird
+ * @param expectedCount - Die erwartete Anzahl an Following für dynamische Scroll-Berechnung
  */
-async function getFollowingList(page: Page, username: string): Promise<string[]> {
+async function getFollowingList(page: Page, username: string, expectedCount: number = 200): Promise<string[]> {
     try {
         // API-Response Sammler
         const apiFollowing = new Set<string>();
@@ -258,8 +259,13 @@ async function getFollowingList(page: Page, username: string): Promise<string[]>
         // DOM-basierte Sammlung als Backup
         const domFollowing = new Set<string>();
         let noNewCount = 0;
-        const maxScrolls = 120; // Mehr Scrolls für große Listen
-        const maxNoNewCount = 20; // Mehr Versuche bevor wir aufgeben
+
+        // Dynamische Scroll-Anzahl: ~10 Accounts pro Scroll sichtbar
+        // Bei 500 Following = 60 Scrolls, bei 1000 Following = 120 Scrolls
+        const maxScrolls = Math.max(80, Math.ceil(expectedCount / 8) + 20);
+        const maxNoNewCount = 25; // Mehr Versuche bevor wir aufgeben
+
+        console.log(`   📜 Max Scrolls: ${maxScrolls} (für ${expectedCount} Following)`);
 
         // Finde den Dialog/Container für das Scrolling
         const scrollContainer = await page.$('[role="dialog"] div[style*="overflow"], [role="dialog"] ul, div[style*="overflow-y"]');
@@ -563,11 +569,27 @@ async function main() {
 
             console.log(`   Aktuell: ${currentCount}`);
 
+            // ⚠️ Skip Profile mit zu vielen Followings (nicht zuverlässig scrapbar)
+            const MAX_FOLLOWING = 1000;
+            if (currentCount > MAX_FOLLOWING) {
+                console.log(`   ⏭️ ÜBERSPRUNGEN: ${currentCount} > ${MAX_FOLLOWING} Following`);
+                console.log(`      Profile mit >1000 Following können nicht zuverlässig gescrapt werden.`);
+                console.log(`      Nur Count aktualisieren, keine Changes.\n`);
+
+                await db.execute({
+                    sql: `UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now') WHERE id = ?`,
+                    args: [currentCount, profileId]
+                });
+
+                await humanDelay(3000, 5000);
+                continue;
+            }
+
             if (currentCount !== lastCount) {
                 console.log(`   🚨 ÄNDERUNG: ${lastCount} → ${currentCount}`);
 
                 // Full Scrape
-                const currentFollowing = await getFollowingList(page, username);
+                const currentFollowing = await getFollowingList(page, username, currentCount);
                 console.log(`   📋 ${currentFollowing.length} Following gescrapt`);
 
                 // Diagnose-Logs für Scraping-Quote
