@@ -129,7 +129,7 @@ export async function toggleSetActive(setId: string): Promise<{ success: boolean
 // ============ PROFILES ============
 
 // Add a profile to a set
-// NOTE: We only add the username to the DB. The VPS worker will fetch full details on next cron run.
+// Uses upsert: if profile exists globally, connect it. If not, create it.
 export async function addProfileToSet(setId: string, username: string): Promise<{ success: boolean; profile?: ProfileInfo; error?: string }> {
     const cleanUsername = username.trim().replace('@', '').toLowerCase();
 
@@ -142,29 +142,46 @@ export async function addProfileToSet(setId: string, username: string): Promise<
         return { success: false, error: 'Ungültiger Benutzername.' };
     }
 
-    // Check if profile already exists in set
-    const existing = await prisma.monitoredProfile.findUnique({
-        where: { setId_username: { setId, username: cleanUsername } },
-    });
-
-    if (existing) {
-        return { success: false, error: 'Dieses Profil ist bereits im Set.' };
-    }
-
-    // Simply add to database - VPS worker will fetch details later
     try {
-        const profile = await prisma.monitoredProfile.create({
-            data: {
-                username: cleanUsername,
-                fullName: cleanUsername, // Will be updated by VPS
-                profilePicUrl: null,
-                isPrivate: false,
-                isVerified: false,
-                followerCount: 0,
-                followingCount: 0, // 0 triggers initial full scrape on VPS
-                setId,
-            },
+        // Check if profile already exists in THIS set
+        const set = await prisma.profileSet.findUnique({
+            where: { id: setId },
+            include: { profiles: { where: { username: cleanUsername } } }
         });
+
+        if (set?.profiles.length) {
+            return { success: false, error: 'Dieses Profil ist bereits im Set.' };
+        }
+
+        // Check if profile exists globally
+        const existingProfile = await prisma.monitoredProfile.findUnique({
+            where: { username: cleanUsername }
+        });
+
+        let profile;
+        if (existingProfile) {
+            // Connect existing profile to set
+            profile = await prisma.monitoredProfile.update({
+                where: { username: cleanUsername },
+                data: {
+                    sets: { connect: { id: setId } }
+                }
+            });
+        } else {
+            // Create new profile and connect to set
+            profile = await prisma.monitoredProfile.create({
+                data: {
+                    username: cleanUsername,
+                    fullName: cleanUsername,
+                    profilePicUrl: null,
+                    isPrivate: false,
+                    isVerified: false,
+                    followerCount: 0,
+                    followingCount: 0,
+                    sets: { connect: { id: setId } }
+                },
+            });
+        }
 
         return {
             success: true,
@@ -186,12 +203,36 @@ export async function addProfileToSet(setId: string, username: string): Promise<
     }
 }
 
-// Remove a profile from a set
+// Remove a profile from a set (disconnect, not delete)
 export async function removeProfileFromSet(setId: string, username: string): Promise<{ success: boolean; error?: string }> {
     try {
-        await prisma.monitoredProfile.delete({
-            where: { setId_username: { setId, username: username.toLowerCase() } },
+        const profile = await prisma.monitoredProfile.findUnique({
+            where: { username: username.toLowerCase() },
+            include: { sets: true }
         });
+
+        if (!profile) {
+            return { success: false, error: 'Profil nicht gefunden.' };
+        }
+
+        // Disconnect from this set
+        await prisma.monitoredProfile.update({
+            where: { username: username.toLowerCase() },
+            data: { sets: { disconnect: { id: setId } } }
+        });
+
+        // If profile is no longer in any sets, delete it entirely
+        const updatedProfile = await prisma.monitoredProfile.findUnique({
+            where: { username: username.toLowerCase() },
+            include: { sets: true }
+        });
+
+        if (updatedProfile && updatedProfile.sets.length === 0) {
+            await prisma.monitoredProfile.delete({
+                where: { username: username.toLowerCase() }
+            });
+        }
+
         return { success: true };
     } catch (error) {
         console.error('Error removing profile:', error);

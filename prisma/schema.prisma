@@ -23,7 +23,7 @@ model ProfileSet {
 // A profile being monitored for changes
 model MonitoredProfile {
   id              String   @id @default(cuid())
-  username        String
+  username        String   @unique
   fullName        String?
   profilePicUrl   String?
   isPrivate       Boolean  @default(false)
@@ -34,16 +34,14 @@ model MonitoredProfile {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  setId           String
-  set             ProfileSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  // Many-to-Many: Ein Profil kann in mehreren Sets sein
+  sets            ProfileSet[]
 
   // The current list of accounts this profile follows
   followingList   FollowingEntry[]
   
   // History of changes detected
   changes         ChangeEvent[]
-
-  @@unique([setId, username])
 }
 
 // Current following list entry for a monitored profile

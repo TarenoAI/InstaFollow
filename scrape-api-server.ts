@@ -33,14 +33,28 @@ const db = createClient({
 
 // Aktive Scrape-Jobs
 const activeJobs = new Map<string, {
-    status: 'starting' | 'counting' | 'scraping' | 'saving' | 'done' | 'error';
+    status: 'starting' | 'counting' | 'scraping' | 'saving' | 'done' | 'error' | 'queued';
     progress: number;
     total: number;
     found: number;
     estimatedSeconds: number;
     error?: string;
     startedAt: number;
+    queuePosition?: number;
 }>();
+
+// Job Queue für sequentielle Verarbeitung
+interface QueuedJob {
+    jobId: string;
+    username: string;
+    profileId: string;
+    setId: string;
+}
+const jobQueue: QueuedJob[] = [];
+let isProcessingQueue = false;
+
+// Verzögerung zwischen Jobs (30 Sekunden)
+const DELAY_BETWEEN_JOBS = 30000;
 
 // Browser-Instanz (wiederverwendbar)
 let browser: any = null;
@@ -66,18 +80,28 @@ async function humanDelay(minMs: number, maxMs: number) {
 }
 
 /**
- * Holt Following-Anzahl von einem Profil (Quick-Check)
+ * Holt Profile-Info inkl. Following-Anzahl, Profilbild, Follower (Quick-Check)
  */
-async function getFollowingCount(page: Page, username: string): Promise<number> {
+interface ProfileQuickInfo {
+    followingCount: number;
+    followerCount: number;
+    profilePicUrl: string | null;
+    isVerified: boolean;
+    fullName: string | null;
+}
+
+async function getProfileQuickInfo(page: Page, username: string): Promise<ProfileQuickInfo> {
     await page.goto(`https://www.instagram.com/${username}/`, {
         waitUntil: 'domcontentloaded',
         timeout: 30000
     });
     await page.waitForTimeout(3000);
 
-    const count = await page.evaluate(() => {
-        const links = document.querySelectorAll('a[href*="/following/"]');
-        for (const link of links) {
+    const info = await page.evaluate(() => {
+        // Following count
+        let followingCount = 0;
+        const followingLinks = document.querySelectorAll('a[href*="/following/"]');
+        for (const link of followingLinks) {
             const text = link.textContent || '';
             const match = text.match(/(\d+[.,]?\d*)\s*(K|M|Tsd\.|Mio\.)?/i);
             if (match) {
@@ -85,13 +109,42 @@ async function getFollowingCount(page: Page, username: string): Promise<number> 
                 const suffix = match[2]?.toLowerCase();
                 if (suffix === 'k' || suffix === 'tsd.') num *= 1000;
                 if (suffix === 'm' || suffix === 'mio.') num *= 1000000;
-                return Math.round(num);
+                followingCount = Math.round(num);
+                break;
             }
         }
-        return 0;
+
+        // Follower count
+        let followerCount = 0;
+        const followerLinks = document.querySelectorAll('a[href*="/followers/"]');
+        for (const link of followerLinks) {
+            const text = link.textContent || '';
+            const match = text.match(/(\d+[.,]?\d*)\s*(K|M|Tsd\.|Mio\.)?/i);
+            if (match) {
+                let num = parseFloat(match[1].replace(',', '.'));
+                const suffix = match[2]?.toLowerCase();
+                if (suffix === 'k' || suffix === 'tsd.') num *= 1000;
+                if (suffix === 'm' || suffix === 'mio.') num *= 1000000;
+                followerCount = Math.round(num);
+                break;
+            }
+        }
+
+        // Profile Picture
+        const headerImg = document.querySelector('header img');
+        const profilePicUrl = headerImg?.getAttribute('src') || null;
+
+        // Verified badge
+        const isVerified = !!document.querySelector('svg[aria-label="Verifiziert"], svg[aria-label="Verified"]');
+
+        // Full Name
+        const nameSpan = document.querySelector('header section > div > span');
+        const fullName = nameSpan?.textContent?.trim() || null;
+
+        return { followingCount, followerCount, profilePicUrl, isVerified, fullName };
     });
 
-    return count;
+    return info;
 }
 
 /**
@@ -183,7 +236,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 
 /**
  * POST /api/scrape/:username
- * Startet einen Scrape-Job für einen User
+ * Startet einen Scrape-Job für einen User (wird in Queue hinzugefügt)
  */
 app.post('/api/scrape/:username', async (req: Request, res: Response) => {
     const username = req.params.username as string;
@@ -191,42 +244,77 @@ app.post('/api/scrape/:username', async (req: Request, res: Response) => {
 
     const jobId = `${username}_${Date.now()}`;
 
-    // Prüfe ob bereits ein Job läuft
+    // Prüfe ob bereits ein Job läuft oder in Queue
     for (const [id, job] of activeJobs) {
         if (id.startsWith(username) && job.status !== 'done' && job.status !== 'error') {
             return res.json({
                 success: false,
-                error: 'Scrape läuft bereits',
+                error: 'Scrape läuft bereits oder ist in der Queue',
                 jobId: id
             });
         }
     }
 
-    // Erstelle Job
+    // Füge zur Queue hinzu
+    const queuePosition = jobQueue.length + 1;
+
     activeJobs.set(jobId, {
-        status: 'starting',
+        status: 'queued',
         progress: 0,
         total: 0,
         found: 0,
         estimatedSeconds: 0,
-        startedAt: Date.now()
+        startedAt: Date.now(),
+        queuePosition
     });
 
-    res.json({ success: true, jobId });
+    jobQueue.push({ jobId, username, profileId, setId });
 
-    // Starte Scrape im Hintergrund
-    (async () => {
+    console.log(`📋 Job hinzugefügt: @${username} (Position ${queuePosition})`);
+
+    res.json({ success: true, jobId, queuePosition });
+
+    // Starte Queue-Verarbeitung falls nicht bereits aktiv
+    processQueue();
+});
+
+/**
+ * Verarbeitet die Job-Queue sequentiell
+ */
+async function processQueue() {
+    if (isProcessingQueue || jobQueue.length === 0) return;
+
+    isProcessingQueue = true;
+
+    while (jobQueue.length > 0) {
+        const currentJob = jobQueue.shift()!;
+        const { jobId, username, profileId } = currentJob;
+
+        // Update Queue-Positionen für verbleibende Jobs
+        jobQueue.forEach((qJob, idx) => {
+            const job = activeJobs.get(qJob.jobId);
+            if (job) job.queuePosition = idx + 1;
+        });
+
+        const job = activeJobs.get(jobId);
+        if (!job) continue;
+
+        console.log(`\n🔄 Starte Scrape: @${username}`);
+
         try {
             const page = await ensureBrowser();
-            const job = activeJobs.get(jobId)!;
 
-            // 1. Hole Following-Anzahl
+            // 1. Hole Profil-Info (Following, Followers, Profilbild)
             job.status = 'counting';
-            const followingCount = await getFollowingCount(page, username);
-            job.total = followingCount;
+            job.queuePosition = undefined;
+            const profileInfo = await getProfileQuickInfo(page, username);
+            job.total = profileInfo.followingCount;
+
+            console.log(`   📊 Following: ${profileInfo.followingCount}, Followers: ${profileInfo.followerCount}`);
+            if (profileInfo.profilePicUrl) console.log(`   🖼️ Profilbild gefunden`);
 
             // Berechne Zeitschätzung (ca. 3 Sekunden pro 10 Following)
-            job.estimatedSeconds = Math.max(30, Math.round(followingCount / 10 * 3));
+            job.estimatedSeconds = Math.max(30, Math.round(profileInfo.followingCount / 10 * 3));
 
             // 2. Scrape Following-Liste
             job.status = 'scraping';
@@ -251,12 +339,25 @@ app.post('/api/scrape/:username', async (req: Request, res: Response) => {
                 });
             }
 
-            // Update Profil
+            // Update Profil mit allen Infos
             await db.execute({
                 sql: `UPDATE MonitoredProfile 
-                      SET followingCount = ?, lastCheckedAt = datetime('now'), updatedAt = datetime('now') 
+                      SET followingCount = ?, 
+                          followerCount = ?,
+                          profilePicUrl = ?,
+                          isVerified = ?,
+                          fullName = COALESCE(?, fullName),
+                          lastCheckedAt = datetime('now'), 
+                          updatedAt = datetime('now') 
                       WHERE id = ?`,
-                args: [following.length, profileId]
+                args: [
+                    following.length,
+                    profileInfo.followerCount,
+                    profileInfo.profilePicUrl,
+                    profileInfo.isVerified ? 1 : 0,
+                    profileInfo.fullName,
+                    profileId
+                ]
             });
 
             // Session speichern
@@ -268,15 +369,22 @@ app.post('/api/scrape/:username', async (req: Request, res: Response) => {
             console.log(`✅ Scrape fertig: @${username} - ${following.length} Following`);
 
         } catch (err: any) {
-            const job = activeJobs.get(jobId);
             if (job) {
                 job.status = 'error';
                 job.error = err.message;
             }
             console.error(`❌ Scrape-Fehler @${username}:`, err.message);
         }
-    })();
-});
+
+        // Warte zwischen Jobs um Instagram nicht zu überlasten
+        if (jobQueue.length > 0) {
+            console.log(`⏳ Warte ${DELAY_BETWEEN_JOBS / 1000}s vor nächstem Job...`);
+            await new Promise(r => setTimeout(r, DELAY_BETWEEN_JOBS));
+        }
+    }
+
+    isProcessingQueue = false;
+}
 
 /**
  * GET /api/scrape/:jobId/status
@@ -315,15 +423,16 @@ app.get('/api/estimate/:username', async (req: Request, res: Response) => {
 
     try {
         const page = await ensureBrowser();
-        const followingCount = await getFollowingCount(page, username);
+        const profileInfo = await getProfileQuickInfo(page, username);
 
         // Schätzung: ~3 Sekunden pro 10 Following, mindestens 30 Sekunden
-        const estimatedSeconds = Math.max(30, Math.round(followingCount / 10 * 3));
+        const estimatedSeconds = Math.max(30, Math.round(profileInfo.followingCount / 10 * 3));
 
         res.json({
             success: true,
             username,
-            followingCount,
+            followingCount: profileInfo.followingCount,
+            followerCount: profileInfo.followerCount,
             estimatedSeconds,
             estimatedMinutes: Math.ceil(estimatedSeconds / 60)
         });

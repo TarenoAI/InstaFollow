@@ -582,12 +582,152 @@ interface SetDetailProps {
   onShowDetails: (profileId: string, username: string) => void;
 }
 
+interface ScrapeJobStatus {
+  status: 'starting' | 'counting' | 'scraping' | 'saving' | 'done' | 'error' | 'queued';
+  progress: number;
+  total: number;
+  found: number;
+  estimatedSeconds: number;
+  elapsedSeconds: number;
+  error?: string;
+  jobId: string;
+  queuePosition?: number;
+}
+
 function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
   const [newProfile, setNewProfile] = useState('');
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
-  const [scrapeProfile, setScrapeProfile] = useState<ProfileInfo | null>(null);
-  const [showScrapeModal, setShowScrapeModal] = useState(false);
+
+  // Aktive Scrape-Jobs pro Profil (username -> status)
+  const [activeJobs, setActiveJobs] = useState<Map<string, ScrapeJobStatus>>(new Map());
+
+  const SCRAPE_API_URL = process.env.NEXT_PUBLIC_SCRAPE_API_URL || 'http://localhost:3001';
+
+  // Polling für aktive Jobs
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const newJobs = new Map(activeJobs);
+      let hasChanges = false;
+
+      for (const [username, job] of activeJobs) {
+        if (job.status === 'done' || job.status === 'error') continue;
+
+        try {
+          const res = await fetch(`${SCRAPE_API_URL}/api/scrape/${job.jobId}/status`);
+          const data = await res.json();
+
+          if (data.success) {
+            newJobs.set(username, {
+              ...job,
+              status: data.status,
+              progress: data.progress,
+              total: data.total,
+              found: data.found,
+              estimatedSeconds: data.estimatedSeconds,
+              elapsedSeconds: data.elapsedSeconds,
+              error: data.error,
+              queuePosition: data.queuePosition
+            });
+            hasChanges = true;
+
+            // Wenn fertig, nach 3 Sekunden entfernen und refreshen
+            if (data.status === 'done') {
+              setTimeout(() => {
+                setActiveJobs(prev => {
+                  const updated = new Map(prev);
+                  updated.delete(username);
+                  return updated;
+                });
+                onRefresh();
+              }, 3000);
+            }
+
+            // Bei Fehler nach 5 Sekunden entfernen
+            if (data.status === 'error') {
+              setTimeout(() => {
+                setActiveJobs(prev => {
+                  const updated = new Map(prev);
+                  updated.delete(username);
+                  return updated;
+                });
+              }, 5000);
+            }
+          }
+        } catch {
+          // Ignore polling errors
+        }
+      }
+
+      if (hasChanges) {
+        setActiveJobs(newJobs);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [activeJobs, SCRAPE_API_URL, onRefresh]);
+
+  const startScrape = async (profile: ProfileInfo) => {
+    // Prüfe ob bereits ein Job läuft
+    if (activeJobs.has(profile.username)) return;
+
+    // Füge zum aktiven Jobs hinzu
+    setActiveJobs(prev => {
+      const updated = new Map(prev);
+      updated.set(profile.username, {
+        status: 'starting',
+        progress: 0,
+        total: 0,
+        found: 0,
+        estimatedSeconds: 0,
+        elapsedSeconds: 0,
+        jobId: ''
+      });
+      return updated;
+    });
+
+    try {
+      const res = await fetch(`${SCRAPE_API_URL}/api/scrape/${profile.username}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId: profile.id, setId: set.id })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setActiveJobs(prev => {
+          const updated = new Map(prev);
+          updated.set(profile.username, {
+            ...prev.get(profile.username)!,
+            jobId: data.jobId,
+            status: 'counting'
+          });
+          return updated;
+        });
+      } else {
+        setActiveJobs(prev => {
+          const updated = new Map(prev);
+          updated.set(profile.username, {
+            ...prev.get(profile.username)!,
+            status: 'error',
+            error: data.error || 'Konnte nicht gestartet werden'
+          });
+          return updated;
+        });
+      }
+    } catch (err: any) {
+      setActiveJobs(prev => {
+        const updated = new Map(prev);
+        updated.set(profile.username, {
+          ...prev.get(profile.username)!,
+          status: 'error',
+          error: 'API nicht erreichbar'
+        });
+        return updated;
+      });
+    }
+  };
 
   const handleAddProfile = async () => {
     if (!newProfile.trim()) return;
@@ -677,80 +817,162 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
       {/* Profiles List */}
       {set.profiles.length > 0 ? (
         <div className="space-y-2">
-          {set.profiles.map((profile: ProfileInfo) => (
-            <div
-              key={profile.username}
-              className="follower-card group"
-            >
-              <img
-                src={proxyImageUrl(profile.profilePicUrl || '')}
-                alt={profile.username}
-                className="w-12 h-12 rounded-full object-cover"
-              />
-              <div className="flex-1 min-w-0 ml-4">
-                <div className="flex items-center gap-1.5">
-                  <h4 className="font-semibold truncate">{profile.username}</h4>
-                  {profile.isVerified && (
-                    <span className="text-[var(--accent)] text-xs">
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                        <path fillRule="evenodd" d="M8.603 3.799A4.49 4.49 0 0112 2.25c1.357 0 2.573.6 3.397 1.549a4.49 4.49 0 013.498 1.307 4.491 4.491 0 011.307 3.497A4.49 4.49 0 0121.75 12a4.49 4.49 0 01-1.549 3.397 4.491 4.491 0 01-1.307 3.497 4.491 4.491 0 01-3.497 1.307A4.49 4.49 0 0112 21.75a4.49 4.49 0 01-3.397-1.549 4.49 4.49 0 01-3.498-1.306 4.491 4.491 0 01-1.307-3.498A4.49 4.49 0 012.25 12c0-1.357.6-2.573 1.549-3.397a4.49 4.49 0 011.307-3.497 4.49 4.49 0 013.497-1.307zm7.007 6.387a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+          {set.profiles.map((profile: ProfileInfo) => {
+            const job = activeJobs.get(profile.username);
+            const isActive = !!job;
+
+            return (
+              <div
+                key={profile.username}
+                className="follower-card group relative overflow-hidden"
+              >
+                {/* Inline Progress Bar (Hintergrund) */}
+                {isActive && job.status !== 'done' && job.status !== 'error' && (
+                  <div
+                    className="absolute inset-0 bg-gradient-to-r from-[var(--accent)]/20 to-purple-500/20 transition-all duration-500"
+                    style={{ width: `${job.progress}%` }}
+                  />
+                )}
+
+                {/* Done overlay */}
+                {isActive && job.status === 'done' && (
+                  <div className="absolute inset-0 bg-[var(--success)]/10 animate-pulse" />
+                )}
+
+                {/* Error overlay */}
+                {isActive && job.status === 'error' && (
+                  <div className="absolute inset-0 bg-[var(--error)]/10" />
+                )}
+
+                <div className="relative flex items-center gap-4 z-10">
+                  <img
+                    src={proxyImageUrl(profile.profilePicUrl || '')}
+                    alt={profile.username}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <a
+                        href={`https://www.instagram.com/${profile.username}/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold truncate hover:text-[var(--accent)] transition-colors flex items-center gap-1"
+                      >
+                        {profile.username}
+                        <svg className="w-3.5 h-3.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                      {profile.isVerified && (
+                        <span className="text-[var(--accent)] text-xs">
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                            <path fillRule="evenodd" d="M8.603 3.799A4.49 4.49 0 0112 2.25c1.357 0 2.573.6 3.397 1.549a4.49 4.49 0 013.498 1.307 4.491 4.491 0 011.307 3.497A4.49 4.49 0 0121.75 12a4.49 4.49 0 01-1.549 3.397 4.491 4.491 0 01-1.307 3.497 4.491 4.491 0 01-3.497 1.307A4.49 4.49 0 0112 21.75a4.49 4.49 0 01-3.397-1.549 4.49 4.49 0 01-3.498-1.306 4.491 4.491 0 01-1.307-3.498A4.49 4.49 0 012.25 12c0-1.357.6-2.573 1.549-3.397a4.49 4.49 0 011.307-3.497 4.49 4.49 0 013.497-1.307zm7.007 6.387a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-sm text-[var(--text-muted)] truncate">
+                        {profile.fullName || profile.username}
+                      </p>
+
+                      {/* Scrape Status inline */}
+                      {isActive ? (
+                        <div className="flex items-center gap-2">
+                          {job.status === 'done' ? (
+                            <p className="text-xs text-[var(--success)] flex items-center gap-1">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              {job.found.toLocaleString()} Following gescrapt
+                            </p>
+                          ) : job.status === 'error' ? (
+                            <p className="text-xs text-[var(--error)] flex items-center gap-1">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              {job.error || 'Fehler'}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-[var(--accent)] flex items-center gap-2">
+                              <div className="spinner w-3 h-3" />
+                              <span>
+                                {job.status === 'queued' && `In Warteschlange${job.queuePosition ? ` (Position ${job.queuePosition})` : ''}`}
+                                {job.status === 'counting' && 'Lade Profil...'}
+                                {job.status === 'scraping' && `${job.found}/${job.total} (${Math.round(job.progress)}%)`}
+                                {job.status === 'saving' && 'Speichern...'}
+                                {job.status === 'starting' && 'Starte...'}
+                              </span>
+                              {job.estimatedSeconds > 0 && (
+                                <span className="text-[var(--text-muted)]">
+                                  ~{Math.max(0, job.estimatedSeconds - job.elapsedSeconds)}s
+                                </span>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-xs text-[var(--text-muted)] truncate">
+                            {profile.followingCount?.toLocaleString() || 0} Following
+                          </p>
+                          {profile.lastCheckedAt && (
+                            <p className="text-xs text-[var(--success)] flex items-center gap-1 mt-0.5 animate-fade-in">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]"></span>
+                              Geprüft: {new Date(profile.lastCheckedAt).toLocaleString('de-DE', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                day: '2-digit',
+                                month: '2-digit'
+                              })}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Scrape Button */}
+                  <button
+                    onClick={() => startScrape(profile)}
+                    disabled={isActive}
+                    className={`p-2 rounded-lg transition-colors ${isActive
+                      ? 'opacity-50 cursor-not-allowed text-[var(--text-muted)]'
+                      : 'hover:bg-[var(--accent)]/20 text-[var(--text-muted)] hover:text-[var(--accent)]'
+                      }`}
+                    title={isActive ? 'Scrape läuft...' : 'Jetzt scrapen'}
+                  >
+                    {isActive && job.status !== 'done' && job.status !== 'error' ? (
+                      <div className="spinner w-5 h-5" />
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <p className="text-sm text-[var(--text-muted)] truncate">
-                    {profile.fullName || profile.username}
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)] truncate">
-                    {profile.followerCount?.toLocaleString() || 0} Follower
-                  </p>
-                  {profile.lastCheckedAt && (
-                    <p className="text-xs text-[var(--success)] flex items-center gap-1 mt-0.5 animate-fade-in">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]"></span>
-                      Geprüft: {new Date(profile.lastCheckedAt).toLocaleString('de-DE', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        day: '2-digit',
-                        month: '2-digit'
-                      })}
-                    </p>
-                  )}
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => onShowDetails(profile.id, profile.username)}
+                    className="p-2 hover:bg-[var(--card-hover)] rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--accent)]"
+                    title="Details & Verlauf anzeigen"
+                  >
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => handleRemoveProfile(profile.username)}
+                    className="p-2 hover:bg-[var(--error)]/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                    title="Aus Set entfernen"
+                  >
+                    <svg className="w-5 h-5 text-[var(--error)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               </div>
-              {/* Scrape Button */}
-              <button
-                onClick={() => {
-                  setScrapeProfile(profile);
-                  setShowScrapeModal(true);
-                }}
-                className="p-2 hover:bg-[var(--accent)]/20 rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--accent)]"
-                title="Jetzt scrapen"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
-              <button
-                onClick={() => onShowDetails(profile.id, profile.username)}
-                className="p-2 hover:bg-[var(--card-hover)] rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--accent)]"
-                title="Details & Verlauf anzeigen"
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
-              <button
-                onClick={() => handleRemoveProfile(profile.username)}
-                className="p-2 hover:bg-[var(--error)]/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                title="Aus Set entfernen"
-              >
-                <svg className="w-5 h-5 text-[var(--error)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="glass-card p-12 text-center">
@@ -765,22 +987,6 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
           </p>
         </div>
       )}
-
-      {/* Scrape Modal */}
-      <ScrapeModal
-        isOpen={showScrapeModal}
-        onClose={() => {
-          setShowScrapeModal(false);
-          setScrapeProfile(null);
-        }}
-        profile={scrapeProfile}
-        setId={set.id}
-        onComplete={() => {
-          setShowScrapeModal(false);
-          setScrapeProfile(null);
-          onRefresh();
-        }}
-      />
     </div>
   );
 }
