@@ -192,32 +192,45 @@ async function checkInstagramProfile(page: Page, username: string): Promise<Play
         await page.waitForTimeout(500);
 
         const profileInfo = await page.evaluate(() => {
-            // Follower-Zahl
-            let followers = 0;
-            const metaLinks = document.querySelectorAll('a[href*="/followers/"], span[title], meta[property="og:description"]');
+            // Meta Description holen (enthält Follower-Zahl)
+            const metaDesc = document.querySelector('meta[property="og:description"]');
+            const metaContent = metaDesc?.getAttribute('content') || '';
 
-            for (const el of metaLinks) {
-                const text = el.getAttribute('title') || el.textContent || '';
-                // Match patterns like "1.5M", "150K", "1,234,567"
-                const match = text.match(/([\d,.]+)\s*([MK])?/i);
-                if (match) {
-                    let num = parseFloat(match[1].replace(/,/g, ''));
-                    if (match[2]?.toUpperCase() === 'M') num *= 1000000;
-                    if (match[2]?.toUpperCase() === 'K') num *= 1000;
-                    if (num > followers) followers = Math.round(num);
-                }
+            let followers = 0;
+
+            // Pattern: "887K Follower" oder "349K Follower"
+            const kMatch = metaContent.match(/(\d+[.,]?\d*)\s*K\s/i);
+            if (kMatch) {
+                followers = Math.round(parseFloat(kMatch[1].replace(',', '.')) * 1000);
             }
 
-            // Fallback: Meta Description
+            // Pattern: "144M Follower"
+            const mMatch = metaContent.match(/(\d+[.,]?\d*)\s*M\s/i);
+            if (mMatch) {
+                followers = Math.round(parseFloat(mMatch[1].replace(',', '.')) * 1000000);
+            }
+
+            // Deutsche Formate: "888 Tsd. Follower" oder "1,5 Mio. Follower"
+            const tsdMatch = metaContent.match(/(\d+[.,]?\d*)\s*Tsd\./i);
+            if (tsdMatch) {
+                followers = Math.round(parseFloat(tsdMatch[1].replace(',', '.')) * 1000);
+            }
+
+            const mioMatch = metaContent.match(/(\d+[.,]?\d*)\s*Mio\./i);
+            if (mioMatch) {
+                followers = Math.round(parseFloat(mioMatch[1].replace(',', '.')) * 1000000);
+            }
+
+            // Fallback: span[title] mit reinen Zahlen (z.B. "1.234.567")
             if (followers === 0) {
-                const metaDesc = document.querySelector('meta[property="og:description"]');
-                const content = metaDesc?.getAttribute('content') || '';
-                const match = content.match(/([\d,.]+)\s*(Mio\.|M|Tsd\.|K)?\s*(Follower|Abonnenten)/i);
-                if (match) {
-                    let num = parseFloat(match[1].replace(/,/g, '.'));
-                    if (match[2] && (match[2].includes('Mio') || match[2] === 'M')) num *= 1000000;
-                    if (match[2] && (match[2].includes('Tsd') || match[2] === 'K')) num *= 1000;
-                    followers = Math.round(num);
+                const spans = document.querySelectorAll('span[title]');
+                for (const span of spans) {
+                    const title = span.getAttribute('title') || '';
+                    const numMatch = title.match(/^[\d.]+$/);
+                    if (numMatch) {
+                        const num = parseInt(title.replace(/\./g, ''));
+                        if (num > followers) followers = num;
+                    }
                 }
             }
 
