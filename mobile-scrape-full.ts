@@ -50,7 +50,8 @@ async function extractFollowing(page: any): Promise<string[]> {
         links.forEach(link => {
             const href = link.getAttribute('href');
             // Muster: /username/ (ohne weitere Pfade)
-            if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/) && !href.includes('/accounts/') && !href.includes('/explore/')) {
+            // Erlaubte Zeichen: Buchstaben, Zahlen, Punkte, Unterstriche, Bindestriche
+            if (href && href.match(/^\/[a-zA-Z0-9._-]+\/?$/) && !href.includes('/accounts/') && !href.includes('/explore/')) {
                 const username = href.replace(/\//g, '');
                 if (username && !users.includes(username) && username.length > 1) {
                     // Filtere Navigation-Links
@@ -101,9 +102,9 @@ async function scrapeProfile(page: any, username: string): Promise<string[]> {
     const allUsernames = new Set<string>();
     let noNewCount = 0;
     let scrollCount = 0;
-    const maxScrolls = 50; // Mehr Scrolls für vollständige Liste
+    const maxScrolls = 100; // Mehr Scrolls für vollständige Liste
 
-    while (scrollCount < maxScrolls && noNewCount < 5) {
+    while (scrollCount < maxScrolls && noNewCount < 15) {
         // Extrahiere aktuelle Usernames
         const current = await extractFollowing(page);
         const previousSize = allUsernames.size;
@@ -119,13 +120,13 @@ async function scrapeProfile(page: any, username: string): Promise<string[]> {
         console.log(`   Scroll ${scrollCount + 1}: ${allUsernames.size} Accounts gefunden`);
 
         // Scroll down - auf Mobile einfach Fenster scrollen
-        await page.evaluate(() => window.scrollBy(0, 800));
-        await humanDelay(1500, 2500);
+        await page.evaluate(() => window.scrollBy(0, 600));
+        await humanDelay(2500, 4000); // Längere Delays für Lazy Loading
 
         // Zusätzlich Touch-Scroll simulieren
         await page.mouse.move(200, 400);
-        await page.mouse.wheel(0, 500);
-        await humanDelay(500, 1000);
+        await page.mouse.wheel(0, 300);
+        await humanDelay(1000, 1500);
 
         scrollCount++;
     }

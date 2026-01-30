@@ -5,7 +5,7 @@
       "value": "L49M1_3qNVqAqE9_9s6uPU",
       "domain": ".instagram.com",
       "path": "/",
-      "expires": 1804167380.382082,
+      "expires": 1804360036.261363,
       "httpOnly": false,
       "secure": true,
       "sameSite": "Lax"
@@ -25,7 +25,7 @@
       "value": "68228218929",
       "domain": ".instagram.com",
       "path": "/",
-      "expires": 1777383380.383983,
+      "expires": 1777576036.261417,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -41,21 +41,11 @@
       "sameSite": "Lax"
     },
     {
-      "name": "sessionid",
-      "value": "68228218929%3AiYMoxRncyX0VRQ%3A16%3AAYjAnlICYi4yrBbglfEIqoqGo-i740HON3tzkvwU5A",
-      "domain": ".instagram.com",
-      "path": "/",
-      "expires": 1801140231.957526,
-      "httpOnly": true,
-      "secure": true,
-      "sameSite": "Lax"
-    },
-    {
       "name": "wd",
       "value": "390x664",
       "domain": ".instagram.com",
       "path": "/",
-      "expires": 1770212158,
+      "expires": 1770404832,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -71,8 +61,28 @@
       "sameSite": "None"
     },
     {
+      "name": "sessionid",
+      "value": "68228218929%3AiYMoxRncyX0VRQ%3A16%3AAYjzccVc8NeFr0ut-2d4GjNu770FtOgce1OF_12e5Q",
+      "domain": ".instagram.com",
+      "path": "/",
+      "expires": 1801335574.479265,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "datr",
+      "value": "rP98abPkuVpTvVflTKITjIfy",
+      "domain": ".instagram.com",
+      "path": "/",
+      "expires": 1804359596.145743,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
       "name": "rur",
-      "value": "\"LDC\\05468228218929\\0541801143380:01fee4d879ed9bd1b761c73ba61eef293c49c94986e8a7b67aa64b85e49ed793700d5f01\"",
+      "value": "\"LDC\\05468228218929\\0541801336036:01fe76e8b26a93b60325767e72c52948be68e9a774b0e69d584a73ef5d067b5728fcef10\"",
       "domain": ".instagram.com",
       "path": "/",
       "expires": -1,
@@ -91,7 +101,7 @@
         },
         {
           "name": "chatd-deviceid",
-          "value": "8daea688-27e7-48b6-bb8f-d794f5cf1df5"
+          "value": "6bbf77c0-f928-4b52-8c76-8d28c5556ef8"
         },
         {
           "name": "ig_direct_icon_rebrand_nux",
@@ -99,15 +109,15 @@
         },
         {
           "name": "IGSession",
-          "value": "6k25r2:1769609197908"
+          "value": "uqjtfp:1769801832768"
         },
         {
           "name": "pigeon_state",
-          "value": "{\"lastDeviceInfoTime\":1769596727049}"
+          "value": "{\"lastDeviceInfoTime\":1769716877685}"
         },
         {
           "name": "fr",
-          "value": "AVgmymidaw1oMRfsL_whzJLi-64OPYYoF8hUjvBK_nLFzjybHstOhgXy2cPzHoM0eKtUOZiB7ImHNavagAH_ooWusvLNE1rorf43QC-8xCh6j6f6TVw9sysIQD9d-g-3PtV5O6k"
+          "value": "AVhOrdc1Kl1pDf-TGkk_MpJuuuFwVdlYCv7POJmVDHVkk_GN9BihgvbMIkks9bU0IM-O9WHOHRc00rNpj-iYdfRf8iE7zVTXonatpAiG1T05EeGx_tCw5NC8PpkWK3qi3d-Rqzk"
         },
         {
           "name": "pixel_fire_ts",
@@ -115,11 +125,11 @@
         },
         {
           "name": "Session",
-          "value": "jwi7s0:1769607432908"
+          "value": "q2otp6:1769800067768"
         },
         {
           "name": "has_interop_upgraded",
-          "value": "{\"lastCheckedAt\":1769596206274,\"status\":false}"
+          "value": "{\"lastCheckedAt\":1769716874448,\"status\":false}"
         },
         {
           "name": "_oz_bandwidthEstimate",
@@ -127,7 +137,11 @@
         },
         {
           "name": "banzai:last_storage_flush",
-          "value": "1769596206680.4"
+          "value": "1769799573156.2998"
+        },
+        {
+          "name": "ig_uta_b",
+          "value": "1769803279844"
         },
         {
           "name": "caa_spi_dialog_dismiss",
@@ -135,7 +149,7 @@
         },
         {
           "name": "hb_timestamp",
-          "value": "1769604225081"
+          "value": "1769799572301"
         },
         {
           "name": "_oz_bandwidthAndTTFBSamples",
@@ -147,7 +161,7 @@
         },
         {
           "name": "signal_flush_timestamp",
-          "value": "1769604225151"
+          "value": "1769799572305"
         }
       ]
     },

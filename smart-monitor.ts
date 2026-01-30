@@ -163,7 +163,7 @@ async function fullScrape(page: Page, username: string): Promise<string[]> {
             const usernames = await page.evaluate(() => {
                 return Array.from(document.querySelectorAll('a'))
                     .map(a => a.getAttribute('href'))
-                    .filter(href => href && href.match(/^\/[a-zA-Z0-9._]+\/?$/))
+                    .filter(href => href && href.match(/^\/[a-zA-Z0-9._-]+\/?$/))
                     .filter(href => !href!.includes('explore') && !href!.includes('accounts'))
                     .map(href => href!.replace(/\//g, ''));
             });

@@ -216,7 +216,7 @@ async function getFollowingList(page: Page, username: string): Promise<string[]>
             const users = await page.evaluate(() => {
                 return Array.from(document.querySelectorAll('a'))
                     .map(a => a.getAttribute('href'))
-                    .filter(h => h && h.match(/^\/[a-zA-Z0-9._]+\/?$/))
+                    .filter(h => h && h.match(/^\/[a-zA-Z0-9._-]+\/?$/))
                     .filter(h => !['explore', 'reels', 'p', 'direct', 'accounts', 'stories'].some(x => h!.includes(x)))
                     .map(h => h!.replace(/\//g, ''));
             });

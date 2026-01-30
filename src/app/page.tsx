@@ -379,6 +379,201 @@ function CreateSetModal({ isOpen, onClose, onCreated }: CreateSetModalProps) {
   );
 }
 
+// ============ SCRAPE MODAL ============
+interface ScrapeModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  profile: ProfileInfo | null;
+  setId: string;
+  onComplete: () => void;
+}
+
+function ScrapeModal({ isOpen, onClose, profile, setId, onComplete }: ScrapeModalProps) {
+  const [status, setStatus] = useState<'idle' | 'counting' | 'scraping' | 'saving' | 'done' | 'error'>('idle');
+  const [progress, setProgress] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [found, setFound] = useState(0);
+  const [estimatedSeconds, setEstimatedSeconds] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [jobId, setJobId] = useState<string | null>(null);
+
+  const SCRAPE_API_URL = process.env.NEXT_PUBLIC_SCRAPE_API_URL || 'http://localhost:3001';
+
+  useEffect(() => {
+    if (isOpen && profile && status === 'idle') {
+      startScrape();
+    }
+  }, [isOpen, profile]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (jobId && status !== 'done' && status !== 'error') {
+      interval = setInterval(pollStatus, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [jobId, status]);
+
+  const startScrape = async () => {
+    if (!profile) return;
+
+    setStatus('counting');
+    setProgress(0);
+    setErrorMessage('');
+
+    try {
+      const res = await fetch(`${SCRAPE_API_URL}/api/scrape/${profile.username}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId: profile.id, setId })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setJobId(data.jobId);
+      } else {
+        setStatus('error');
+        setErrorMessage(data.error || 'Scrape konnte nicht gestartet werden');
+      }
+    } catch (err: any) {
+      setStatus('error');
+      setErrorMessage('API nicht erreichbar. Ist der Scrape-Server aktiv?');
+    }
+  };
+
+  const pollStatus = async () => {
+    if (!jobId) return;
+
+    try {
+      const res = await fetch(`${SCRAPE_API_URL}/api/scrape/${jobId}/status`);
+      const data = await res.json();
+
+      if (data.success) {
+        setStatus(data.status);
+        setProgress(data.progress);
+        setTotal(data.total);
+        setFound(data.found);
+        setEstimatedSeconds(data.estimatedSeconds);
+        setElapsedSeconds(data.elapsedSeconds);
+
+        if (data.status === 'done') {
+          setTimeout(() => {
+            onComplete();
+          }, 1500);
+        } else if (data.status === 'error') {
+          setErrorMessage(data.error || 'Unbekannter Fehler');
+        }
+      }
+    } catch (err) {
+      // Ignore polling errors
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+  };
+
+  const getStatusText = () => {
+    switch (status) {
+      case 'idle': return 'Vorbereiten...';
+      case 'counting': return 'Lade Profil...';
+      case 'scraping': return `Scrape Following-Liste... (${found}/${total})`;
+      case 'saving': return 'Speichere in Datenbank...';
+      case 'done': return '✅ Fertig!';
+      case 'error': return '❌ Fehler';
+      default: return '';
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-backdrop" onClick={status === 'done' || status === 'error' ? onClose : undefined}>
+      <div
+        className="glass-card p-8 w-full max-w-md mx-4 animate-scale-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-[var(--accent)] to-purple-500 flex items-center justify-center">
+            {status === 'done' ? (
+              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : status === 'error' ? (
+              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <div className="spinner w-8 h-8 border-white" />
+            )}
+          </div>
+
+          <h2 className="text-xl font-bold mb-2">
+            {status === 'done' ? 'Scrape abgeschlossen' : status === 'error' ? 'Scrape fehlgeschlagen' : 'Scrape läuft...'}
+          </h2>
+
+          <p className="text-[var(--text-muted)] mb-6">@{profile?.username}</p>
+
+          {/* Progress Bar */}
+          {status !== 'done' && status !== 'error' && (
+            <div className="mb-6">
+              <div className="w-full bg-[var(--card)] rounded-full h-3 mb-3 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-[var(--accent)] to-purple-500 transition-all duration-500 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              <p className="text-sm text-[var(--text-muted)]">{getStatusText()}</p>
+
+              {estimatedSeconds > 0 && (
+                <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2">
+                  <span>Vergangen: {formatTime(elapsedSeconds)}</span>
+                  <span>Geschätzt: ~{formatTime(estimatedSeconds)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Stats */}
+          {(total > 0 || found > 0) && status !== 'error' && (
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="p-4 bg-[var(--card)] rounded-xl">
+                <p className="text-2xl font-bold text-[var(--accent)]">{total.toLocaleString()}</p>
+                <p className="text-xs text-[var(--text-muted)]">Following</p>
+              </div>
+              <div className="p-4 bg-[var(--card)] rounded-xl">
+                <p className="text-2xl font-bold text-[var(--success)]">{found.toLocaleString()}</p>
+                <p className="text-xs text-[var(--text-muted)]">Gescrapt</p>
+              </div>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {errorMessage && (
+            <div className="p-4 bg-[var(--error)]/20 border border-[var(--error)] rounded-xl mb-6 text-left">
+              <p className="text-sm text-[var(--error)]">{errorMessage}</p>
+            </div>
+          )}
+
+          {/* Actions */}
+          {(status === 'done' || status === 'error') && (
+            <button
+              onClick={onClose}
+              className="btn-primary w-full"
+            >
+              Schließen
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============ SET DETAIL VIEW ============
 interface SetDetailProps {
   set: SetInfo;
@@ -391,6 +586,8 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
   const [newProfile, setNewProfile] = useState('');
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
+  const [scrapeProfile, setScrapeProfile] = useState<ProfileInfo | null>(null);
+  const [showScrapeModal, setShowScrapeModal] = useState(false);
 
   const handleAddProfile = async () => {
     if (!newProfile.trim()) return;
@@ -521,6 +718,19 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
                   )}
                 </div>
               </div>
+              {/* Scrape Button */}
+              <button
+                onClick={() => {
+                  setScrapeProfile(profile);
+                  setShowScrapeModal(true);
+                }}
+                className="p-2 hover:bg-[var(--accent)]/20 rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--accent)]"
+                title="Jetzt scrapen"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
               <button
                 onClick={() => onShowDetails(profile.id, profile.username)}
                 className="p-2 hover:bg-[var(--card-hover)] rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--accent)]"
@@ -555,6 +765,22 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
           </p>
         </div>
       )}
+
+      {/* Scrape Modal */}
+      <ScrapeModal
+        isOpen={showScrapeModal}
+        onClose={() => {
+          setShowScrapeModal(false);
+          setScrapeProfile(null);
+        }}
+        profile={scrapeProfile}
+        setId={set.id}
+        onComplete={() => {
+          setShowScrapeModal(false);
+          setScrapeProfile(null);
+          onRefresh();
+        }}
+      />
     </div>
   );
 }

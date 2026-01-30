@@ -1,0 +1,95 @@
+{
+  "cookies": [
+    {
+      "name": "guest_id",
+      "value": "v1%3A176964213410343370",
+      "domain": ".twitter.com",
+      "path": "/",
+      "expires": 1803856534.223356,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "sAU.nX44ah80v4Ef2eRmRYL7XkiJb2h1G9Nf6Uwx_os-1769642134.0394182-1.0.1.1-D4PIclR_8vPwiFI7YcjvdzjmBe3rWnxEUJrs9Ob9X8WYg0_BpU0dAYvAdtHpo5F33jQs3g6fxwHoF.15QfAxFzcj7EBhFIE02K86gVK3ulf6v5SJhIIyr2Xxjqcqp8WK",
+      "domain": ".twitter.com",
+      "path": "/",
+      "expires": 1769643934.223441,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "guest_id",
+      "value": "v1%3A176964213458851528",
+      "domain": ".x.com",
+      "path": "/",
+      "expires": 1803856534.635398,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "gt",
+      "value": "2016651394250318112",
+      "domain": ".x.com",
+      "path": "/",
+      "expires": 1769651134.761845,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__cuid",
+      "value": "dd13e45c6ead4c088fb024dec844503e",
+      "domain": ".x.com",
+      "path": "/",
+      "expires": 1804202137,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "att",
+      "value": "1-zh5viJewSxBhWasyQAidnBozkZq542iN84baqllE",
+      "domain": ".x.com",
+      "path": "/",
+      "expires": 1769728540.502315,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "g_state",
+      "value": "{\"i_l\":0,\"i_ll\":1769642369332,\"i_b\":\"U/BYwvf+HrCT4eDXcRAt7yB5nBB7/6x7RfxfbPfKj/E\",\"i_e\":{\"enable_itp_optimization\":3}}",
+      "domain": "x.com",
+      "path": "/",
+      "expires": 1785194369,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "f.9ksHcLunAJi31B8Vu.l3wXxmKDXYZyIV0oT9cVMa0-1769642369.4803977-1.0.1.1-kBKMrQBCWWpuOgSr047Cd8qP3mWssFXFfm8FmAGIFJaQq5PUgpU6BJENeyj9CXqc.v6qec7AVKHYtCePdw0GISNDVNeBT0dVLA_OU99OAmf7XvAkk0sGuSNOqHnFCmX7",
+      "domain": ".x.com",
+      "path": "/",
+      "expires": 1769644169.611652,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://x.com",
+      "localStorage": [
+        {
+          "name": "__cuid",
+          "value": "dd13e45c6ead4c088fb024dec844503e"
+        }
+      ]
+    }
+  ]
+}
