@@ -179,24 +179,63 @@ async function getProfileInfo(page: Page, username: string, takeScreenshot: bool
 }
 
 /**
- * Holt die Following-Liste (verbessert für VPS mit mehr Scrolls & längeren Delays)
+ * Holt die Following-Liste mit API-Interception für 100% Erfassung
+ * Fängt Instagram's API-Responses ab während gescrollt wird
  */
 async function getFollowingList(page: Page, username: string): Promise<string[]> {
     try {
+        // API-Response Sammler
+        const apiFollowing = new Set<string>();
+
+        // Intercepte Instagram API-Responses
+        const responseHandler = async (response: any) => {
+            const url = response.url();
+
+            // Instagram Following API
+            if (url.includes('/api/v1/friendships/') && url.includes('/following/')) {
+                try {
+                    const json = await response.json();
+                    if (json.users) {
+                        for (const user of json.users) {
+                            if (user.username) {
+                                apiFollowing.add(user.username);
+                            }
+                        }
+                    }
+                } catch { }
+            }
+
+            // GraphQL Following
+            if (url.includes('graphql') && url.includes('following')) {
+                try {
+                    const json = await response.json();
+                    const edges = json?.data?.user?.edge_follow?.edges ||
+                        json?.data?.user?.following?.edges || [];
+                    for (const edge of edges) {
+                        const u = edge?.node?.username;
+                        if (u) apiFollowing.add(u);
+                    }
+                } catch { }
+            }
+        };
+
+        page.on('response', responseHandler);
+
         await page.goto(`https://www.instagram.com/${username}/`, {
             waitUntil: 'domcontentloaded',
             timeout: 30000
         });
-        await page.waitForTimeout(4000); // Längere Wartezeit für VPS
+        await page.waitForTimeout(4000);
         await dismissPopups(page);
 
         await page.click('a[href*="following"]', { timeout: 10000 });
-        await page.waitForTimeout(4000); // Längere Wartezeit für Modal
+        await page.waitForTimeout(4000);
 
-        const following = new Set<string>();
+        // DOM-basierte Sammlung als Backup
+        const domFollowing = new Set<string>();
         let noNewCount = 0;
-        const maxScrolls = 80; // Erhöht von 30 auf 80 für vollständigeres Scraping
-        const maxNoNewCount = 12; // Erhöht von 5 auf 12
+        const maxScrolls = 60;
+        const maxNoNewCount = 15;
 
         for (let scroll = 0; scroll < maxScrolls && noNewCount < maxNoNewCount; scroll++) {
             const users = await page.evaluate(() => {
@@ -207,31 +246,39 @@ async function getFollowingList(page: Page, username: string): Promise<string[]>
                     .map(h => h!.replace(/\//g, ''));
             });
 
-            const prevSize = following.size;
-            users.forEach(u => u && following.add(u));
+            const prevSize = domFollowing.size;
+            users.forEach(u => u && domFollowing.add(u));
 
-            if (following.size === prevSize) noNewCount++;
+            if (domFollowing.size === prevSize) noNewCount++;
             else noNewCount = 0;
 
-            // Logge nur jeden 5. Scroll um Log-Spam zu reduzieren
-            if (scroll % 5 === 0 || following.size !== prevSize) {
-                console.log(`   Scroll ${scroll + 1}/${maxScrolls}: ${following.size} gefunden`);
+            // Logge Status
+            if (scroll % 5 === 0) {
+                console.log(`   Scroll ${scroll + 1}/${maxScrolls}: DOM=${domFollowing.size} | API=${apiFollowing.size}`);
             }
 
-            // Haupt-Scroll
-            await page.evaluate(() => window.scrollBy(0, 600));
-            await humanDelay(2500, 4000); // Längere Delays für Lazy Loading
-
-            // Zusätzlicher Touch-Scroll für besseres Laden (wie in mobile-scrape-full.ts)
-            await page.mouse.move(200, 400);
+            await page.evaluate(() => window.scrollBy(0, 500));
+            await humanDelay(2000, 3500);
             await page.mouse.wheel(0, 300);
             await humanDelay(1000, 1500);
         }
 
-        console.log(`   ✅ Scraping beendet: ${following.size} Following nach ${Math.min(noNewCount, maxNoNewCount) >= maxNoNewCount ? 'keine neuen Einträge' : maxScrolls + ' Scrolls'}`);
+        // Response Handler entfernen
+        page.off('response', responseHandler);
 
-        following.delete(username);
-        return Array.from(following);
+        // Kombiniere beide Quellen
+        const combined = new Set([...domFollowing, ...apiFollowing]);
+        combined.delete(username);
+
+        console.log(`   ✅ Scraping beendet: DOM=${domFollowing.size} | API=${apiFollowing.size} | KOMBINIERT=${combined.size}`);
+
+        // Wenn API mehr gefunden hat, logge das
+        if (apiFollowing.size > domFollowing.size) {
+            const additional = apiFollowing.size - domFollowing.size;
+            console.log(`   📡 API-Interception fand ${additional} zusätzliche Accounts!`);
+        }
+
+        return Array.from(combined);
     } catch (err: any) {
         console.log(`   ❌ Scrape-Fehler: ${err.message}`);
         return [];
