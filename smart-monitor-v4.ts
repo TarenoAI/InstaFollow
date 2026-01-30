@@ -54,22 +54,45 @@ async function humanDelay(minMs: number, maxMs: number) {
 
 async function dismissPopups(page: Page) {
     const selectors = [
+        // Cookie consent
         'button:has-text("Alle akzeptieren")',
         'button:has-text("Allow all cookies")',
+        'button:has-text("Accept All")',
+        // "Not Now" buttons  
         'button:has-text("Jetzt nicht")',
         'button:has-text("Not Now")',
+        'button:has-text("Nicht jetzt")',
+        // Save login info popup
+        'button:has-text("Informationen nicht speichern")',
+        'button:has-text("Not now")',
+        // Turn on notifications
+        'button:has-text("Nicht aktivieren")',
+        'button:has-text("Not Now")',
+        // Close buttons
         '[aria-label="Schließen"]',
         '[aria-label="Close"]',
+        'svg[aria-label="Schließen"]',
+        'svg[aria-label="Close"]',
+        // Cancel/Dismiss
+        'button:has-text("Abbrechen")',
+        'button:has-text("Cancel")',
     ];
+
     for (const sel of selectors) {
         try {
             const btn = await page.$(sel);
             if (btn && await btn.isVisible()) {
                 await btn.click({ force: true });
-                await page.waitForTimeout(500);
+                await page.waitForTimeout(300);
             }
         } catch { }
     }
+
+    // ESC drücken um Dialoge zu schließen
+    try {
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(200);
+    } catch { }
 }
 
 /**
