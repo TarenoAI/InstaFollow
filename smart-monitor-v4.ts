@@ -606,9 +606,9 @@ async function main() {
                                 // ChangeEvents in DB speichern
                                 for (const target of addedProfiles) {
                                     await db.execute({
-                                        sql: `INSERT INTO ChangeEvent (id, type, targetUsername, detectedAt, isConfirmed, processed, profileId) 
-                                              VALUES (?, 'FOLLOW', ?, datetime('now'), 1, 0, ?)`,
-                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, profileId]
+                                        sql: `INSERT INTO ChangeEvent (id, type, targetUsername, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
+                                              VALUES (?, 'FOLLOW', ?, ?, datetime('now'), 1, 0, ?)`,
+                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, monitoredProfileInfo.screenshotPath || null, profileId]
                                     });
                                 }
                             }
@@ -648,9 +648,9 @@ async function main() {
                                 // ChangeEvents in DB speichern
                                 for (const target of removedProfiles) {
                                     await db.execute({
-                                        sql: `INSERT INTO ChangeEvent (id, type, targetUsername, detectedAt, isConfirmed, processed, profileId) 
-                                              VALUES (?, 'UNFOLLOW', ?, datetime('now'), 1, 0, ?)`,
-                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, profileId]
+                                        sql: `INSERT INTO ChangeEvent (id, type, targetUsername, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
+                                              VALUES (?, 'UNFOLLOW', ?, ?, datetime('now'), 1, 0, ?)`,
+                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, monitoredProfileInfo.screenshotPath || null, profileId]
                                     });
                                 }
                             }

@@ -78,6 +78,9 @@ model ChangeEvent {
   // Timestamp of detection
   detectedAt      DateTime @default(now())
   
+  // Screenshot of the monitored profile at time of change
+  screenshotUrl   String?
+  
   // Confirmation status for unfollows
   isConfirmed     Boolean  @default(true)  // true for FOLLOW, needs confirmation for UNFOLLOW
   confirmedAt     DateTime?

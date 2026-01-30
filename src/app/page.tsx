@@ -1016,16 +1016,19 @@ interface TargetInfo {
 interface ProfileDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onRefresh?: () => void;
   profileId: string | null;
   username: string;
 }
 
-function ProfileDetailsModal({ isOpen, onClose, profileId, username }: ProfileDetailsModalProps) {
-  const [activeTab, setActiveTab] = useState<'list' | 'history'>('list');
+function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }: ProfileDetailsModalProps) {
+  const [activeTab, setActiveTab] = useState<'list' | 'history' | 'sets'>('list');
   const [profile, setProfile] = useState<any>(null);
+  const [allSets, setAllSets] = useState<any[]>([]);
   const [followingList, setFollowingList] = useState<any[]>([]);
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [updatingSets, setUpdatingSets] = useState(false);
 
   useEffect(() => {
     if (isOpen && profileId) {
@@ -1044,6 +1047,13 @@ function ProfileDetailsModal({ isOpen, onClose, profileId, username }: ProfileDe
         ]);
         setProfile(prof);
         setFollowingList(list);
+      } else if (activeTab === 'sets') {
+        const [prof, sets] = await Promise.all([
+          getProfileDetails(profileId),
+          getSets()
+        ]);
+        setProfile(prof);
+        setAllSets(sets);
       } else {
         const history = await getRecentChanges(100, profileId);
         setHistoryList(history);
@@ -1052,6 +1062,25 @@ function ProfileDetailsModal({ isOpen, onClose, profileId, username }: ProfileDe
       console.error(e);
     }
     setLoading(false);
+  };
+
+  const handleToggleSet = async (setId: string, isCurrentlyIn: boolean) => {
+    if (!profileId) return;
+    setUpdatingSets(true);
+    try {
+      if (isCurrentlyIn) {
+        await removeProfileFromSet(setId, username);
+      } else {
+        await addToSetDb(setId, username);
+      }
+      // Reload profile data to reflect changes
+      const updatedProf = await getProfileDetails(profileId);
+      setProfile(updatedProf);
+      if (onRefresh) onRefresh();
+    } catch (e) {
+      console.error(e);
+    }
+    setUpdatingSets(false);
   };
 
   if (!isOpen) return null;
@@ -1137,6 +1166,18 @@ function ProfileDetailsModal({ isOpen, onClose, profileId, username }: ProfileDe
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] rounded-t-full"></span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('sets')}
+            className={`relative py-4 px-2 ml-8 text-sm font-semibold transition-all ${activeTab === 'sets'
+              ? 'text-[var(--accent)]'
+              : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
+              }`}
+          >
+            📁 Ordner
+            {activeTab === 'sets' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] rounded-t-full"></span>
+            )}
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-[var(--background)]">
@@ -1210,42 +1251,123 @@ function ProfileDetailsModal({ isOpen, onClose, profileId, username }: ProfileDe
                     </div>
                   ) : (
                     historyList.map((change) => (
-                      <div key={change.id} className="group flex items-center gap-5 p-5 rounded-2xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-lg transition-all">
-                        <div className={`relative p-3 rounded-2xl flex items-center justify-center ${change.type === 'FOLLOW'
-                          ? 'bg-[var(--success)]/10 text-[var(--success)] ring-1 ring-[var(--success)]/20 shadow-[0_0_15px_-3px_rgba(var(--success-rgb),0.3)]'
-                          : 'bg-[var(--error)]/10 text-[var(--error)] ring-1 ring-[var(--error)]/20 shadow-[0_0_15px_-3px_rgba(var(--error-rgb),0.3)]'
-                          }`}>
-                          {change.type === 'FOLLOW' ? (
-                            <svg className="w-5 h-5 font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                            </svg>
-                          ) : (
-                            <svg className="w-5 h-5 font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
-                            </svg>
-                          )}
+                      <div key={change.id} className="group flex flex-col gap-3 p-5 rounded-2xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-lg transition-all">
+                        <div className="flex items-center gap-5">
+                          <div className={`relative p-3 rounded-2xl flex items-center justify-center ${change.type === 'FOLLOW'
+                            ? 'bg-[var(--success)]/10 text-[var(--success)] ring-1 ring-[var(--success)]/20 shadow-[0_0_15px_-3px_rgba(var(--success-rgb),0.3)]'
+                            : 'bg-[var(--error)]/10 text-[var(--error)] ring-1 ring-[var(--error)]/20 shadow-[0_0_15px_-3px_rgba(var(--error-rgb),0.3)]'
+                            }`}>
+                            {change.type === 'FOLLOW' ? (
+                              <svg className="w-5 h-5 font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                              </svg>
+                            ) : (
+                              <svg className="w-5 h-5 font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-[var(--foreground)]">
+                              <span className={change.type === 'FOLLOW' ? 'text-[var(--success)]' : 'text-[var(--error)]'}>
+                                {change.type === 'FOLLOW' ? 'Neuer Follow:' : 'Entfolgt:'}
+                              </span>
+                              {' '}
+                              <span className="font-semibold">@{change.targetUsername}</span>
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {new Date(change.detectedAt).toLocaleString('de-DE')}
+                            </p>
+                          </div>
+                          <img
+                            src={proxyImageUrl(change.targetPicUrl)}
+                            alt={change.targetUsername}
+                            className="w-10 h-10 rounded-full object-cover opacity-80"
+                            onError={(e) => (e.currentTarget.src = "/placeholder-avatar.png")}
+                          />
                         </div>
-                        <div className="flex-1">
-                          <p className="font-semibold text-[var(--foreground)]">
-                            <span className={change.type === 'FOLLOW' ? 'text-[var(--success)]' : 'text-[var(--error)]'}>
-                              {change.type === 'FOLLOW' ? 'Neuer Follow:' : 'Entfolgt:'}
-                            </span>
-                            {' '}
-                            <span className="font-semibold">{change.targetUsername}</span>
-                          </p>
-                          <p className="text-xs text-[var(--text-muted)]">
-                            {new Date(change.detectedAt).toLocaleString('de-DE')}
-                          </p>
-                        </div>
-                        <img
-                          src={proxyImageUrl(change.targetPicUrl)}
-                          alt={change.targetUsername}
-                          className="w-10 h-10 rounded-full object-cover opacity-80"
-                          onError={(e) => (e.currentTarget.src = "/placeholder-avatar.png")}
-                        />
+
+                        {/* Screenshot Preview */}
+                        {change.screenshotUrl && (
+                          <div className="mt-2 rounded-xl overflow-hidden border border-[var(--border)] relative group/screenshot">
+                            <img
+                              src={`/api/screenshot?path=${encodeURIComponent(change.screenshotUrl)}`}
+                              alt="Profil Screenshot"
+                              className="w-full h-auto object-cover rounded-xl"
+                              onError={(e) => (e.currentTarget.style.display = 'none')}
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/screenshot:opacity-100 transition-opacity flex items-center justify-center">
+                              <a
+                                href={`/api/screenshot?path=${encodeURIComponent(change.screenshotUrl)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg text-white text-sm font-medium hover:bg-white/30 transition-colors"
+                              >
+                                📷 Vollbild öffnen
+                              </a>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
+                </div>
+              )}
+
+              {activeTab === 'sets' && (
+                <div className="space-y-6">
+                  <div className="bg-[var(--card)] p-6 rounded-2xl border border-[var(--border)]">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      Ordner-Verwaltung
+                    </h3>
+                    <p className="text-sm text-[var(--text-muted)] mb-6">
+                      Hier kannst du festlegen, in welchen Sets @{username} angezeigt werden soll. Ein Profil kann in mehreren Ordnern gleichzeitig sein.
+                    </p>
+
+                    <div className="space-y-3">
+                      {allSets.map((set) => {
+                        const isInSet = profile?.sets?.some((s: any) => s.id === set.id);
+                        return (
+                          <div
+                            key={set.id}
+                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${isInSet
+                              ? 'bg-[var(--accent)]/5 border-[var(--accent)]/30'
+                              : 'bg-[var(--background)] border-[var(--border)] hover:border-[var(--text-muted)]/30'
+                              }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isInSet ? 'bg-[var(--accent)] text-white' : 'bg-[var(--border)] text-[var(--text-muted)]'
+                                }`}>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                </svg>
+                              </div>
+                              <div>
+                                <p className="font-semibold">{set.name}</p>
+                                <p className="text-xs text-[var(--text-muted)]">
+                                  {set.profiles?.length || 0} Profile enthalten
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              disabled={updatingSets}
+                              onClick={() => handleToggleSet(set.id, isInSet)}
+                              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${isInSet
+                                ? 'bg-[var(--error)]/10 text-[var(--error)] hover:bg-[var(--error)]/20'
+                                : 'bg-[var(--accent)] text-white hover:opacity-90 shadow-lg shadow-[var(--accent)]/20'
+                                } disabled:opacity-50`}
+                            >
+                              {updatingSets ? '...' : (isInSet ? 'Entfernen' : 'Hinzufügen')}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </>
@@ -1715,6 +1837,7 @@ export default function Home() {
       <ProfileDetailsModal
         isOpen={showProfileDetails}
         onClose={() => setShowProfileDetails(false)}
+        onRefresh={loadSets}
         profileId={selectedProfileId}
         username={selectedProfileUsername}
       />
