@@ -473,37 +473,48 @@ async function intelligentScrape(
     await takeDebugScreenshot(page, `${username}-profile`);
 
     // Following klicken - In Mobile oft durch "App öffnen" Banner blockiert
-    try {
-        // Versuche erst normalen Klick mit force: true (ignoriert Interception)
-        await page.click('a[href*="following"]', { timeout: 5000, force: true });
-    } catch {
-        try {
-            // Fallback 1: Versuche Text-Klick
-            const followingLink = await page.$('text=/\\d+\\s*(following|abonniert)/i');
-            if (followingLink) {
-                await followingLink.click({ force: true });
-            } else {
-                // Fallback 2: JavaScript Klick (unblockable)
-                await page.evaluate(() => {
-                    const links = Array.from(document.querySelectorAll('a'));
-                    const followingLink = links.find(a =>
-                        a.href.includes('following') ||
-                        a.innerText.toLowerCase().includes('following') ||
-                        a.innerText.toLowerCase().includes('abonniert')
-                    );
-                    if (followingLink) (followingLink as HTMLElement).click();
-                });
-            }
-        } catch (err) {
-            return { success: false, following: [], retryReason: `Following-Link Klick-Fehler: ${err}` };
+    log('🖱️', 'Versuche Following-Liste zu öffnen...', 2);
+
+    const clickAttempt = await page.evaluate(() => {
+        const links = Array.from(document.querySelectorAll('a'));
+        const fl = links.find(a =>
+            a.href.includes('following') ||
+            a.innerText.toLowerCase().includes('following') ||
+            a.innerText.toLowerCase().includes('abonniert')
+        );
+        if (fl) {
+            (fl as HTMLElement).click();
+            return true;
         }
+        return false;
+    });
+
+    if (!clickAttempt) {
+        try {
+            await page.click('a[href*="following"]', { timeout: 3000, force: true });
+        } catch { }
     }
 
-    await page.waitForTimeout(4000);
-    // NICHT dismissAllPopups aufrufen, da dies den Following-Dialog schließt!
+    await page.waitForTimeout(5000);
 
-    // Screenshot nach Dialog-Öffnung
-    await takeDebugScreenshot(page, `${username}-dialog`);
+    // Screenshot nach Klick-Versuch
+    await takeDebugScreenshot(page, `${username}-after-click-check`);
+
+    // Prüfen, ob die Liste wirklich geladen wurde - In Mobile oft kein [role="dialog"]!
+    const listOpened = await page.evaluate(() => {
+        const dialog = document.querySelector('[role="dialog"]');
+        const listContainer = document.querySelector('div._aano');
+        const ulList = document.querySelector('ul');
+        return !!(dialog || listContainer || ulList);
+    });
+
+    if (!listOpened) {
+        log('⚠️', 'Liste scheint nicht offen zu sein nach Klick. Erneuter Versuch...', 2);
+        await page.keyboard.press('Escape'); // Schließe evtl. Banner
+        await page.waitForTimeout(1000);
+        await page.click('text=/\\d+\\s*(following|abonniert)/i', { force: true, timeout: 5000 }).catch(() => { });
+        await page.waitForTimeout(4000);
+    }
 
     // Scrolling mit verschiedenen Strategien
     const strategies = ['js-scroll', 'keyboard', 'mouse-wheel'];
