@@ -1023,6 +1023,7 @@ interface ProfileDetailsModalProps {
 
 function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }: ProfileDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'list' | 'history' | 'sets' | 'stats'>('list');
+  const [timeRange, setTimeRange] = useState<'week' | 'month'>('week');
   const [profile, setProfile] = useState<any>(null);
   const [allSets, setAllSets] = useState<any[]>([]);
   const [followingList, setFollowingList] = useState<any[]>([]);
@@ -1385,146 +1386,236 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
 
               {activeTab === 'stats' && (
                 <div className="space-y-6">
-                  <div className="bg-[var(--card)] p-6 rounded-2xl border border-[var(--border)]">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  {/* Stats Header & Time Filter */}
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
                       <svg className="w-5 h-5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                       </svg>
-                      Aktivitäts-Statistik
+                      Profil-Analyse
                     </h3>
+                    <div className="flex gap-1 p-1 bg-[var(--card)] rounded-xl border border-[var(--border)]">
+                      <button
+                        onClick={() => setTimeRange('week')}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${timeRange === 'week' ? 'bg-[var(--accent)] text-white shadow-lg' : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'}`}
+                      >
+                        Woche
+                      </button>
+                      <button
+                        onClick={() => setTimeRange('month')}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${timeRange === 'month' ? 'bg-[var(--accent)] text-white shadow-lg' : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'}`}
+                      >
+                        Monat
+                      </button>
+                    </div>
+                  </div>
 
-                    {/* Summary Stats */}
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="p-4 rounded-xl bg-[var(--success)]/10 border border-[var(--success)]/20">
-                        <p className="text-2xl font-bold text-[var(--success)]">
-                          +{historyList.filter(h => h.type === 'FOLLOW').length}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)]">Neue Follows</p>
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--accent)]/30 transition-all">
+                      <p className="text-[var(--text-muted)] text-xs font-bold uppercase tracking-wider mb-1">Total Following</p>
+                      <p className="text-3xl font-black text-[var(--foreground)]">{profile?.followingCount || 0}</p>
+                      <div className="mt-2 flex items-center gap-1 text-[var(--success)] text-xs font-bold">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" />
+                        </svg>
+                        Aktueller Stand
                       </div>
-                      <div className="p-4 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/20">
-                        <p className="text-2xl font-bold text-[var(--error)]">
-                          -{historyList.filter(h => h.type === 'UNFOLLOW').length}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)]">Entfolgt</p>
+                    </div>
+                    <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--success)]/30 transition-all">
+                      <p className="text-[var(--text-muted)] text-xs font-bold uppercase tracking-wider mb-1">Neue Follows</p>
+                      <p className="text-3xl font-black text-[var(--success)]">+{historyList.filter(h => h.type === 'FOLLOW').length}</p>
+                      <p className="mt-2 text-[var(--text-muted)] text-xs font-medium">Im gewählten Zeitraum</p>
+                    </div>
+                    <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--error)]/30 transition-all">
+                      <p className="text-[var(--text-muted)] text-xs font-bold uppercase tracking-wider mb-1">Entfolgt</p>
+                      <p className="text-3xl font-black text-[var(--error)]">-{historyList.filter(h => h.type === 'UNFOLLOW').length}</p>
+                      <p className="mt-2 text-[var(--text-muted)] text-xs font-medium">Im gewählten Zeitraum</p>
+                    </div>
+                  </div>
+
+                  {/* Modern Line Chart */}
+                  <div className="bg-[var(--card)] p-6 rounded-2xl border border-[var(--border)] shadow-sm">
+                    <div className="flex items-center justify-between mb-8">
+                      <div>
+                        <h4 className="font-bold text-sm">Following Entwicklung</h4>
+                        <p className="text-[var(--text-muted)] text-[10px]">Basierend auf detektierten Änderungen</p>
+                      </div>
+                      <div className="flex gap-4 text-[10px] font-bold uppercase overflow-hidden">
+                        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[var(--accent)]"></span> Trend</span>
                       </div>
                     </div>
 
-                    {/* Timeline Chart */}
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium text-[var(--text-muted)]">Zeitverlauf (letzte 7 Tage)</p>
-                      <div className="h-48 bg-[var(--background)] rounded-xl p-4 overflow-hidden">
-                        {historyList.length === 0 ? (
-                          <div className="h-full flex items-center justify-center text-[var(--text-muted)]">
-                            Noch keine Daten für Diagramm
-                          </div>
-                        ) : (
-                          <div className="h-full flex items-end gap-1">
-                            {/* Generate bars for last 7 days */}
-                            {Array.from({ length: 7 }, (_, i) => {
-                              const date = new Date();
-                              date.setDate(date.getDate() - (6 - i));
-                              const dateStr = date.toISOString().split('T')[0];
+                    <div className="h-64 relative">
+                      {historyList.length < 1 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] border-2 border-dashed border-[var(--border)] rounded-xl">
+                          <svg className="w-10 h-10 mb-2 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                          <p className="text-xs font-bold">Keine Aktivitätsdaten vorhanden</p>
+                        </div>
+                      ) : (() => {
+                        const days = timeRange === 'week' ? 7 : 30;
+                        const dataPoints: { date: string, label: string, followers: number }[] = [];
+                        let currentRef = profile?.followingCount || 0;
 
-                              const follows = historyList.filter(h => {
-                                const detectedStr = typeof h.detectedAt === 'string'
-                                  ? h.detectedAt
-                                  : new Date(h.detectedAt).toISOString();
-                                return h.type === 'FOLLOW' && detectedStr.startsWith(dateStr);
-                              }).length;
-                              const unfollows = historyList.filter(h => {
-                                const detectedStr = typeof h.detectedAt === 'string'
-                                  ? h.detectedAt
-                                  : new Date(h.detectedAt).toISOString();
-                                return h.type === 'UNFOLLOW' && detectedStr.startsWith(dateStr);
-                              }).length;
+                        // Create data points for the timeline
+                        for (let i = 0; i < days; i++) {
+                          const date = new Date();
+                          date.setDate(date.getDate() - (days - 1 - i));
+                          const dateStr = date.toISOString().split('T')[0];
 
-                              const maxHeight = 120;
-                              const countsByDay = historyList.reduce((acc, h) => {
-                                const detectedStr = typeof h.detectedAt === 'string'
-                                  ? h.detectedAt
-                                  : new Date(h.detectedAt).toISOString();
-                                const d = detectedStr.split('T')[0];
-                                acc[d] = (acc[d] || 0) + 1;
-                                return acc;
-                              }, {} as Record<string, number>);
-                              const maxValue = Math.max(...Object.values(countsByDay) as number[], 1);
+                          // How many changes happened AFTER this date up to now?
+                          // We work backwards to estimate the count at this point
+                          const changesSinceThen = historyList.filter(h => {
+                            const d = typeof h.detectedAt === 'string' ? h.detectedAt : new Date(h.detectedAt).toISOString();
+                            return d > dateStr;
+                          });
 
-                              return (
-                                <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                                  <div className="flex-1 flex items-end gap-0.5 w-full">
-                                    <div
-                                      className="flex-1 bg-[var(--success)] rounded-t transition-all"
-                                      style={{ height: `${(follows / maxValue) * maxHeight}px` }}
-                                      title={`${follows} Follows`}
+                          const followsSinceThen = changesSinceThen.filter(h => h.type === 'FOLLOW').length;
+                          const unfollowsSinceThen = changesSinceThen.filter(h => h.type === 'UNFOLLOW').length;
+
+                          // Estimate: current - (follows since then) + (unfollows since then)
+                          const estimatedCount = currentRef - followsSinceThen + unfollowsSinceThen;
+
+                          dataPoints.push({
+                            date: dateStr,
+                            label: date.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' }),
+                            followers: estimatedCount
+                          });
+                        }
+
+                        const minFollowers = Math.min(...dataPoints.map(p => p.followers));
+                        const maxFollowers = Math.max(...dataPoints.map(p => p.followers));
+                        const range = Math.max(maxFollowers - minFollowers, 5);
+                        const padding = range * 0.2;
+
+                        const chartMin = Math.max(0, minFollowers - padding);
+                        const chartMax = maxFollowers + padding;
+                        const chartRange = chartMax - chartMin;
+
+                        const width = 1000;
+                        const height = 400;
+
+                        // Calculate points for the line
+                        const points = dataPoints.map((p, i) => {
+                          const x = (i / (days - 1)) * width;
+                          const y = height - ((p.followers - chartMin) / chartRange) * height;
+                          return `${x},${y}`;
+                        }).join(' ');
+
+                        // Area path (under the line)
+                        const areaPath = `0,${height} ${points} ${width},${height} Z`;
+
+                        return (
+                          <div className="w-full h-full relative group">
+                            <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+                              <defs>
+                                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.3" />
+                                  <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+                                </linearGradient>
+                              </defs>
+
+                              {/* Y-Axis Grid Lines */}
+                              {[0, 0.25, 0.5, 0.75, 1].map((p, idx) => (
+                                <line
+                                  key={idx}
+                                  x1="0" y1={height * p} x2={width} y2={height * p}
+                                  stroke="var(--border)" strokeWidth="1" strokeDasharray="5,5"
+                                />
+                              ))}
+
+                              {/* Fill Area */}
+                              <path d={areaPath} fill="url(#chartGradient)" className="transition-all duration-700 ease-out" />
+
+                              {/* Main Line */}
+                              <polyline
+                                fill="none"
+                                stroke="var(--accent)"
+                                strokeWidth="4"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                points={points}
+                                className="transition-all duration-700 ease-out"
+                              />
+
+                              {/* Dots */}
+                              {dataPoints.map((p, i) => {
+                                const x = (i / (days - 1)) * width;
+                                const y = height - ((p.followers - chartMin) / chartRange) * height;
+                                return (
+                                  <g key={i} className="cursor-pointer group/point">
+                                    <circle
+                                      cx={x} cy={y} r="6"
+                                      fill="var(--background)" stroke="var(--accent)" strokeWidth="3"
+                                      className="transition-all group-hover/point:r-8"
                                     />
-                                    <div
-                                      className="flex-1 bg-[var(--error)] rounded-t transition-all"
-                                      style={{ height: `${(unfollows / maxValue) * maxHeight}px` }}
-                                      title={`${unfollows} Unfollows`}
-                                    />
-                                  </div>
-                                  <span className="text-[10px] text-[var(--text-muted)]">
-                                    {date.toLocaleDateString('de-DE', { weekday: 'short' })}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex justify-center gap-6 text-xs">
-                        <span className="flex items-center gap-2">
-                          <span className="w-3 h-3 rounded bg-[var(--success)]"></span>
-                          Follows
-                        </span>
-                        <span className="flex items-center gap-2">
-                          <span className="w-3 h-3 rounded bg-[var(--error)]"></span>
-                          Unfollows
-                        </span>
-                      </div>
-                    </div>
+                                    {/* Tooltip on hover - Simplified */}
+                                    <rect x={x - 40} y={y - 45} width="80" height="35" rx="8" fill="var(--card)" className="opacity-0 group-hover/point:opacity-100 transition-opacity border border-[var(--border)] shadow-xl" />
+                                    <text x={x} y={y - 23} textAnchor="middle" fill="var(--foreground)" className="opacity-0 group-hover/point:opacity-100 text-[12px] font-black pointer-events-none">{p.followers}</text>
+                                  </g>
+                                );
+                              })}
+                            </svg>
 
-                    {/* Weekly/Monthly Report Export */}
-                    <div className="mt-6 pt-6 border-t border-[var(--border)]">
-                      <p className="text-sm font-medium mb-3">📤 Report exportieren</p>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => {
-                            const report = {
-                              profile: username,
-                              period: 'Letzte 7 Tage',
-                              follows: historyList.filter(h => h.type === 'FOLLOW').length,
-                              unfollows: historyList.filter(h => h.type === 'UNFOLLOW').length,
-                              events: historyList.map(h => ({
-                                type: h.type,
-                                target: h.targetUsername,
-                                date: h.detectedAt
-                              }))
-                            };
-                            navigator.clipboard.writeText(JSON.stringify(report, null, 2));
-                            alert('Report in Zwischenablage kopiert!');
-                          }}
-                          className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-all"
-                        >
-                          Weekly Report
-                        </button>
-                        <button
-                          onClick={() => {
-                            const text = `📊 @${username} Activity Report\n\n` +
-                              `✅ Neue Follows: ${historyList.filter(h => h.type === 'FOLLOW').length}\n` +
-                              `❌ Entfolgt: ${historyList.filter(h => h.type === 'UNFOLLOW').length}\n\n` +
-                              historyList.slice(0, 10).map(h =>
-                                `${h.type === 'FOLLOW' ? '✅' : '❌'} @${h.targetUsername}`
-                              ).join('\n');
-                            navigator.clipboard.writeText(text);
-                            alert('Social Media Text kopiert!');
-                          }}
-                          className="px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-sm font-medium hover:border-[var(--accent)] transition-all"
-                        >
-                          📱 Social Media Text
-                        </button>
-                      </div>
+                            {/* X-Axis Labels */}
+                            <div className="absolute -bottom-8 left-0 right-0 flex justify-between px-1">
+                              {dataPoints.filter((_, i) => i % (timeRange === 'week' ? 1 : 5) === 0).map((p, i) => (
+                                <span key={i} className="text-[10px] font-bold text-[var(--text-muted)] rotate-[-15deg] origin-top-left whitespace-nowrap">
+                                  {p.label}
+                                </span>
+                              ))}
+                            </div>
+
+                            {/* Y-Axis Labels */}
+                            <div className="absolute -left-12 top-0 bottom-0 flex flex-col justify-between py-1">
+                              <span className="text-[10px] font-bold text-[var(--text-muted)]">{Math.round(chartMax)}</span>
+                              <span className="text-[10px] font-bold text-[var(--text-muted)]">{Math.round(chartMin)}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
+                  </div>
+
+                  {/* Actions & Sharing */}
+                  <div className="flex flex-wrap gap-4 pt-4">
+                    <button
+                      onClick={() => {
+                        const text = `📊 Monitoring Report für @${username}\n\n` +
+                          `📈 Entwicklung: von ${profile?.followingCount - (historyList.filter(h => h.type === 'FOLLOW').length - historyList.filter(h => h.type === 'UNFOLLOW').length)} auf ${profile?.followingCount} Following\n` +
+                          `✅ Neu gefolgt: ${historyList.filter(h => h.type === 'FOLLOW').length}\n` +
+                          `❌ Entfolgt: ${historyList.filter(h => h.type === 'UNFOLLOW').length}\n\n` +
+                          `#Instagram #Monitoring #Analytics`;
+                        navigator.clipboard.writeText(text);
+                        alert('Social Media Report kopiert! ✨');
+                      }}
+                      className="flex-1 min-w-[200px] flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] text-white rounded-2xl font-black text-sm shadow-lg shadow-[var(--accent)]/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.84 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" /></svg>
+                      Social Media Post kopieren
+                    </button>
+                    <button
+                      onClick={() => {
+                        const csv = [
+                          ['Datum', 'Typ', 'Benutzername'],
+                          ...historyList.map(h => [h.detectedAt, h.type, h.targetUsername])
+                        ].map(e => e.join(',')).join('\n');
+                        const blob = new Blob([csv], { type: 'text/csv' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.setAttribute('href', url);
+                        a.setAttribute('download', `${username}_stats.csv`);
+                        a.click();
+                      }}
+                      className="px-6 py-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl font-bold text-sm text-[var(--foreground)] hover:bg-[var(--background)] transition-all flex items-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      CSV Export
+                    </button>
                   </div>
                 </div>
               )}
