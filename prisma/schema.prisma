@@ -17,7 +17,25 @@ model ProfileSet {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Linked Twitter/X Account for posting (optional)
+  twitterAccountId  String?
+  twitterAccount    TwitterAccount? @relation(fields: [twitterAccountId], references: [id])
+
   profiles    MonitoredProfile[]
+}
+
+// Twitter/X Account for multi-account posting
+model TwitterAccount {
+  id              String   @id @default(cuid())
+  username        String   @unique  // @BundesligaWatch, @LaLigaWatch, etc.
+  displayName     String?           // "Bundesliga Watch 🇩🇪"
+  sessionPath     String?           // Path to session JSON file
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Sets linked to this account
+  sets            ProfileSet[]
 }
 
 // A profile being monitored for changes

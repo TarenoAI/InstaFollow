@@ -21,11 +21,19 @@ export interface ProfileInfo {
     screenshotUrl: string | null;
 }
 
+export interface TwitterAccountInfo {
+    id: string;
+    username: string;
+    displayName: string | null;
+    isActive: boolean;
+}
+
 export interface SetInfo {
     id: string;
     name: string;
     isActive: boolean;
     profiles: ProfileInfo[];
+    twitterAccount: TwitterAccountInfo | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -37,7 +45,7 @@ export interface SetInfo {
 // Get all sets
 export async function getSets(): Promise<SetInfo[]> {
     const sets = await prisma.profileSet.findMany({
-        include: { profiles: true },
+        include: { profiles: true, twitterAccount: true } as any,
         orderBy: { createdAt: 'desc' },
     });
 
@@ -57,6 +65,12 @@ export async function getSets(): Promise<SetInfo[]> {
             lastCheckedAt: p.lastCheckedAt,
             screenshotUrl: p.screenshotUrl,
         })),
+        twitterAccount: set.twitterAccount ? {
+            id: set.twitterAccount.id,
+            username: set.twitterAccount.username,
+            displayName: set.twitterAccount.displayName,
+            isActive: set.twitterAccount.isActive,
+        } : null,
         createdAt: set.createdAt,
         updatedAt: set.updatedAt,
     }));
@@ -87,6 +101,7 @@ export async function createSet(name: string): Promise<{ success: boolean; set?:
                 name: set.name,
                 isActive: set.isActive,
                 profiles: [],
+                twitterAccount: null,
                 createdAt: set.createdAt,
                 updatedAt: set.updatedAt,
             },
@@ -326,4 +341,65 @@ export async function getProfileFollowing(profileId: string) {
         isPrivate: f.isPrivate,
         isVerified: f.isVerified,
     }));
+}
+
+// ============ TWITTER ACCOUNTS ============
+
+// Get all Twitter accounts
+export async function getTwitterAccounts(): Promise<TwitterAccountInfo[]> {
+    try {
+        const accounts = await (prisma as any).twitterAccount.findMany({
+            orderBy: { username: 'asc' },
+        });
+        return accounts.map((a: any) => ({
+            id: a.id,
+            username: a.username,
+            displayName: a.displayName,
+            isActive: a.isActive,
+        }));
+    } catch {
+        // Table doesn't exist yet
+        return [];
+    }
+}
+
+// Create a new Twitter account
+export async function createTwitterAccount(username: string, displayName?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        await (prisma as any).twitterAccount.create({
+            data: {
+                username: username.replace('@', '').toLowerCase(),
+                displayName: displayName || username,
+            },
+        });
+        return { success: true };
+    } catch (error: any) {
+        if (error.code === 'P2002') {
+            return { success: false, error: 'Dieser Twitter-Account existiert bereits.' };
+        }
+        return { success: false, error: 'Fehler beim Erstellen.' };
+    }
+}
+
+// Delete a Twitter account
+export async function deleteTwitterAccount(accountId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        await (prisma as any).twitterAccount.delete({ where: { id: accountId } });
+        return { success: true };
+    } catch {
+        return { success: false, error: 'Fehler beim Löschen.' };
+    }
+}
+
+// Link a Twitter account to a set
+export async function linkTwitterAccountToSet(setId: string, twitterAccountId: string | null): Promise<{ success: boolean; error?: string }> {
+    try {
+        await prisma.profileSet.update({
+            where: { id: setId },
+            data: { twitterAccountId } as any,
+        });
+        return { success: true };
+    } catch {
+        return { success: false, error: 'Fehler beim Verknüpfen.' };
+    }
 }
