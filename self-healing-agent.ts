@@ -506,7 +506,6 @@ async function runAgent() {
             SELECT id, username, followingCount 
             FROM MonitoredProfile 
             ORDER BY lastCheckedAt ASC
-            LIMIT 5
         `);
 
         log('📋', `${profiles.rows.length} Profile zu prüfen\n`);
