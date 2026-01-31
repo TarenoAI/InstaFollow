@@ -22,7 +22,7 @@ const INSTAGRAM_PASSWORD = process.env.INSTAGRAM_PASSWORD!;
 const INSTAGRAM_SESSION_PATH = 'instagram-session.json';
 
 const MAX_RETRIES = 3;
-const MIN_SCRAPE_QUOTA = 0.75; // 75% - Instagram hat Lazy-Loading Limits
+const MIN_SCRAPE_QUOTA = 0.98; // 98% - Fast 100%, aber kleine Abweichungen durch deaktivierte Accounts erlauben
 
 // ============ AGENT STATE ============
 interface AgentState {
@@ -362,7 +362,7 @@ async function intelligentScrape(
     }
 
     await page.waitForTimeout(4000);
-    await dismissAllPopups(page);
+    // NICHT dismissAllPopups aufrufen, da dies den Following-Dialog schließt!
 
     // Screenshot nach Dialog-Öffnung
     await takeDebugScreenshot(page, `${username}-dialog`);
@@ -381,7 +381,7 @@ async function intelligentScrape(
             if (dialog) {
                 dialog.querySelectorAll('a').forEach(a => {
                     const href = a.getAttribute('href');
-                    if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/)) {
+                    if (href && href.match(/^\/[a-zA-Z0-9._\-]+\/?$/)) {
                         const username = href.replace(/\//g, '');
                         if (!['explore', 'reels', 'p', 'direct', 'accounts'].includes(username)) {
                             links.push(username);
@@ -549,7 +549,12 @@ async function runAgent() {
             let scrapeResult = { success: false, following: [] as string[], retryReason: '' };
 
             while (agentState.retryCount < MAX_RETRIES && !scrapeResult.success) {
-                scrapeResult = await intelligentScrape(page, username, currentCount);
+                const result = await intelligentScrape(page, username, currentCount);
+                scrapeResult = {
+                    success: result.success,
+                    following: result.following,
+                    retryReason: result.retryReason || 'Unbekannter Fehler'
+                };
 
                 if (!scrapeResult.success) {
                     agentState.retryCount++;
