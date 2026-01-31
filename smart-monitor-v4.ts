@@ -254,7 +254,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 
         await page.click('a[href*="following"]', { timeout: 10000 });
         await page.waitForTimeout(4000);
-        await dismissPopups(page);
+        // NICHT dismissPopups aufrufen, da dies das Following-Fenster schließt!
 
         // DEBUG: Screenshot nach Dialog-Öffnung
         await page.screenshot({ path: `debug-dialog-${username}.png` });
@@ -663,11 +663,11 @@ async function main() {
                     console.log(`      3. Netzwerk-Latenz auf VPS`);
                 }
 
-                // ⚠️ KRITISCH: Wenn weniger als 75% gescrapt, keine Changes verarbeiten!
-                const MIN_SCRAPE_QUOTA = 0.75;
+                // ⚠️ KRITISCH: Wenn weniger als 95% gescrapt, keine Changes verarbeiten!
+                const MIN_SCRAPE_QUOTA = 0.95;
                 if (currentFollowing.length < currentCount * MIN_SCRAPE_QUOTA) {
                     console.log(`   🚫 ABBRUCH: Nur ${currentFollowing.length}/${currentCount} gescrapt (${scrapeQuote}%)`);
-                    console.log(`      Benötigt: mindestens ${Math.ceil(currentCount * 0.75)} (75%)`);
+                    console.log(`      Benötigt: mindestens ${Math.ceil(currentCount * 0.95)} (95%)`);
                     console.log(`      ➡️ Keine Changes werden verarbeitet um falsche Unfollows zu vermeiden!`);
                     console.log(`      ➡️ Nur den Count aktualisieren, kein Post.\n`);
 
