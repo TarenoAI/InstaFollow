@@ -1022,7 +1022,7 @@ interface ProfileDetailsModalProps {
 }
 
 function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }: ProfileDetailsModalProps) {
-  const [activeTab, setActiveTab] = useState<'list' | 'history' | 'sets'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'history' | 'sets' | 'stats'>('list');
   const [profile, setProfile] = useState<any>(null);
   const [allSets, setAllSets] = useState<any[]>([]);
   const [followingList, setFollowingList] = useState<any[]>([]);
@@ -1149,7 +1149,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
               : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
               }`}
           >
-            📜 Abonniert {followingList.length > 0 && <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--accent)]/20">({followingList.length})</span>}
+            📜 Abonniert {(profile?.followingCount || followingList.length) > 0 && <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--accent)]/20">({profile?.followingCount || followingList.length})</span>}
             {activeTab === 'list' && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] rounded-t-full"></span>
             )}
@@ -1175,6 +1175,18 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
           >
             📁 Ordner
             {activeTab === 'sets' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] rounded-t-full"></span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('stats')}
+            className={`relative py-4 px-2 ml-8 text-sm font-semibold transition-all ${activeTab === 'stats'
+              ? 'text-[var(--accent)]'
+              : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
+              }`}
+          >
+            📊 Statistik
+            {activeTab === 'stats' && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] rounded-t-full"></span>
             )}
           </button>
@@ -1366,6 +1378,144 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'stats' && (
+                <div className="space-y-6">
+                  <div className="bg-[var(--card)] p-6 rounded-2xl border border-[var(--border)]">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      Aktivitäts-Statistik
+                    </h3>
+
+                    {/* Summary Stats */}
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="p-4 rounded-xl bg-[var(--success)]/10 border border-[var(--success)]/20">
+                        <p className="text-2xl font-bold text-[var(--success)]">
+                          +{historyList.filter(h => h.type === 'FOLLOW').length}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">Neue Follows</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/20">
+                        <p className="text-2xl font-bold text-[var(--error)]">
+                          -{historyList.filter(h => h.type === 'UNFOLLOW').length}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">Entfolgt</p>
+                      </div>
+                    </div>
+
+                    {/* Timeline Chart */}
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-[var(--text-muted)]">Zeitverlauf (letzte 7 Tage)</p>
+                      <div className="h-48 bg-[var(--background)] rounded-xl p-4 overflow-hidden">
+                        {historyList.length === 0 ? (
+                          <div className="h-full flex items-center justify-center text-[var(--text-muted)]">
+                            Noch keine Daten für Diagramm
+                          </div>
+                        ) : (
+                          <div className="h-full flex items-end gap-1">
+                            {/* Generate bars for last 7 days */}
+                            {Array.from({ length: 7 }, (_, i) => {
+                              const date = new Date();
+                              date.setDate(date.getDate() - (6 - i));
+                              const dateStr = date.toISOString().split('T')[0];
+
+                              const follows = historyList.filter(h =>
+                                h.type === 'FOLLOW' && h.detectedAt.startsWith(dateStr)
+                              ).length;
+                              const unfollows = historyList.filter(h =>
+                                h.type === 'UNFOLLOW' && h.detectedAt.startsWith(dateStr)
+                              ).length;
+
+                              const maxHeight = 120;
+                              const maxValue = Math.max(
+                                ...historyList.reduce((acc, h) => {
+                                  const d = h.detectedAt.split('T')[0];
+                                  acc[d] = (acc[d] || 0) + 1;
+                                  return acc;
+                                }, {} as Record<string, number>)
+                                , 1);
+
+                              return (
+                                <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                                  <div className="flex-1 flex items-end gap-0.5 w-full">
+                                    <div
+                                      className="flex-1 bg-[var(--success)] rounded-t transition-all"
+                                      style={{ height: `${(follows / maxValue) * maxHeight}px` }}
+                                      title={`${follows} Follows`}
+                                    />
+                                    <div
+                                      className="flex-1 bg-[var(--error)] rounded-t transition-all"
+                                      style={{ height: `${(unfollows / maxValue) * maxHeight}px` }}
+                                      title={`${unfollows} Unfollows`}
+                                    />
+                                  </div>
+                                  <span className="text-[10px] text-[var(--text-muted)]">
+                                    {date.toLocaleDateString('de-DE', { weekday: 'short' })}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex justify-center gap-6 text-xs">
+                        <span className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded bg-[var(--success)]"></span>
+                          Follows
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded bg-[var(--error)]"></span>
+                          Unfollows
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Weekly/Monthly Report Export */}
+                    <div className="mt-6 pt-6 border-t border-[var(--border)]">
+                      <p className="text-sm font-medium mb-3">📤 Report exportieren</p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            const report = {
+                              profile: username,
+                              period: 'Letzte 7 Tage',
+                              follows: historyList.filter(h => h.type === 'FOLLOW').length,
+                              unfollows: historyList.filter(h => h.type === 'UNFOLLOW').length,
+                              events: historyList.map(h => ({
+                                type: h.type,
+                                target: h.targetUsername,
+                                date: h.detectedAt
+                              }))
+                            };
+                            navigator.clipboard.writeText(JSON.stringify(report, null, 2));
+                            alert('Report in Zwischenablage kopiert!');
+                          }}
+                          className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-all"
+                        >
+                          Weekly Report
+                        </button>
+                        <button
+                          onClick={() => {
+                            const text = `📊 @${username} Activity Report\n\n` +
+                              `✅ Neue Follows: ${historyList.filter(h => h.type === 'FOLLOW').length}\n` +
+                              `❌ Entfolgt: ${historyList.filter(h => h.type === 'UNFOLLOW').length}\n\n` +
+                              historyList.slice(0, 10).map(h =>
+                                `${h.type === 'FOLLOW' ? '✅' : '❌'} @${h.targetUsername}`
+                              ).join('\n');
+                            navigator.clipboard.writeText(text);
+                            alert('Social Media Text kopiert!');
+                          }}
+                          className="px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-sm font-medium hover:border-[var(--accent)] transition-all"
+                        >
+                          📱 Social Media Text
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
