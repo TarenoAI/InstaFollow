@@ -717,10 +717,15 @@ async function main() {
                             if (addedProfiles.length > 0) {
                                 const tweetText = formatTweetText('FOLLOW', monitoredProfileInfo, addedProfiles);
 
+                                // Screenshot: Bei 1 Target -> Target-Screenshot, sonst Monitor-Screenshot
+                                const screenshotToUse = addedProfiles.length === 1 && addedProfiles[0].screenshotPath
+                                    ? addedProfiles[0].screenshotPath
+                                    : monitoredProfileInfo.screenshotPath;
+
                                 const tweetUrl = await postToTwitter(
                                     browser,
                                     tweetText,
-                                    monitoredProfileInfo.screenshotPath
+                                    screenshotToUse
                                 );
 
                                 await sendWebhook({

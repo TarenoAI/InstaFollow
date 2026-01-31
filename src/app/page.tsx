@@ -1425,21 +1425,29 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                               date.setDate(date.getDate() - (6 - i));
                               const dateStr = date.toISOString().split('T')[0];
 
-                              const follows = historyList.filter(h =>
-                                h.type === 'FOLLOW' && h.detectedAt.startsWith(dateStr)
-                              ).length;
-                              const unfollows = historyList.filter(h =>
-                                h.type === 'UNFOLLOW' && h.detectedAt.startsWith(dateStr)
-                              ).length;
+                              const follows = historyList.filter(h => {
+                                const detectedStr = typeof h.detectedAt === 'string'
+                                  ? h.detectedAt
+                                  : new Date(h.detectedAt).toISOString();
+                                return h.type === 'FOLLOW' && detectedStr.startsWith(dateStr);
+                              }).length;
+                              const unfollows = historyList.filter(h => {
+                                const detectedStr = typeof h.detectedAt === 'string'
+                                  ? h.detectedAt
+                                  : new Date(h.detectedAt).toISOString();
+                                return h.type === 'UNFOLLOW' && detectedStr.startsWith(dateStr);
+                              }).length;
 
                               const maxHeight = 120;
-                              const maxValue = Math.max(
-                                ...historyList.reduce((acc, h) => {
-                                  const d = h.detectedAt.split('T')[0];
-                                  acc[d] = (acc[d] || 0) + 1;
-                                  return acc;
-                                }, {} as Record<string, number>)
-                                , 1);
+                              const countsByDay = historyList.reduce((acc, h) => {
+                                const detectedStr = typeof h.detectedAt === 'string'
+                                  ? h.detectedAt
+                                  : new Date(h.detectedAt).toISOString();
+                                const d = detectedStr.split('T')[0];
+                                acc[d] = (acc[d] || 0) + 1;
+                                return acc;
+                              }, {} as Record<string, number>);
+                              const maxValue = Math.max(...Object.values(countsByDay) as number[], 1);
 
                               return (
                                 <div key={i} className="flex-1 flex flex-col items-center gap-1">
