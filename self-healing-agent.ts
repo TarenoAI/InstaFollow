@@ -20,9 +20,10 @@ const TURSO_AUTH_TOKEN = process.env.TURSO_AUTH_TOKEN!;
 const INSTAGRAM_USERNAME = process.env.INSTAGRAM_USERNAME!;
 const INSTAGRAM_PASSWORD = process.env.INSTAGRAM_PASSWORD!;
 const INSTAGRAM_SESSION_PATH = 'instagram-session.json';
+const N8N_FAIL_WEBHOOK_URL = process.env.N8N_FAIL_WEBHOOK_URL || ''; // Webhook für Fehlerbenachrichtigungen
 
 const MAX_RETRIES = 3;
-const MIN_SCRAPE_QUOTA = 0.98; // 98% - Fast 100%, aber kleine Abweichungen durch deaktivierte Accounts erlauben
+const MIN_SCRAPE_QUOTA = 0.95; // 95% - Realistische Quote für Mobile Scraping
 
 // ============ AGENT STATE ============
 interface AgentState {
@@ -64,6 +65,60 @@ async function takeDebugScreenshot(page: Page, name: string): Promise<string> {
     agentState.screenshots.push(filename);
     log('📸', `Screenshot: ${filename}`, 1);
     return filename;
+}
+
+// Sende Fehler-Benachrichtigung an n8n
+async function sendFailWebhook(
+    username: string,
+    reason: string,
+    details: {
+        expected: number;
+        scraped: number;
+        quota: number;
+        viewport: string;
+        screenshots: string[];
+    }
+): Promise<void> {
+    if (!N8N_FAIL_WEBHOOK_URL) {
+        log('⚠️', 'N8N_FAIL_WEBHOOK_URL nicht konfiguriert - kein Webhook gesendet', 1);
+        return;
+    }
+
+    try {
+        // Lese letzten Screenshot als Base64
+        let screenshotBase64 = '';
+        const lastScreenshot = details.screenshots[details.screenshots.length - 1];
+        if (lastScreenshot && fs.existsSync(lastScreenshot)) {
+            screenshotBase64 = fs.readFileSync(lastScreenshot).toString('base64');
+        }
+
+        const payload = {
+            type: 'SCRAPING_FAILED',
+            timestamp: new Date().toISOString(),
+            profile: username,
+            reason: reason,
+            expected: details.expected,
+            scraped: details.scraped,
+            quotaPercent: (details.quota * 100).toFixed(1),
+            viewport: details.viewport,
+            screenshotBase64: screenshotBase64,
+            screenshotFilename: lastScreenshot || 'none'
+        };
+
+        const response = await fetch(N8N_FAIL_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            log('📤', `Fehler-Webhook gesendet an n8n`, 1);
+        } else {
+            log('❌', `Webhook-Fehler: ${response.status}`, 1);
+        }
+    } catch (err: any) {
+        log('❌', `Webhook-Exception: ${err.message}`, 1);
+    }
 }
 
 // ============ PROBLEM DETECTION ============
@@ -584,8 +639,31 @@ async function runAgent() {
                 // TODO: Change Detection und Twitter-Post hier einfügen
 
             } else {
-                log('❌', `Fehlgeschlagen nach ${MAX_RETRIES} Versuchen`, 1);
-                log('📸', `Screenshots zur Analyse: ${agentState.screenshots.join(', ')}`, 2);
+                // Detaillierte Fehleranalyse
+                const scrapedCount = scrapeResult.following.length;
+                const quotaPercent = (scrapedCount / currentCount * 100).toFixed(1);
+
+                log('❌', `SCRAPING FEHLGESCHLAGEN nach ${MAX_RETRIES} Versuchen`, 1);
+                log('�', `Diagnose für @${username}:`, 1);
+                log('', `   • Erwartet: ${currentCount} Accounts`, 0);
+                log('', `   • Gescrapt: ${scrapedCount} Accounts (${quotaPercent}%)`, 0);
+                log('', `   • Benötigt: mindestens ${Math.ceil(currentCount * MIN_SCRAPE_QUOTA)} (${MIN_SCRAPE_QUOTA * 100}%)`, 0);
+                log('', `   • Viewport: Mobile (iPhone 12 Pro)`, 0);
+                log('', `   • Mögliche Ursachen:`, 0);
+                log('', `     1. Instagram Rate-Limiting / Lazy-Load Block`, 0);
+                log('', `     2. Session abgelaufen während Scraping`, 0);
+                log('', `     3. Netzwerk-Probleme auf VPS`, 0);
+                log('', `     4. Instagram UI-Änderung`, 0);
+                log('📸', `Screenshots: ${agentState.screenshots.slice(-3).join(', ')}`, 1);
+
+                // Webhook an n8n senden
+                await sendFailWebhook(username, scrapeResult.retryReason, {
+                    expected: currentCount,
+                    scraped: scrapedCount,
+                    quota: scrapedCount / currentCount,
+                    viewport: 'Mobile (iPhone 12 Pro)',
+                    screenshots: agentState.screenshots
+                });
             }
 
             await humanDelay(5000, 10000);
