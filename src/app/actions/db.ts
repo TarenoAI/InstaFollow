@@ -18,6 +18,7 @@ export interface ProfileInfo {
     followerCount: number | null;
     followingCount: number | null;
     lastCheckedAt: Date | null;
+    screenshotUrl: string | null;
 }
 
 export interface SetInfo {
@@ -54,6 +55,7 @@ export async function getSets(): Promise<SetInfo[]> {
             followerCount: p.followerCount,
             followingCount: p.followingCount,
             lastCheckedAt: p.lastCheckedAt,
+            screenshotUrl: p.screenshotUrl,
         })),
         createdAt: set.createdAt,
         updatedAt: set.updatedAt,
@@ -195,6 +197,7 @@ export async function addProfileToSet(setId: string, username: string): Promise<
                 followerCount: profile.followerCount,
                 followingCount: profile.followingCount,
                 lastCheckedAt: profile.lastCheckedAt,
+                screenshotUrl: (profile as any).screenshotUrl || null,
             },
         };
     } catch (error: unknown) {

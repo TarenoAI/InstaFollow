@@ -37,6 +37,9 @@ model MonitoredProfile {
   // Baseline tracking - nur wenn true, können Changes erkannt werden
   isBaselineComplete    Boolean  @default(false)
   lastSuccessfulScrapeAt DateTime?
+  
+  // Screenshot of the profile (latest)
+  screenshotUrl         String?
 
   // Many-to-Many: Ein Profil kann in mehreren Sets sein
   sets            ProfileSet[]
