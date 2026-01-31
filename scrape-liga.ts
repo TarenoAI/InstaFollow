@@ -1,22 +1,10 @@
 /**
- * 🌍 UNIVERSELLER LIGA INSTAGRAM SCRAPER v2
+ * 🌍 UNIVERSELLER LIGA INSTAGRAM SCRAPER v3
  * 
- * Korrigierter Ansatz: Scrapt Instagram von den individuellen Spieler-Profilseiten
+ * Korrigierter Ansatz mit Cookie-Consent und korrekten Selektoren
  * 
  * Ausführen: 
  *   npx tsx scrape-liga.ts <liga-code> [min-followers]
- * 
- * Liga-Codes:
- *   GB1  = Premier League (England)
- *   ES1  = LaLiga (Spanien)
- *   IT1  = Serie A (Italien)
- *   L1   = Bundesliga (Deutschland)
- *   FR1  = Ligue 1 (Frankreich)
- *   ALL  = Alle Top-5-Ligen
- * 
- * Beispiele:
- *   npx tsx scrape-liga.ts L1 300000      # Bundesliga, 300k+ Follower
- *   npx tsx scrape-liga.ts GB1 500000     # Premier League, 500k+ Follower
  */
 
 import 'dotenv/config';
@@ -29,7 +17,7 @@ import fs from 'fs';
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════
 
-const INSTAGRAM_SESSION_PATH = path.join(process.cwd(), 'playwright-session.json');
+const INSTAGRAM_SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
 const iPhone = devices['iPhone 13 Pro'];
 
 const LIGA_CODE = process.argv[2] || 'L1';
@@ -81,6 +69,53 @@ function formatFollowers(n: number): string {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// COOKIE CONSENT HANDLER
+// ═══════════════════════════════════════════════════════════════
+
+async function handleCookieConsent(page: Page) {
+    try {
+        // Warte kurz um zu sehen ob Consent Modal erscheint
+        await page.waitForTimeout(1000);
+
+        // Versuche den Consent-Button zu finden und klicken
+        const consentSelectors = [
+            'button:has-text("Zustimmen")',
+            'button:has-text("Accept")',
+            'button:has-text("Akzeptieren")',
+            '[title="Zustimmen & weiter"]',
+            '.sp_choice_type_11', // Sourcepoint consent
+        ];
+
+        for (const selector of consentSelectors) {
+            try {
+                const btn = await page.$(selector);
+                if (btn) {
+                    await btn.click();
+                    await page.waitForTimeout(500);
+                    console.log('      🍪 Cookie-Consent akzeptiert');
+                    return;
+                }
+            } catch { }
+        }
+
+        // Versuche in iframes zu suchen
+        for (const frame of page.frames()) {
+            try {
+                const btn = await frame.$('button:has-text("Zustimmen")');
+                if (btn) {
+                    await btn.click();
+                    await page.waitForTimeout(500);
+                    console.log('      🍪 Cookie-Consent akzeptiert (iframe)');
+                    return;
+                }
+            } catch { }
+        }
+    } catch (e) {
+        // Ignore - consent might not be present
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // TRANSFERMARKT SCRAPING
 // ═══════════════════════════════════════════════════════════════
 
@@ -90,22 +125,26 @@ async function getTeamsFromLiga(page: Page, ligaUrl: string): Promise<Team[]> {
     await page.goto(ligaUrl, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2000);
 
+    await handleCookieConsent(page);
+
     const teams = await page.evaluate(() => {
         const results: { name: string; id: string }[] = [];
 
-        // Vereins-Tabelle finden
-        const rows = document.querySelectorAll('table.items tbody tr');
-        rows.forEach(row => {
-            const link = row.querySelector('td.hauptlink a[href*="/startseite/verein/"]');
-            if (link) {
-                const href = link.getAttribute('href') || '';
-                const match = href.match(/\/verein\/(\d+)/);
-                if (match) {
-                    results.push({
-                        name: link.textContent?.trim() || '',
-                        id: match[1]
-                    });
-                }
+        // Vereins-Tabelle finden - mehrere mögliche Selektoren
+        const links = document.querySelectorAll('a[href*="/startseite/verein/"]');
+        const seen = new Set<string>();
+
+        links.forEach(link => {
+            const href = link.getAttribute('href') || '';
+            const match = href.match(/\/verein\/(\d+)/);
+            const name = link.textContent?.trim() || '';
+
+            if (match && name.length > 1 && !seen.has(match[1])) {
+                seen.add(match[1]);
+                results.push({
+                    name,
+                    id: match[1]
+                });
             }
         });
 
@@ -117,23 +156,34 @@ async function getTeamsFromLiga(page: Page, ligaUrl: string): Promise<Team[]> {
 }
 
 async function getPlayerLinksFromTeam(page: Page, team: Team): Promise<PlayerLink[]> {
-    const kaderUrl = `https://www.transfermarkt.de/team/kader/verein/${team.id}`;
+    // Erweiterte Kader-Ansicht mit plus/1
+    const kaderUrl = `https://www.transfermarkt.de/team/kader/verein/${team.id}/saison_id/2024/plus/1`;
 
     try {
         await page.goto(kaderUrl, { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(2000);
+
+        await handleCookieConsent(page);
 
         const players = await page.evaluate(() => {
             const results: { name: string; profileUrl: string }[] = [];
+            const seen = new Set<string>();
 
-            // Finde alle Spieler in der Kader-Tabelle
-            const rows = document.querySelectorAll('table.items tbody tr');
-            rows.forEach(row => {
-                const nameLink = row.querySelector('td.hauptlink a[href*="/profil/spieler/"]');
-                if (nameLink) {
-                    const href = nameLink.getAttribute('href') || '';
-                    const name = nameLink.textContent?.trim() || '';
-                    if (href && name) {
+            // Finde alle Spieler-Links
+            const links = document.querySelectorAll('a[href*="/profil/spieler/"]');
+
+            links.forEach(link => {
+                const href = link.getAttribute('href') || '';
+                const name = link.textContent?.trim() || '';
+
+                // Nur echte Namen (nicht Bilder, nicht zu kurz)
+                if (href && name.length > 2 && !seen.has(href)) {
+                    // Prüfe ob es ein echter Spielername ist (nicht "Transferhistorie" etc.)
+                    const isPlayerName = !name.includes('Transferhistorie') &&
+                        !name.includes('Leistungsdaten') &&
+                        !name.match(/^\d+$/);
+                    if (isPlayerName) {
+                        seen.add(href);
                         results.push({
                             name,
                             profileUrl: 'https://www.transfermarkt.de' + href
@@ -155,25 +205,36 @@ async function getPlayerLinksFromTeam(page: Page, team: Team): Promise<PlayerLin
 async function getInstagramFromPlayerProfile(page: Page, player: PlayerLink): Promise<string | null> {
     try {
         await page.goto(player.profileUrl, { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(1500);
 
-        // Suche nach Instagram-Link auf der Spieler-Profilseite
+        await handleCookieConsent(page);
+
+        // Suche nach Instagram-Link mit verschiedenen Methoden
         const instagram = await page.evaluate(() => {
-            // Methode 1: Direkter Instagram-Link im Social-Media Bereich
-            const igLink = document.querySelector('a[href*="instagram.com"]');
-            if (igLink) {
-                const href = igLink.getAttribute('href') || '';
-                const match = href.match(/instagram\.com\/([^\/\?]+)/);
-                if (match) return match[1].toLowerCase();
+            // Methode 1: Link mit title="Instagram" (am zuverlässigsten)
+            const igByTitle = document.querySelector('a[title="Instagram"]');
+            if (igByTitle) {
+                const href = igByTitle.getAttribute('href') || '';
+                const match = href.match(/instagram\.com\/([^\/\?\s]+)/);
+                if (match) return match[1].toLowerCase().replace(/\/$/, '');
             }
 
-            // Methode 2: Suche im "Weitere Infos" Bereich
-            const allLinks = Array.from(document.querySelectorAll('a'));
-            for (const link of allLinks) {
+            // Methode 2: Link in Social-Media-Toolbar
+            const igInToolbar = document.querySelector('.social-media-toolbar__icons a[href*="instagram.com"]');
+            if (igInToolbar) {
+                const href = igInToolbar.getAttribute('href') || '';
+                const match = href.match(/instagram\.com\/([^\/\?\s]+)/);
+                if (match) return match[1].toLowerCase().replace(/\/$/, '');
+            }
+
+            // Methode 3: Beliebiger Instagram-Link
+            const allIgLinks = document.querySelectorAll('a[href*="instagram.com"]');
+            for (const link of allIgLinks) {
                 const href = link.getAttribute('href') || '';
-                if (href.includes('instagram.com')) {
-                    const match = href.match(/instagram\.com\/([^\/\?]+)/);
-                    if (match) return match[1].toLowerCase();
+                const match = href.match(/instagram\.com\/([^\/\?\s]+)/);
+                // Filtere generische Pfade raus
+                if (match && !['p', 'explore', 'reel', 'stories', 'accounts'].includes(match[1])) {
+                    return match[1].toLowerCase().replace(/\/$/, '');
                 }
             }
 
@@ -226,20 +287,16 @@ async function checkInstagramProfile(page: Page, username: string, playerName: s
             return { followers, isVerified, fullName, profilePicUrl };
         });
 
-        if (profileData.followers >= MIN_FOLLOWERS) {
-            return {
-                playerName,
-                team,
-                liga,
-                instagram: username,
-                followers: profileData.followers,
-                isVerified: profileData.isVerified,
-                fullName: profileData.fullName,
-                profilePicUrl: profileData.profilePicUrl
-            };
-        }
-
-        return null;
+        return {
+            playerName,
+            team,
+            liga,
+            instagram: username,
+            followers: profileData.followers,
+            isVerified: profileData.isVerified,
+            fullName: profileData.fullName,
+            profilePicUrl: profileData.profilePicUrl
+        };
     } catch (error) {
         return null;
     }
@@ -257,7 +314,6 @@ async function saveToTurso(players: PlayerInfo[], setName: string) {
 
     console.log(`\n💾 Speichere ${players.length} Spieler in Turso...`);
 
-    // Set erstellen oder finden
     const setId = `set_${setName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
     await db.execute({
         sql: `INSERT OR IGNORE INTO ProfileSet (id, name, isActive, createdAt, updatedAt) 
@@ -270,7 +326,6 @@ async function saveToTurso(players: PlayerInfo[], setName: string) {
         try {
             const profileId = `mp_${player.instagram.toLowerCase()}`;
 
-            // Profil erstellen oder aktualisieren
             await db.execute({
                 sql: `INSERT INTO MonitoredProfile (id, username, fullName, profilePicUrl, isVerified, followerCount, createdAt, updatedAt)
                       VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
@@ -290,7 +345,6 @@ async function saveToTurso(players: PlayerInfo[], setName: string) {
                 ]
             });
 
-            // Mit Set verbinden
             await db.execute({
                 sql: `INSERT OR IGNORE INTO _MonitoredProfileToProfileSet (A, B) VALUES (?, ?)`,
                 args: [profileId, setId]
@@ -323,24 +377,33 @@ async function main() {
     }
 
     console.log(`\n${'═'.repeat(60)}`);
-    console.log(`🏆 LIGA INSTAGRAM SCRAPER v2`);
+    console.log(`🏆 LIGA INSTAGRAM SCRAPER v3`);
     console.log(`${'═'.repeat(60)}`);
     console.log(`📌 Ligen: ${ligaCodes.map(c => LIGEN[c].name).join(', ')}`);
     console.log(`📌 Mindest-Follower: ${formatFollowers(MIN_FOLLOWERS)}`);
     console.log(`${'═'.repeat(60)}\n`);
 
+    // Prüfe Session-Pfad
+    const sessionPath = fs.existsSync(INSTAGRAM_SESSION_PATH)
+        ? INSTAGRAM_SESSION_PATH
+        : fs.existsSync('playwright-session.json') ? 'playwright-session.json' : undefined;
+
+    if (!sessionPath) {
+        console.warn('⚠️ Keine Instagram-Session gefunden! Follower-Check könnte fehlschlagen.');
+    }
+
     const browser = await chromium.launch({ headless: true });
 
     // Transfermarkt Context (Desktop)
     const tmContext = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     });
     const tmPage = await tmContext.newPage();
 
     // Instagram Context (Mobile mit Session)
     const igContext = await browser.newContext({
         ...iPhone,
-        storageState: fs.existsSync(INSTAGRAM_SESSION_PATH) ? INSTAGRAM_SESSION_PATH : undefined
+        storageState: sessionPath
     });
     const igPage = await igContext.newPage();
 
@@ -352,29 +415,27 @@ async function main() {
             const liga = LIGEN[code];
             console.log(`\n🏟️ === ${liga.name} ===`);
 
-            // Teams holen
             const teams = await getTeamsFromLiga(tmPage, liga.url);
 
             for (const team of teams) {
                 console.log(`\n   ⚽ ${team.name}`);
 
-                // Spieler-Links von Kader-Seite holen
                 const playerLinks = await getPlayerLinksFromTeam(tmPage, team);
                 console.log(`      👥 ${playerLinks.length} Spieler im Kader`);
 
                 let teamInstagrams = 0;
-                for (const player of playerLinks) {
-                    await humanDelay(500, 1000);
+                let teamQualified = 0;
 
-                    // Instagram von Spieler-Profilseite holen
+                for (const player of playerLinks) {
+                    await humanDelay(300, 600);
+
                     const instagram = await getInstagramFromPlayerProfile(tmPage, player);
 
                     if (instagram && !checkedInstagrams.has(instagram)) {
                         checkedInstagrams.add(instagram);
                         teamInstagrams++;
 
-                        // Follower auf Instagram checken
-                        await humanDelay(1000, 2000);
+                        await humanDelay(500, 1000);
                         const info = await checkInstagramProfile(
                             igPage,
                             instagram,
@@ -384,13 +445,23 @@ async function main() {
                         );
 
                         if (info) {
-                            console.log(`      ✅ @${info.instagram}: ${formatFollowers(info.followers)} (${player.name})`);
-                            allPlayers.push(info);
+                            const status = info.followers >= MIN_FOLLOWERS ? '✅ QUALIFIZIERT' : '⬇️ Nicht qualifiziert';
+                            console.log(`      ${player.name}:`);
+                            console.log(`         Instagram: @${instagram}`);
+                            console.log(`         Follower: ${formatFollowers(info.followers)}`);
+                            console.log(`         Status: ${status}`);
+
+                            if (info.followers >= MIN_FOLLOWERS) {
+                                teamQualified++;
+                                allPlayers.push(info);
+                            }
                         }
+                    } else if (!instagram) {
+                        console.log(`      ${player.name}: ❌ Kein Instagram`);
                     }
                 }
 
-                console.log(`      📱 ${teamInstagrams} Instagram-Accounts gefunden`);
+                console.log(`      📊 Ergebnis: ${teamInstagrams} Instagram-Accounts, ${teamQualified} qualifiziert`);
             }
         }
 
@@ -409,7 +480,6 @@ async function main() {
                 console.log(`   ${i + 1}. @${p.instagram} - ${formatFollowers(p.followers)} (${p.playerName}, ${p.liga})`);
             });
 
-            // In DB speichern
             const setName = ligaCodes.length > 1
                 ? `Top Europa ${formatFollowers(MIN_FOLLOWERS)}+`
                 : `${LIGEN[ligaCodes[0]].name} ${formatFollowers(MIN_FOLLOWERS)}+`;
