@@ -22,7 +22,7 @@ const INSTAGRAM_PASSWORD = process.env.INSTAGRAM_PASSWORD!;
 const INSTAGRAM_SESSION_PATH = 'instagram-session.json';
 
 const MAX_RETRIES = 3;
-const MIN_SCRAPE_QUOTA = 1.0; // 100%
+const MIN_SCRAPE_QUOTA = 0.75; // 75% - Instagram hat Lazy-Loading Limits
 
 // ============ AGENT STATE ============
 interface AgentState {
