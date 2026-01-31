@@ -148,14 +148,71 @@ async function performLogin(page: Page): Promise<boolean> {
 
     try {
         await page.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'networkidle' });
+        await page.waitForTimeout(3000);
+
+        // Screenshot vor Login
+        await takeDebugScreenshot(page, 'login-page');
+
+        // Cookie Consent schließen (falls vorhanden)
+        const cookieButtons = [
+            'button:has-text("Allow all cookies")',
+            'button:has-text("Alle Cookies erlauben")',
+            'button:has-text("Accept All")',
+            'button:has-text("Akzeptieren")',
+            'button:has-text("Allow essential and optional cookies")',
+            '[data-testid="cookie-policy-manage-dialog-accept-button"]'
+        ];
+
+        for (const selector of cookieButtons) {
+            try {
+                const btn = await page.$(selector);
+                if (btn) {
+                    await btn.click();
+                    log('🍪', 'Cookie-Consent akzeptiert', 2);
+                    await page.waitForTimeout(2000);
+                    break;
+                }
+            } catch { }
+        }
+
+        // Warte auf Login-Formular
         await page.waitForTimeout(2000);
 
+        // Versuche verschiedene Selektoren für Username
+        const usernameSelectors = [
+            'input[name="username"]',
+            'input[aria-label="Phone number, username, or email"]',
+            'input[aria-label="Telefonnummer, Benutzername oder E-Mail"]',
+            'input[type="text"]'
+        ];
+
+        let usernameInput = null;
+        for (const selector of usernameSelectors) {
+            usernameInput = await page.$(selector);
+            if (usernameInput) {
+                log('📝', `Username-Feld gefunden: ${selector}`, 2);
+                break;
+            }
+        }
+
+        if (!usernameInput) {
+            await takeDebugScreenshot(page, 'login-no-username');
+            log('❌', 'Kein Username-Feld gefunden', 2);
+            return false;
+        }
+
         // Username eingeben
-        await page.fill('input[name="username"]', INSTAGRAM_USERNAME);
+        await usernameInput.fill(INSTAGRAM_USERNAME);
         await humanDelay(500, 1000);
 
         // Password eingeben
-        await page.fill('input[name="password"]', INSTAGRAM_PASSWORD);
+        const passwordInput = await page.$('input[name="password"], input[type="password"]');
+        if (passwordInput) {
+            await passwordInput.fill(INSTAGRAM_PASSWORD);
+        } else {
+            log('❌', 'Kein Password-Feld gefunden', 2);
+            return false;
+        }
         await humanDelay(500, 1000);
 
         // Login Button klicken
