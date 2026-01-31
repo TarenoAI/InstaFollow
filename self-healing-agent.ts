@@ -12,6 +12,7 @@ import { chromium, Browser, Page, BrowserContext } from 'playwright';
 import { createClient } from '@libsql/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import 'dotenv/config';
 
 // ============ CONFIGURATION ============
@@ -118,6 +119,73 @@ async function sendFailWebhook(
         }
     } catch (err: any) {
         log('❌', `Webhook-Exception: ${err.message}`, 1);
+    }
+}
+
+// 🚩 Erstellt einen Incident-Report im Repo und pusht ihn zu GitHub
+async function createIncidentReport(
+    username: string,
+    reason: string,
+    details: {
+        expected: number;
+        scraped: number;
+        quota: number;
+        viewport: string;
+        screenshots: string[];
+    }
+): Promise<void> {
+    const incidentDir = path.join(process.cwd(), '.incidents');
+    if (!fs.existsSync(incidentDir)) {
+        fs.mkdirSync(incidentDir, { recursive: true });
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const reportId = `incident-${username}-${timestamp}`;
+    const reportPath = path.join(incidentDir, `${reportId}.md`);
+
+    // Letzten Screenshot in den Incident-Ordner verschieben/kopieren
+    let incidentScreenshot = '';
+    const lastScreenshot = details.screenshots[details.screenshots.length - 1];
+    if (lastScreenshot && fs.existsSync(lastScreenshot)) {
+        incidentScreenshot = `${reportId}.png`;
+        fs.copyFileSync(lastScreenshot, path.join(incidentDir, incidentScreenshot));
+    }
+
+    const content = `
+# 🚨 INCIDENT REPORT: Scraping Failed for @${username}
+**Datum:** ${new Date().toLocaleString()}
+**Status:** FAILED
+**Grund:** ${reason}
+
+## 📊 Statistik
+- **Erwartet:** ${details.expected}
+- **Gescrapt:** ${details.scraped}
+- **Quote:** ${(details.quota * 100).toFixed(1)}% (Limit: ${(MIN_SCRAPE_QUOTA * 100).toFixed(1)}%)
+- **Viewport:** ${details.viewport}
+
+## 📸 Letzter Zustand
+![Screenshot](${incidentScreenshot})
+
+## 📝 Analyse-Log
+- Retry-Versuche: ${MAX_RETRIES}
+- Strategien: js-scroll, keyboard, mouse-wheel
+- Letzte Screenshots: ${details.screenshots.slice(-3).join(', ')}
+
+---
+*Dieser Report wurde automatisch vom Self-Healing Agenten erstellt.*
+`;
+
+    fs.writeFileSync(reportPath, content);
+    log('📝', `Incident-Report erstellt: ${reportPath}`, 1);
+
+    try {
+        log('🚀', 'Pushe Incident zu GitHub für automatische Analyse...', 1);
+        execSync(`git add .incidents/${reportId}.*`);
+        execSync(`git commit -m "incident: scrape fail @${username} [skip ci]"`);
+        execSync('git push origin main');
+        log('✅', 'Incident erfolgreich zu GitHub gepusht!', 1);
+    } catch (err: any) {
+        log('❌', `Git-Push fehlgeschlagen: ${err.message}`, 1);
     }
 }
 
@@ -658,6 +726,15 @@ async function runAgent() {
 
                 // Webhook an n8n senden
                 await sendFailWebhook(username, scrapeResult.retryReason, {
+                    expected: currentCount,
+                    scraped: scrapedCount,
+                    quota: scrapedCount / currentCount,
+                    viewport: 'Mobile (iPhone 12 Pro)',
+                    screenshots: agentState.screenshots
+                });
+
+                // Incident Report an GitHub senden
+                await createIncidentReport(username, scrapeResult.retryReason, {
                     expected: currentCount,
                     scraped: scrapedCount,
                     quota: scrapedCount / currentCount,
