@@ -516,6 +516,24 @@ async function intelligentScrape(
         await page.waitForTimeout(4000);
     }
 
+    // 🔥 WICHTIG: "Save login info" Popup schließen (blockiert sonst die Liste!)
+    const saveLoginPopupDismissed = await page.evaluate(() => {
+        const notNowBtn = Array.from(document.querySelectorAll('button, div[role="button"]')).find(
+            el => el.textContent?.toLowerCase().includes('not now') ||
+                el.textContent?.toLowerCase().includes('nicht jetzt')
+        );
+        if (notNowBtn) {
+            (notNowBtn as HTMLElement).click();
+            return true;
+        }
+        return false;
+    });
+
+    if (saveLoginPopupDismissed) {
+        log('🚫', '"Save login info" Popup geschlossen!', 2);
+        await page.waitForTimeout(2000);
+    }
+
     // Scrolling mit verschiedenen Strategien
     const strategies = ['js-scroll', 'keyboard', 'mouse-wheel'];
     let strategyIndex = 0;
