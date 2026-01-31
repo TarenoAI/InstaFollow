@@ -147,7 +147,7 @@ async function performLogin(page: Page): Promise<boolean> {
     log('🔐', 'Führe automatischen Login durch...', 1);
 
     try {
-        await page.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'networkidle' });
+        await page.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'domcontentloaded', timeout: 60000 });
         await page.waitForTimeout(3000);
 
         // Screenshot vor Login
@@ -482,7 +482,7 @@ async function runAgent() {
 
         // 1. Login prüfen
         log('🔍', 'Prüfe Login-Status...');
-        await page.goto('https://www.instagram.com/', { waitUntil: 'networkidle' });
+        await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
         await page.waitForTimeout(3000);
 
         const problem = await analyzeProblem(page);
