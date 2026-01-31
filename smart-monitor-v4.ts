@@ -509,11 +509,40 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
     return text.trim();
 }
 
+const LOCK_FILE = path.join(process.cwd(), '.monitor.lock');
+
 // === MAIN ===
 async function main() {
     console.log('\n' + '═'.repeat(60));
     console.log(`🕵️ SMART MONITORING v4 - ${new Date().toLocaleString()}`);
     console.log('═'.repeat(60) + '\n');
+
+    // Lock-File prüfen um überlappende Runs zu verhindern
+    if (fs.existsSync(LOCK_FILE)) {
+        const lockTime = fs.statSync(LOCK_FILE).mtime;
+        const lockAge = (Date.now() - lockTime.getTime()) / 1000 / 60; // in Minuten
+
+        if (lockAge < 60) { // Maximal 60 Minuten Lock
+            console.log(`🔒 ABBRUCH: Ein anderer Prozess läuft bereits (Lock: ${lockAge.toFixed(1)} Min alt)`);
+            console.log(`   Lock-File: ${LOCK_FILE}`);
+            console.log(`   Falls dies ein Fehler ist, lösche die Datei manuell.\n`);
+            return;
+        } else {
+            console.log(`⚠️ Stale Lock gefunden (${lockAge.toFixed(1)} Min alt) - wird überschrieben`);
+        }
+    }
+
+    // Lock setzen
+    fs.writeFileSync(LOCK_FILE, new Date().toISOString());
+    console.log(`🔓 Lock gesetzt`);
+
+    // Cleanup bei Exit
+    const cleanup = () => {
+        try { fs.unlinkSync(LOCK_FILE); } catch { }
+    };
+    process.on('exit', cleanup);
+    process.on('SIGINT', () => { cleanup(); process.exit(); });
+    process.on('SIGTERM', () => { cleanup(); process.exit(); });
 
     const db = createClient({
         url: process.env.TURSO_DATABASE_URL!,
