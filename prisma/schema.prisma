@@ -22,17 +22,21 @@ model ProfileSet {
 
 // A profile being monitored for changes
 model MonitoredProfile {
-  id              String   @id @default(cuid())
-  username        String   @unique
-  fullName        String?
-  profilePicUrl   String?
-  isPrivate       Boolean  @default(false)
-  isVerified      Boolean  @default(false)
-  followerCount   Int?
-  followingCount  Int?
-  lastCheckedAt   DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  username              String   @unique
+  fullName              String?
+  profilePicUrl         String?
+  isPrivate             Boolean  @default(false)
+  isVerified            Boolean  @default(false)
+  followerCount         Int?
+  followingCount        Int?
+  lastCheckedAt         DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  // Baseline tracking - nur wenn true, können Changes erkannt werden
+  isBaselineComplete    Boolean  @default(false)
+  lastSuccessfulScrapeAt DateTime?
 
   // Many-to-Many: Ein Profil kann in mehreren Sets sein
   sets            ProfileSet[]

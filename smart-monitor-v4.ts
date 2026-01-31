@@ -578,13 +578,14 @@ async function main() {
         console.log('✅ Eingeloggt!\n');
 
         // Alle Profile laden
-        const profiles = await db.execute("SELECT id, username, followingCount FROM MonitoredProfile");
+        const profiles = await db.execute("SELECT id, username, followingCount, isBaselineComplete FROM MonitoredProfile");
         console.log(`📋 ${profiles.rows.length} Profile zu prüfen:\n`);
 
         for (const row of profiles.rows) {
             const profileId = row.id as string;
             const username = row.username as string;
             const lastCount = (row.followingCount as number) || 0;
+            const isBaselineComplete = Boolean(row.isBaselineComplete);
 
             console.log('─'.repeat(60));
             console.log(`🔍 @${username} (DB: ${lastCount})`);
@@ -663,9 +664,17 @@ async function main() {
 
                     console.log(`   ➕ Neu: ${addedUsernames.length} | ➖ Entfolgt: ${removedUsernames.length}`);
 
-                    // === INITIALER SCRAPE: Direkt in DB speichern ohne Profilinfos ===
-                    if (oldFollowing.size === 0) {
-                        console.log(`\n   🆕 INITIALER SCRAPE - Speichere ${currentFollowing.length} Einträge direkt in Turso...`);
+                    // === BASELINE NICHT KOMPLETT: Erst Baseline erstellen ===
+                    if (!isBaselineComplete) {
+                        console.log(`\n   🆕 BASELINE NICHT KOMPLETT - Erstelle/Aktualisiere Baseline...`);
+                        console.log(`      Bisherige Einträge in DB: ${oldFollowing.size}`);
+                        console.log(`      Gescrapt: ${currentFollowing.length}`);
+
+                        // Lösche alte Einträge und ersetze mit vollständigem Scrape
+                        await db.execute({
+                            sql: "DELETE FROM FollowingEntry WHERE profileId = ?",
+                            args: [profileId]
+                        });
 
                         // Batch-Insert für bessere Performance
                         const batchSize = 50;
@@ -683,13 +692,19 @@ async function main() {
                             console.log(`      💾 Batch ${batch + 1}: ${end}/${currentFollowing.length} gespeichert`);
                         }
 
-                        // Nur den Count aktualisieren, kein Twitter-Post bei initialem Scrape
+                        // Markiere als Baseline-complete + speichere Zeitpunkt
                         await db.execute({
-                            sql: `UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now') WHERE id = ?`,
+                            sql: `UPDATE MonitoredProfile SET 
+                                  followingCount = ?, 
+                                  lastCheckedAt = datetime('now'),
+                                  isBaselineComplete = 1,
+                                  lastSuccessfulScrapeAt = datetime('now')
+                                  WHERE id = ?`,
                             args: [currentCount, profileId]
                         });
 
-                        console.log(`   ✅ Initialer Scrape abgeschlossen - Weiter zum nächsten Profil\n`);
+                        console.log(`   ✅ Baseline erstellt (${currentFollowing.length} Einträge) - KEINE Changes gemeldet`);
+                        console.log(`   ℹ️ Ab jetzt werden Änderungen erkannt!\n`);
                         await humanDelay(5000, 10000);
                         continue; // Zum nächsten Profil!
                     }
@@ -811,7 +826,8 @@ async function main() {
                                   fullName = ?,
                                   profilePicUrl = ?,
                                   isVerified = ?,
-                                  lastCheckedAt = datetime('now') 
+                                  lastCheckedAt = datetime('now'),
+                                  lastSuccessfulScrapeAt = datetime('now')
                                   WHERE id = ?`,
                             args: [
                                 currentCount,
@@ -823,9 +839,13 @@ async function main() {
                             ]
                         });
                     } else {
-                        // Keine neuen/entfernten Follows, nur Count updaten
+                        // Keine neuen/entfernten Follows, nur Count und Timestamp updaten
                         await db.execute({
-                            sql: "UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now') WHERE id = ?",
+                            sql: `UPDATE MonitoredProfile SET 
+                                  followingCount = ?, 
+                                  lastCheckedAt = datetime('now'),
+                                  lastSuccessfulScrapeAt = datetime('now') 
+                                  WHERE id = ?`,
                             args: [currentCount, profileId]
                         });
                     }
