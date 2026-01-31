@@ -215,9 +215,38 @@ async function performLogin(page: Page): Promise<boolean> {
         }
         await humanDelay(500, 1000);
 
-        // Login Button klicken
-        await page.click('button[type="submit"]');
-        await page.waitForTimeout(5000);
+        // Screenshot vor Submit
+        await takeDebugScreenshot(page, 'login-before-submit');
+
+        // Login Button klicken - verschiedene Selektoren
+        const loginButtonSelectors = [
+            'button[type="submit"]',
+            'button:has-text("Log in")',
+            'button:has-text("Anmelden")',
+            'div[role="button"]:has-text("Log in")',
+            'div[role="button"]:has-text("Anmelden")'
+        ];
+
+        let buttonClicked = false;
+        for (const selector of loginButtonSelectors) {
+            try {
+                const btn = await page.$(selector);
+                if (btn) {
+                    await btn.click();
+                    log('🔘', `Login-Button geklickt: ${selector}`, 2);
+                    buttonClicked = true;
+                    break;
+                }
+            } catch { }
+        }
+
+        if (!buttonClicked) {
+            // Fallback: Enter drücken
+            log('⌨️', 'Fallback: Enter drücken', 2);
+            await page.keyboard.press('Enter');
+        }
+
+        await page.waitForTimeout(8000);
 
         // Prüfe ob Login erfolgreich
         const currentUrl = page.url();
