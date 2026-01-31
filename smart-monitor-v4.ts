@@ -634,11 +634,11 @@ async function main() {
                     console.log(`      3. Netzwerk-Latenz auf VPS`);
                 }
 
-                // ⚠️ KRITISCH: Wenn weniger als 90% gescrapt, keine Changes verarbeiten!
-                const MIN_SCRAPE_QUOTA = 0.90;
+                // ⚠️ KRITISCH: Wenn weniger als 100% gescrapt, keine Changes verarbeiten!
+                const MIN_SCRAPE_QUOTA = 1.0;
                 if (currentFollowing.length < currentCount * MIN_SCRAPE_QUOTA) {
                     console.log(`   🚫 ABBRUCH: Nur ${currentFollowing.length}/${currentCount} gescrapt (${scrapeQuote}%)`);
-                    console.log(`      Benötigt: mindestens ${Math.ceil(currentCount * MIN_SCRAPE_QUOTA)} (90%)`);
+                    console.log(`      Benötigt: mindestens ${currentCount} (100%)`);
                     console.log(`      ➡️ Keine Changes werden verarbeitet um falsche Unfollows zu vermeiden!`);
                     console.log(`      ➡️ Nur den Count aktualisieren, kein Post.\n`);
 
