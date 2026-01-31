@@ -472,15 +472,30 @@ async function intelligentScrape(
     // Screenshot vor dem Klick
     await takeDebugScreenshot(page, `${username}-profile`);
 
-    // Following klicken
+    // Following klicken - In Mobile oft durch "App öffnen" Banner blockiert
     try {
-        await page.click('a[href*="following"]', { timeout: 10000 });
+        // Versuche erst normalen Klick mit force: true (ignoriert Interception)
+        await page.click('a[href*="following"]', { timeout: 5000, force: true });
     } catch {
-        // Fallback: Versuche Text-Klick
-        const followingLink = await page.$('text=/\\d+\\s*(following|abonniert)/i');
-        if (followingLink) await followingLink.click();
-        else {
-            return { success: false, following: [], retryReason: 'Following-Link nicht gefunden' };
+        try {
+            // Fallback 1: Versuche Text-Klick
+            const followingLink = await page.$('text=/\\d+\\s*(following|abonniert)/i');
+            if (followingLink) {
+                await followingLink.click({ force: true });
+            } else {
+                // Fallback 2: JavaScript Klick (unblockable)
+                await page.evaluate(() => {
+                    const links = Array.from(document.querySelectorAll('a'));
+                    const followingLink = links.find(a =>
+                        a.href.includes('following') ||
+                        a.innerText.toLowerCase().includes('following') ||
+                        a.innerText.toLowerCase().includes('abonniert')
+                    );
+                    if (followingLink) (followingLink as HTMLElement).click();
+                });
+            }
+        } catch (err) {
+            return { success: false, following: [], retryReason: `Following-Link Klick-Fehler: ${err}` };
         }
     }
 
@@ -496,50 +511,67 @@ async function intelligentScrape(
     let noNewCount = 0;
     const maxScrolls = Math.max(80, Math.ceil(expectedCount / 8) + 20);
 
+    log('📜', `Starte Scrolling-Prozess (Max: ${maxScrolls}, Erwartet: ${expectedCount})`, 1);
+
     for (let scroll = 0; scroll < maxScrolls && noNewCount < 25; scroll++) {
         // DOM auslesen
         const users = await page.evaluate(() => {
             const links: string[] = [];
-            const dialog = document.querySelector('[role="dialog"]');
-            if (dialog) {
-                dialog.querySelectorAll('a').forEach(a => {
-                    const href = a.getAttribute('href');
-                    if (href && href.match(/^\/[a-zA-Z0-9._\-]+\/?$/)) {
-                        const username = href.replace(/\//g, '');
-                        if (!['explore', 'reels', 'p', 'direct', 'accounts'].includes(username)) {
-                            links.push(username);
-                        }
+
+            // In Mobile ist der Dialog oft der gesamte Body oder ein spezielles div
+            // Instagram Mobile UI nutzt oft div[role="dialog"] oder einfach die Hauptliste
+            const dialog = document.querySelector('[role="dialog"]') || document.querySelector('div._aano');
+
+            const target = dialog || document.body;
+            target.querySelectorAll('a').forEach(a => {
+                const href = a.getAttribute('href');
+                if (href && href.match(/^\/[a-zA-Z0-9._\-]+\/?$/)) {
+                    const username = href.replace(/\//g, '');
+                    if (!['explore', 'reels', 'p', 'direct', 'accounts'].includes(username)) {
+                        links.push(username);
                     }
-                });
-            }
-            return links;
+                }
+            });
+            return Array.from(new Set(links));
         });
 
-        const prevSize = following.size;
-        users.forEach(u => following.add(u));
+        const currentDOMCount = users.length;
+        const currentAPICount = apiFollowing.size;
+        const totalFound = new Set([...users, ...apiFollowing]).size;
 
-        if (following.size === prevSize) noNewCount++;
-        else noNewCount = 0;
-
-        // Log alle 5 Scrolls
-        if (scroll % 5 === 0) {
-            log('📜', `Scroll ${scroll + 1}: DOM=${following.size} | API=${apiFollowing.size}`, 2);
+        if (scroll % 5 === 0 || scroll === 1) {
+            log('📜', `Scroll ${scroll}: DOM=${currentDOMCount} | API=${currentAPICount} | Total=${totalFound} / ${expectedCount}`, 2);
         }
 
-        // Scroll-Strategie anwenden
-        const strategy = strategies[strategyIndex % strategies.length];
+        const prevTotal = following.size;
+        for (const u of users) following.add(u);
+        for (const u of apiFollowing) following.add(u);
 
+        if (following.size > prevTotal) {
+            noNewCount = 0;
+        } else {
+            noNewCount++;
+            if (noNewCount === 10) {
+                const strategy = strategies[strategyIndex % strategies.length];
+                log('🔄', `Keine neuen Daten - Wechsle Strategie zu: ${strategy}`, 2);
+                strategyIndex++;
+            }
+        }
+
+        // Scrolling ausführen
         try {
+            const strategy = strategies[strategyIndex % strategies.length];
             if (strategy === 'js-scroll') {
                 await page.evaluate(() => {
-                    const dialog = document.querySelector('[role="dialog"]');
-                    if (dialog) {
-                        const scrollables = dialog.querySelectorAll('div');
-                        for (const el of scrollables) {
-                            if (el.scrollHeight > el.clientHeight) {
-                                el.scrollTop += 800;
-                                return;
-                            }
+                    const scrollers = [
+                        document.querySelector('[role="dialog"] div'),
+                        document.querySelector('div._aano'),
+                        window
+                    ];
+                    for (const s of scrollers) {
+                        if (s) {
+                            if (s === window) window.scrollBy(0, 800);
+                            else (s as Element).scrollTop += 800;
                         }
                     }
                 });
