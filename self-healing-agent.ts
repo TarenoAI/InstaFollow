@@ -505,7 +505,6 @@ async function runAgent() {
         const profiles = await db.execute(`
             SELECT id, username, followingCount 
             FROM MonitoredProfile 
-            WHERE isActive = 1
             ORDER BY lastCheckedAt ASC
             LIMIT 5
         `);
