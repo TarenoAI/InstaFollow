@@ -267,22 +267,38 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 
         console.log(`   📜 Max Scrolls: ${maxScrolls} (für ${expectedCount} Following)`);
 
-        // Finde den Dialog/Container für das Scrolling
-        const scrollContainer = await page.$('[role="dialog"] div[style*="overflow"], [role="dialog"] ul, div[style*="overflow-y"]');
+        // Warte auf Dialog und finde das scrollbare Element
+        await page.waitForTimeout(2000);
+
+        // Versuche verschiedene Selektoren für den scrollbaren Container
+        let scrollContainer = await page.$('div[role="dialog"] div[style*="overflow"]');
+        if (!scrollContainer) {
+            scrollContainer = await page.$('[role="dialog"] div[class*="x1n2onr6"]');
+        }
+        if (!scrollContainer) {
+            // Fallback: Finde das div das die Following-Liste enthält
+            scrollContainer = await page.$('[role="dialog"] div > div > div');
+        }
+
+        console.log(`   📦 Scroll-Container gefunden: ${!!scrollContainer}`);
 
         for (let scroll = 0; scroll < maxScrolls && noNewCount < maxNoNewCount; scroll++) {
             // Sammle alle sichtbaren Usernames
             const users = await page.evaluate(() => {
                 const links: string[] = [];
-                document.querySelectorAll('a[role="link"]').forEach(a => {
-                    const href = a.getAttribute('href');
-                    if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/)) {
-                        const username = href.replace(/\//g, '');
-                        if (!['explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search'].includes(username)) {
-                            links.push(username);
+                // Suche in Dialog nach Links
+                const dialog = document.querySelector('[role="dialog"]');
+                if (dialog) {
+                    dialog.querySelectorAll('a[role="link"]').forEach(a => {
+                        const href = a.getAttribute('href');
+                        if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/)) {
+                            const username = href.replace(/\//g, '');
+                            if (!['explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search'].includes(username)) {
+                                links.push(username);
+                            }
                         }
-                    }
-                });
+                    });
+                }
                 return links;
             });
 
@@ -297,31 +313,40 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 console.log(`   Scroll ${scroll + 1}/${maxScrolls}: DOM=${domFollowing.size} | API=${apiFollowing.size}`);
             }
 
-            // Verschiedene Scroll-Strategien
+            // ROBUSTES SCROLLING: Mehrere Strategien
             try {
-                if (scrollContainer) {
-                    // Scrolle innerhalb des Dialogs
-                    await scrollContainer.evaluate((el: Element) => {
-                        el.scrollTop += 500;
-                    });
-                } else {
-                    // Fallback: Keyboard scrolling (Page Down)
-                    await page.keyboard.press('End'); // Scrollt zum Ende der Liste
-                    await page.waitForTimeout(200);
-                    await page.keyboard.press('ArrowDown');
-                    await page.keyboard.press('ArrowDown');
-                    await page.keyboard.press('ArrowDown');
-                }
-            } catch {
+                // Strategie 1: Scroll im Dialog mit JavaScript
+                await page.evaluate(() => {
+                    const dialog = document.querySelector('[role="dialog"]');
+                    if (dialog) {
+                        // Finde das scrollbare Element im Dialog
+                        const scrollables = dialog.querySelectorAll('div');
+                        for (const el of scrollables) {
+                            if (el.scrollHeight > el.clientHeight) {
+                                el.scrollTop += 800;
+                                return;
+                            }
+                        }
+                    }
+                });
+
+                await page.waitForTimeout(500);
+
+                // Strategie 2: Keyboard scrolling
+                await page.keyboard.press('End');
+                await page.waitForTimeout(300);
+                await page.keyboard.press('PageDown');
+
+            } catch (scrollErr) {
                 // Fallback: Mouse wheel
-                await page.mouse.wheel(0, 500);
+                await page.mouse.wheel(0, 800);
             }
 
-            await humanDelay(1500, 2500);
+            await humanDelay(1200, 2000);
 
-            // Alle 20 Scrolls: Extra warten für Lazy Loading
-            if (scroll % 20 === 19) {
-                await page.waitForTimeout(3000);
+            // Alle 10 Scrolls: Extra warten für Lazy Loading
+            if (scroll % 10 === 9) {
+                await page.waitForTimeout(2500);
             }
         }
 
