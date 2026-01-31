@@ -10,20 +10,34 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Missing path parameter' }, { status: 400 });
     }
 
-    // Security: Only allow files from the screenshots directory
-    const screenshotsDir = path.join(process.cwd(), 'screenshots');
-    const resolvedPath = path.resolve(filePath);
+    // Support both old and new screenshot directory structures
+    const newScreenshotsDir = path.join(process.cwd(), 'artifacts/screenshots');
+    const oldScreenshotsDir = path.join(process.cwd(), 'screenshots');
 
-    // Also allow absolute paths that point to screenshots dir
-    const isInScreenshotsDir = resolvedPath.startsWith(screenshotsDir);
-    const isRelativeScreenshot = filePath.includes('screenshots/') || filePath.startsWith('screenshots');
+    // Extract just the filename from the path
+    const filename = path.basename(filePath);
 
-    if (!isInScreenshotsDir && !isRelativeScreenshot) {
-        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    // Try new location first, then old location
+    const possiblePaths = [
+        path.join(newScreenshotsDir, filename),
+        path.join(oldScreenshotsDir, filename),
+        path.resolve(filePath), // Absolute path as fallback
+    ];
+
+    let finalPath: string | null = null;
+    for (const p of possiblePaths) {
+        try {
+            await fs.access(p);
+            finalPath = p;
+            break;
+        } catch {
+            continue;
+        }
     }
 
-    // Resolve relative paths
-    const finalPath = isInScreenshotsDir ? resolvedPath : path.join(process.cwd(), filePath);
+    if (!finalPath) {
+        return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    }
 
     try {
         const fileBuffer = await fs.readFile(finalPath);
@@ -41,6 +55,6 @@ export async function GET(request: NextRequest) {
             },
         });
     } catch (error) {
-        return NextResponse.json({ error: 'File not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Error reading file' }, { status: 500 });
     }
 }

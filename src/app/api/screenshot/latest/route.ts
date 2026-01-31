@@ -10,30 +10,50 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Missing username parameter' }, { status: 400 });
     }
 
-    const screenshotsDir = path.join(process.cwd(), 'screenshots');
+    // Search in both old and new screenshot directories
+    const newDir = path.join(process.cwd(), 'artifacts/screenshots');
+    const oldDir = path.join(process.cwd(), 'screenshots');
+
+    let allScreenshots: { name: string; dir: string }[] = [];
+
+    // Check new directory
+    try {
+        const newFiles = await fs.readdir(newDir);
+        allScreenshots.push(...newFiles
+            .filter(f => f.startsWith(`${username}_`) && (f.endsWith('.png') || f.endsWith('.webp')))
+            .map(name => ({ name, dir: newDir }))
+        );
+    } catch { /* Directory may not exist */ }
+
+    // Check old directory
+    try {
+        const oldFiles = await fs.readdir(oldDir);
+        allScreenshots.push(...oldFiles
+            .filter(f => f.startsWith(`${username}_`) && (f.endsWith('.png') || f.endsWith('.webp')))
+            .map(name => ({ name, dir: oldDir }))
+        );
+    } catch { /* Directory may not exist */ }
+
+    if (allScreenshots.length === 0) {
+        return NextResponse.json({ error: 'No screenshots found for this user' }, { status: 404 });
+    }
+
+    // Sort by name (which includes timestamp) - newest first
+    allScreenshots.sort((a, b) => b.name.localeCompare(a.name));
+
+    const latest = allScreenshots[0];
+    const filePath = path.join(latest.dir, latest.name);
 
     try {
-        const files = await fs.readdir(screenshotsDir);
-
-        // Find all screenshots for this username (format: username_timestamp.png)
-        const userScreenshots = files
-            .filter(f => f.startsWith(`${username}_`) && f.endsWith('.png'))
-            .sort()
-            .reverse(); // Newest first (higher timestamp = newer)
-
-        if (userScreenshots.length === 0) {
-            return NextResponse.json({ error: 'No screenshots found' }, { status: 404 });
-        }
-
-        const latestScreenshot = userScreenshots[0];
-        const filePath = path.join(screenshotsDir, latestScreenshot);
         const fileBuffer = await fs.readFile(filePath);
+        const ext = path.extname(latest.name).toLowerCase();
+        const contentType = ext === '.webp' ? 'image/webp' : 'image/png';
 
         return new NextResponse(fileBuffer, {
             headers: {
-                'Content-Type': 'image/png',
+                'Content-Type': contentType,
                 'Cache-Control': 'public, max-age=300', // Cache for 5 mins
-                'X-Screenshot-Name': latestScreenshot,
+                'X-Screenshot-Name': latest.name,
             },
         });
     } catch (error) {

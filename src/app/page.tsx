@@ -1669,12 +1669,17 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
 
                         const minFollowers = Math.min(...dataPoints.map(p => p.followers));
                         const maxFollowers = Math.max(...dataPoints.map(p => p.followers));
-                        const range = Math.max(maxFollowers - minFollowers, 5);
-                        const padding = range * 0.2;
+
+                        // Ensure at least 10% range for visibility, or minimum of 5 units
+                        const actualRange = maxFollowers - minFollowers;
+                        const minPaddingPercent = 0.1; // 10% of current value
+                        const minPadding = Math.max(5, currentRef * minPaddingPercent);
+                        const range = Math.max(actualRange, minPadding);
+                        const padding = range * 0.3; // More padding for better visibility
 
                         const chartMin = Math.max(0, minFollowers - padding);
                         const chartMax = maxFollowers + padding;
-                        const chartRange = chartMax - chartMin;
+                        const chartRange = chartMax - chartMin || 10; // Prevent division by zero
 
                         const width = 1000;
                         const height = 400;
@@ -1750,10 +1755,16 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                               ))}
                             </div>
 
-                            {/* Y-Axis Labels */}
-                            <div className="absolute -left-12 top-0 bottom-0 flex flex-col justify-between py-1">
-                              <span className="text-[10px] font-bold text-[var(--text-muted)]">{Math.round(chartMax)}</span>
-                              <span className="text-[10px] font-bold text-[var(--text-muted)]">{Math.round(chartMin)}</span>
+                            {/* Y-Axis Labels - 5 evenly spaced */}
+                            <div className="absolute -left-14 top-0 bottom-0 flex flex-col justify-between py-1">
+                              {[0, 0.25, 0.5, 0.75, 1].map((p, idx) => {
+                                const value = Math.round(chartMax - (p * chartRange));
+                                return (
+                                  <span key={idx} className="text-[10px] font-bold text-[var(--text-muted)] text-right w-12">
+                                    {value}
+                                  </span>
+                                );
+                              })}
                             </div>
                           </div>
                         );
