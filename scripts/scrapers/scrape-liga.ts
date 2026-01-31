@@ -1,33 +1,10 @@
 /**
- * 🌍 UNIVERSELLER LIGA INSTAGRAM SCRAPER
+ * 🌍 UNIVERSELLER LIGA INSTAGRAM SCRAPER v3
  * 
- * Unterstützt alle europäischen Top-Ligen von Transfermarkt.de
+ * Korrigierter Ansatz mit Cookie-Consent und Besuch der Spieler-Profilseiten.
  * 
  * Ausführen: 
- *   npx tsx scrape-liga.ts <liga-code> [min-followers]
- * 
- * Liga-Codes:
- *   GB1  = Premier League (England)
- *   ES1  = LaLiga (Spanien)
- *   IT1  = Serie A (Italien)
- *   L1   = Bundesliga (Deutschland)
- *   FR1  = Ligue 1 (Frankreich)
- *   PO1  = Liga Portugal
- *   TR1  = Süper Lig (Türkei)
- *   NL1  = Eredivisie (Niederlande)
- *   BE1  = Jupiler Pro League (Belgien)
- *   GR1  = Super League 1 (Griechenland)
- *   DK1  = Superliga (Dänemark)
- *   A1   = Bundesliga (Österreich)
- *   SE1  = Allsvenskan (Schweden)
- *   NO1  = Eliteserien (Norwegen)
- *   SC1  = Premiership (Schottland)
- *   ALL  = Alle Top-5-Ligen (GB1, ES1, IT1, L1, FR1)
- * 
- * Beispiele:
- *   npx tsx scrape-liga.ts L1 300000      # Bundesliga, 300k+ Follower
- *   npx tsx scrape-liga.ts GB1 500000     # Premier League, 500k+ Follower
- *   npx tsx scrape-liga.ts ALL 1000000    # Top-5 Ligen, 1M+ Follower
+ *   npx tsx scripts/scrapers/scrape-liga.ts <liga-code> [min-followers]
  */
 
 import 'dotenv/config';
@@ -43,27 +20,15 @@ import fs from 'fs';
 const INSTAGRAM_SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
 const iPhone = devices['iPhone 13 Pro'];
 
-// Liga-Code und Mindest-Follower aus Argumenten
 const LIGA_CODE = process.argv[2] || 'L1';
 const MIN_FOLLOWERS = parseInt(process.argv[3] || '300000');
 
-// Liga-Definitionen
 const LIGEN: Record<string, { name: string; url: string }> = {
     'GB1': { name: 'Premier League', url: 'https://www.transfermarkt.de/premier-league/startseite/wettbewerb/GB1' },
     'ES1': { name: 'LaLiga', url: 'https://www.transfermarkt.de/laliga/startseite/wettbewerb/ES1' },
     'IT1': { name: 'Serie A', url: 'https://www.transfermarkt.de/serie-a/startseite/wettbewerb/IT1' },
     'L1': { name: 'Bundesliga', url: 'https://www.transfermarkt.de/bundesliga/startseite/wettbewerb/L1' },
     'FR1': { name: 'Ligue 1', url: 'https://www.transfermarkt.de/ligue-1/startseite/wettbewerb/FR1' },
-    'PO1': { name: 'Liga Portugal', url: 'https://www.transfermarkt.de/liga-portugal/startseite/wettbewerb/PO1' },
-    'TR1': { name: 'Süper Lig', url: 'https://www.transfermarkt.de/super-lig/startseite/wettbewerb/TR1' },
-    'NL1': { name: 'Eredivisie', url: 'https://www.transfermarkt.de/eredivisie/startseite/wettbewerb/NL1' },
-    'BE1': { name: 'Jupiler Pro League', url: 'https://www.transfermarkt.de/jupiler-pro-league/startseite/wettbewerb/BE1' },
-    'GR1': { name: 'Super League 1', url: 'https://www.transfermarkt.de/super-league-1/startseite/wettbewerb/GR1' },
-    'DK1': { name: 'Superliga', url: 'https://www.transfermarkt.de/superliga/startseite/wettbewerb/DK1' },
-    'A1': { name: 'Bundesliga Österreich', url: 'https://www.transfermarkt.de/bundesliga/startseite/wettbewerb/A1' },
-    'SE1': { name: 'Allsvenskan', url: 'https://www.transfermarkt.de/allsvenskan/startseite/wettbewerb/SE1' },
-    'NO1': { name: 'Eliteserien', url: 'https://www.transfermarkt.de/eliteserien/startseite/wettbewerb/NO1' },
-    'SC1': { name: 'Premiership', url: 'https://www.transfermarkt.de/scottish-premiership/startseite/wettbewerb/SC1' },
 };
 
 const TOP5_CODES = ['GB1', 'ES1', 'IT1', 'L1', 'FR1'];
@@ -71,6 +36,11 @@ const TOP5_CODES = ['GB1', 'ES1', 'IT1', 'L1', 'FR1'];
 interface Team {
     name: string;
     id: string;
+}
+
+interface PlayerLink {
+    name: string;
+    profileUrl: string;
 }
 
 interface PlayerInfo {
@@ -99,6 +69,48 @@ function formatFollowers(n: number): string {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// COOKIE CONSENT HANDLER
+// ═══════════════════════════════════════════════════════════════
+
+async function handleCookieConsent(page: Page) {
+    try {
+        await page.waitForTimeout(1000);
+
+        const consentSelectors = [
+            'button:has-text("Zustimmen")',
+            'button:has-text("Accept")',
+            'button:has-text("Akzeptieren")',
+            '[title="Zustimmen & weiter"]',
+            '.sp_choice_type_11',
+        ];
+
+        for (const selector of consentSelectors) {
+            try {
+                const btn = await page.$(selector);
+                if (btn) {
+                    await btn.click();
+                    await page.waitForTimeout(500);
+                    return;
+                }
+            } catch { }
+        }
+
+        for (const frame of page.frames()) {
+            try {
+                const btn = await frame.$('button:has-text("Zustimmen")');
+                if (btn) {
+                    await btn.click();
+                    await page.waitForTimeout(500);
+                    return;
+                }
+            } catch { }
+        }
+    } catch (e) {
+        // Ignore
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // TRANSFERMARKT SCRAPING
 // ═══════════════════════════════════════════════════════════════
 
@@ -108,22 +120,24 @@ async function getTeamsFromLiga(page: Page, ligaUrl: string): Promise<Team[]> {
     await page.goto(ligaUrl, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2000);
 
+    await handleCookieConsent(page);
+
     const teams = await page.evaluate(() => {
         const results: { name: string; id: string }[] = [];
+        const links = document.querySelectorAll('a[href*="/startseite/verein/"]');
+        const seen = new Set<string>();
 
-        // Vereins-Tabelle finden
-        const rows = document.querySelectorAll('table.items tbody tr');
-        rows.forEach(row => {
-            const link = row.querySelector('td.hauptlink a[href*="/startseite/verein/"]');
-            if (link) {
-                const href = link.getAttribute('href') || '';
-                const match = href.match(/\/verein\/(\d+)/);
-                if (match) {
-                    results.push({
-                        name: link.textContent?.trim() || '',
-                        id: match[1]
-                    });
-                }
+        links.forEach(link => {
+            const href = link.getAttribute('href') || '';
+            const match = href.match(/\/verein\/(\d+)/);
+            const name = link.textContent?.trim() || '';
+
+            if (match && name.length > 1 && !seen.has(match[1])) {
+                seen.add(match[1]);
+                results.push({
+                    name,
+                    id: match[1]
+                });
             }
         });
 
@@ -134,28 +148,33 @@ async function getTeamsFromLiga(page: Page, ligaUrl: string): Promise<Team[]> {
     return teams;
 }
 
-async function getTeamPlayerInstagrams(page: Page, team: Team): Promise<{ username: string; playerName: string }[]> {
-    const kaderUrl = `https://www.transfermarkt.de/team/kader/verein/${team.id}`;
+async function getPlayerLinksFromTeam(page: Page, team: Team): Promise<PlayerLink[]> {
+    const kaderUrl = `https://www.transfermarkt.de/team/kader/verein/${team.id}/saison_id/2024/plus/1`;
 
     try {
         await page.goto(kaderUrl, { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(2000);
+
+        await handleCookieConsent(page);
 
         const players = await page.evaluate(() => {
-            const results: { username: string; playerName: string }[] = [];
+            const results: { name: string; profileUrl: string }[] = [];
+            const seen = new Set<string>();
+            const links = document.querySelectorAll('a[href*="/profil/spieler/"]');
 
-            const rows = document.querySelectorAll('table.items tbody tr.odd, table.items tbody tr.even');
-            rows.forEach(row => {
-                const nameCell = row.querySelector('td.hauptlink a');
-                const igLink = row.querySelector('a[href*="instagram.com"]');
+            links.forEach(link => {
+                const href = link.getAttribute('href') || '';
+                const name = link.textContent?.trim() || '';
 
-                if (nameCell && igLink) {
-                    const href = igLink.getAttribute('href') || '';
-                    const match = href.match(/instagram\.com\/([^\/\?]+)/);
-                    if (match) {
+                if (href && name.length > 2 && !seen.has(href)) {
+                    const isPlayerName = !name.includes('Transferhistorie') &&
+                        !name.includes('Leistungsdaten') &&
+                        !name.match(/^\d+$/);
+                    if (isPlayerName) {
+                        seen.add(href);
                         results.push({
-                            username: match[1].toLowerCase(),
-                            playerName: nameCell.textContent?.trim() || ''
+                            name,
+                            profileUrl: 'https://www.transfermarkt.de' + href
                         });
                     }
                 }
@@ -166,8 +185,48 @@ async function getTeamPlayerInstagrams(page: Page, team: Team): Promise<{ userna
 
         return players;
     } catch (error) {
-        console.error(`   ⚠️ Fehler bei Team ${team.name}:`, error);
+        console.error(`   ⚠️ Fehler beim Laden von ${team.name}:`, error);
         return [];
+    }
+}
+
+async function getInstagramFromPlayerProfile(page: Page, player: PlayerLink): Promise<string | null> {
+    try {
+        await page.goto(player.profileUrl, { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(1000); // Schnellerer Zugriff, da TM stabil ist
+
+        await handleCookieConsent(page);
+
+        const instagram = await page.evaluate(() => {
+            const igByTitle = document.querySelector('a[title="Instagram"]');
+            if (igByTitle) {
+                const href = igByTitle.getAttribute('href') || '';
+                const match = href.match(/instagram\.com\/([^\/\?\s]+)/);
+                if (match) return match[1].toLowerCase().replace(/\/$/, '');
+            }
+
+            const igInToolbar = document.querySelector('.social-media-toolbar__icons a[href*="instagram.com"]');
+            if (igInToolbar) {
+                const href = igInToolbar.getAttribute('href') || '';
+                const match = href.match(/instagram\.com\/([^\/\?\s]+)/);
+                if (match) return match[1].toLowerCase().replace(/\/$/, '');
+            }
+
+            const allIgLinks = document.querySelectorAll('a[href*="instagram.com"]');
+            for (const link of allIgLinks) {
+                const href = link.getAttribute('href') || '';
+                const match = href.match(/instagram\.com\/([^\/\?\s]+)/);
+                if (match && !['p', 'explore', 'reel', 'stories', 'accounts'].includes(match[1])) {
+                    return match[1].toLowerCase().replace(/\/$/, '');
+                }
+            }
+
+            return null;
+        });
+
+        return instagram;
+    } catch (error) {
+        return null;
     }
 }
 
@@ -181,7 +240,6 @@ async function checkInstagramProfile(page: Page, username: string, playerName: s
         await page.waitForTimeout(2000);
 
         const profileData = await page.evaluate(() => {
-            // Follower-Zahl finden
             const metaDesc = document.querySelector('meta[name="description"]');
             let followers = 0;
             if (metaDesc) {
@@ -196,57 +254,26 @@ async function checkInstagramProfile(page: Page, username: string, playerName: s
                 }
             }
 
-            // Alternative: Stats-Bereich
-            if (!followers) {
-                const statsSection = document.querySelector('header section ul');
-                if (statsSection) {
-                    const followerItem = Array.from(statsSection.querySelectorAll('li')).find(li =>
-                        li.textContent?.toLowerCase().includes('follower')
-                    );
-                    if (followerItem) {
-                        const text = followerItem.textContent || '';
-                        const match = text.match(/([\d,\.]+)\s*(M|K)?/i);
-                        if (match) {
-                            let num = parseFloat(match[1].replace(/,/g, '.'));
-                            const suffix = (match[2] || '').toUpperCase();
-                            if (suffix === 'M') num *= 1_000_000;
-                            if (suffix === 'K') num *= 1_000;
-                            followers = Math.round(num);
-                        }
-                    }
-                }
-            }
-
-            // Verified Badge
-            const isVerified = !!document.querySelector('svg[aria-label*="Verified"], span[title*="Verified"]');
-
-            // Full Name
+            const isVerified = !!document.querySelector('svg[aria-label*="Verified"], span[title*="Verified"], svg[aria-label*="verifiziert"]');
             const nameEl = document.querySelector('header section h2, header h1');
             const fullName = nameEl?.textContent?.trim() || null;
-
-            // Profile Pic
-            const picEl = document.querySelector('header img[alt], img[data-testid="user-avatar"]');
+            const picEl = document.querySelector('header img[alt]');
             const profilePicUrl = picEl?.getAttribute('src') || null;
 
             return { followers, isVerified, fullName, profilePicUrl };
         });
 
-        if (profileData.followers >= MIN_FOLLOWERS) {
-            return {
-                playerName,
-                team,
-                liga,
-                instagram: username,
-                followers: profileData.followers,
-                isVerified: profileData.isVerified,
-                fullName: profileData.fullName,
-                profilePicUrl: profileData.profilePicUrl
-            };
-        }
-
-        return null;
+        return {
+            playerName,
+            team,
+            liga,
+            instagram: username,
+            followers: profileData.followers,
+            isVerified: profileData.isVerified,
+            fullName: profileData.fullName,
+            profilePicUrl: profileData.profilePicUrl
+        };
     } catch (error) {
-        console.error(`   ⚠️ Fehler bei @${username}:`, error);
         return null;
     }
 }
@@ -263,23 +290,17 @@ async function saveToTurso(players: PlayerInfo[], setName: string) {
 
     console.log(`\n💾 Speichere ${players.length} Spieler in Turso...`);
 
-    // Set erstellen oder finden
+    const setId = `set_${setName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
     await db.execute({
         sql: `INSERT OR IGNORE INTO ProfileSet (id, name, isActive, createdAt, updatedAt) 
               VALUES (?, ?, 1, datetime('now'), datetime('now'))`,
-        args: [`set_${setName.toLowerCase().replace(/\s+/g, '_')}`, setName]
+        args: [setId, setName]
     });
-
-    const setResult = await db.execute({
-        sql: `SELECT id FROM ProfileSet WHERE name = ?`,
-        args: [setName]
-    });
-    const setId = setResult.rows[0]?.id as string;
 
     let added = 0;
     for (const player of players) {
         try {
-            // Profil erstellen oder aktualisieren
+            const profileId = `mp_${player.instagram.toLowerCase()}`;
             await db.execute({
                 sql: `INSERT INTO MonitoredProfile (id, username, fullName, profilePicUrl, isVerified, followerCount, createdAt, updatedAt)
                       VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
@@ -290,7 +311,7 @@ async function saveToTurso(players: PlayerInfo[], setName: string) {
                         followerCount = excluded.followerCount,
                         updatedAt = datetime('now')`,
                 args: [
-                    `mp_${player.instagram.toLowerCase()}`,
+                    profileId,
                     player.instagram.toLowerCase(),
                     player.fullName || player.playerName,
                     player.profilePicUrl,
@@ -299,10 +320,9 @@ async function saveToTurso(players: PlayerInfo[], setName: string) {
                 ]
             });
 
-            // Mit Set verbinden
             await db.execute({
                 sql: `INSERT OR IGNORE INTO _MonitoredProfileToProfileSet (A, B) VALUES (?, ?)`,
-                args: [`mp_${player.instagram.toLowerCase()}`, setId]
+                args: [profileId, setId]
             });
 
             added++;
@@ -320,11 +340,9 @@ async function saveToTurso(players: PlayerInfo[], setName: string) {
 // ═══════════════════════════════════════════════════════════════
 
 async function main() {
-    // Bestimme welche Ligen gescrapt werden
     let ligaCodes: string[];
     if (LIGA_CODE.toUpperCase() === 'ALL') {
         ligaCodes = TOP5_CODES;
-        console.log(`\n🌍 MULTI-LIGA SCRAPER: Top 5 Ligen`);
     } else if (!LIGEN[LIGA_CODE.toUpperCase()]) {
         console.error(`❌ Unbekannter Liga-Code: ${LIGA_CODE}`);
         console.log('Verfügbare Codes:', Object.keys(LIGEN).join(', '), 'oder ALL');
@@ -334,79 +352,87 @@ async function main() {
     }
 
     console.log(`\n${'═'.repeat(60)}`);
-    console.log(`🏆 LIGA INSTAGRAM SCRAPER`);
+    console.log(`🏆 LIGA INSTAGRAM SCRAPER v3`);
     console.log(`${'═'.repeat(60)}`);
     console.log(`📌 Ligen: ${ligaCodes.map(c => LIGEN[c].name).join(', ')}`);
     console.log(`📌 Mindest-Follower: ${formatFollowers(MIN_FOLLOWERS)}`);
     console.log(`${'═'.repeat(60)}\n`);
 
+    const sessionPath = fs.existsSync(INSTAGRAM_SESSION_PATH)
+        ? INSTAGRAM_SESSION_PATH
+        : fs.existsSync('playwright-session.json') ? 'playwright-session.json' : undefined;
+
     const browser = await chromium.launch({ headless: true });
 
-    // Transfermarkt Context (Desktop)
     const tmContext = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
     });
     const tmPage = await tmContext.newPage();
 
-    // Instagram Context (Mobile mit Session)
     const igContext = await browser.newContext({
         ...iPhone,
-        storageState: fs.existsSync(INSTAGRAM_SESSION_PATH) ? INSTAGRAM_SESSION_PATH : undefined
+        storageState: sessionPath
     });
     const igPage = await igContext.newPage();
 
     const allPlayers: PlayerInfo[] = [];
+    const checkedInstagrams = new Set<string>();
 
     try {
         for (const code of ligaCodes) {
             const liga = LIGEN[code];
             console.log(`\n🏟️ === ${liga.name} ===`);
 
-            // Teams holen
             const teams = await getTeamsFromLiga(tmPage, liga.url);
 
             for (const team of teams) {
                 console.log(`\n   ⚽ ${team.name}`);
 
-                // Spieler-Instagrams holen
-                const players = await getTeamPlayerInstagrams(tmPage, team);
-                console.log(`      📱 ${players.length} Instagram-Accounts gefunden`);
+                const playerLinks = await getPlayerLinksFromTeam(tmPage, team);
+                console.log(`      👥 ${playerLinks.length} Spieler im Kader`);
 
-                for (const player of players) {
-                    await humanDelay(1000, 2000);
+                let teamInstagrams = 0;
+                let teamQualified = 0;
 
-                    const info = await checkInstagramProfile(
-                        igPage,
-                        player.username,
-                        player.playerName,
-                        team.name,
-                        liga.name
-                    );
+                for (const player of playerLinks) {
+                    await humanDelay(200, 400);
+                    const instagram = await getInstagramFromPlayerProfile(tmPage, player);
 
-                    if (info) {
-                        console.log(`      ✅ @${info.instagram}: ${formatFollowers(info.followers)} Follower`);
-                        allPlayers.push(info);
+                    if (instagram && !checkedInstagrams.has(instagram)) {
+                        checkedInstagrams.add(instagram);
+                        teamInstagrams++;
+
+                        await humanDelay(1000, 2000);
+                        const info = await checkInstagramProfile(igPage, instagram, player.name, team.name, liga.name);
+
+                        if (info) {
+                            const status = info.followers >= MIN_FOLLOWERS ? '✅ QUALIFIZIERT' : '⬇️ Nicht qualifiziert';
+                            console.log(`      ${player.name}: @${instagram} (${formatFollowers(info.followers)}) -> ${status}`);
+
+                            if (info.followers >= MIN_FOLLOWERS) {
+                                teamQualified++;
+                                allPlayers.push(info);
+                            }
+                        }
+                    } else if (instagram) {
+                        // Bereits gecheckt
+                    } else {
+                        console.log(`      ${player.name}: ❌ Kein Instagram`);
                     }
                 }
+
+                console.log(`      📊 Ergebnis: ${teamInstagrams} IG Accounts, ${teamQualified} qualifiziert`);
             }
         }
 
-        // Sortieren nach Followern
         allPlayers.sort((a, b) => b.followers - a.followers);
 
-        // Zusammenfassung
         console.log(`\n${'═'.repeat(60)}`);
         console.log(`📊 ZUSAMMENFASSUNG`);
         console.log(`${'═'.repeat(60)}`);
         console.log(`Gefunden: ${allPlayers.length} Spieler mit ${formatFollowers(MIN_FOLLOWERS)}+ Followern\n`);
 
         if (allPlayers.length > 0) {
-            console.log('Top 10:');
-            allPlayers.slice(0, 10).forEach((p, i) => {
-                console.log(`   ${i + 1}. @${p.instagram} - ${formatFollowers(p.followers)} (${p.playerName}, ${p.liga})`);
-            });
-
-            // In DB speichern
             const setName = ligaCodes.length > 1
                 ? `Top Europa ${formatFollowers(MIN_FOLLOWERS)}+`
                 : `${LIGEN[ligaCodes[0]].name} ${formatFollowers(MIN_FOLLOWERS)}+`;
