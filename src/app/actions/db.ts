@@ -45,7 +45,7 @@ export interface SetInfo {
 // Get all sets
 export async function getSets(): Promise<SetInfo[]> {
     const sets = await prisma.profileSet.findMany({
-        include: { profiles: true, twitterAccount: true } as any,
+        include: { profiles: true, twitterAccount: true },
         orderBy: { createdAt: 'desc' },
     });
 
