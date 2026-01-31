@@ -256,6 +256,10 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         await page.waitForTimeout(4000);
         await dismissPopups(page);
 
+        // DEBUG: Screenshot nach Dialog-Öffnung
+        await page.screenshot({ path: `debug-dialog-${username}.png` });
+        console.log(`   📸 Debug Screenshot: debug-dialog-${username}.png`);
+
         // DOM-basierte Sammlung als Backup
         const domFollowing = new Set<string>();
         let noNewCount = 0;
