@@ -96,7 +96,7 @@ async function dismissPopups(page: Page) {
 }
 
 /**
- * Macht einen Screenshot des Profils (nur Header-Bereich)
+ * Macht einen Screenshot des Profils (Profil-Header mit Bild, Stats, Bio)
  */
 async function takeProfileScreenshot(page: Page, username: string): Promise<string> {
     const screenshotPath = path.join(SCREENSHOTS_DIR, `${username}_${Date.now()}.png`);
@@ -106,20 +106,17 @@ async function takeProfileScreenshot(page: Page, username: string): Promise<stri
             waitUntil: 'domcontentloaded',
             timeout: 30000
         });
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(4000); // Mehr Zeit für Bilder
         await dismissPopups(page);
 
-        // Screenshot nur vom Header-Bereich (Profilbild + Stats)
-        const header = await page.$('header');
-        if (header) {
-            await header.screenshot({ path: screenshotPath });
-        } else {
-            // Fallback: Oberen Teil der Seite
-            await page.screenshot({
-                path: screenshotPath,
-                clip: { x: 0, y: 0, width: 390, height: 400 }
-            });
-        }
+        // Warte auf Profilbild als Indikator dass Seite geladen ist
+        await page.waitForSelector('header img', { timeout: 5000 }).catch(() => { });
+
+        // Screenshot des oberen Bereichs (Profilbild + Stats + Bio)
+        await page.screenshot({
+            path: screenshotPath,
+            clip: { x: 0, y: 0, width: 390, height: 500 }
+        });
 
         console.log(`      📸 Screenshot: ${screenshotPath}`);
         return screenshotPath;
@@ -138,17 +135,18 @@ async function getProfileInfo(page: Page, username: string, takeScreenshot: bool
             waitUntil: 'domcontentloaded',
             timeout: 20000
         });
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(4000);
         await dismissPopups(page);
 
         // Screenshot wenn gewünscht
         let screenshotPath = '';
         if (takeScreenshot) {
-            const header = await page.$('header');
-            if (header) {
-                screenshotPath = path.join(SCREENSHOTS_DIR, `${username}_${Date.now()}.png`);
-                await header.screenshot({ path: screenshotPath });
-            }
+            await page.waitForSelector('header img', { timeout: 5000 }).catch(() => { });
+            screenshotPath = path.join(SCREENSHOTS_DIR, `${username}_${Date.now()}.png`);
+            await page.screenshot({
+                path: screenshotPath,
+                clip: { x: 0, y: 0, width: 390, height: 500 }
+            });
         }
 
         // Extrahiere Profilbild

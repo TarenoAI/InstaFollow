@@ -39,22 +39,33 @@ async function dismissPopups(page: Page) {
 }
 
 async function takeProfileScreenshot(page: Page, username: string): Promise<string> {
-    const screenshotPath = path.join(SCREENSHOTS_DIR, `${username}_baseline_${Date.now()}.png`);
+    const screenshotPath = path.join(SCREENSHOTS_DIR, `${username}_${Date.now()}.png`);
 
     try {
         await page.goto(`https://www.instagram.com/${username}/`, {
             waitUntil: 'domcontentloaded',
             timeout: 20000
         });
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(4000); // Mehr Zeit für Bilder
         await dismissPopups(page);
 
-        const header = await page.$('header');
-        if (header) {
-            await header.screenshot({ path: screenshotPath });
-            console.log(`      📸 Screenshot: ${screenshotPath}`);
-            return screenshotPath;
-        }
+        // Warte auf Profilbild (guter Indikator dass Seite geladen ist)
+        await page.waitForSelector('header img', { timeout: 5000 }).catch(() => { });
+
+        // Screenshot des oberen Bereichs (Profil-Header mit Stats)
+        // Clip auf den oberen Bereich, der das Profilbild, Stats und Bio zeigt
+        await page.screenshot({
+            path: screenshotPath,
+            clip: {
+                x: 0,
+                y: 0,
+                width: 390, // Mobile Viewport Breite
+                height: 500  // Genug für Profilbild, Name, Stats, Bio
+            }
+        });
+
+        console.log(`      📸 Screenshot: ${screenshotPath}`);
+        return screenshotPath;
     } catch (e: any) {
         console.log(`      ⚠️ Screenshot fehlgeschlagen: ${e.message}`);
     }
