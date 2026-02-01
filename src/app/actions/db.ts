@@ -351,14 +351,16 @@ export async function getTwitterAccounts(): Promise<TwitterAccountInfo[]> {
         const accounts = await (prisma as any).twitterAccount.findMany({
             orderBy: { username: 'asc' },
         });
+        console.log('[DB] getTwitterAccounts:', accounts?.length || 0, 'accounts found');
         return accounts.map((a: any) => ({
             id: a.id,
             username: a.username,
             displayName: a.displayName,
             isActive: a.isActive,
         }));
-    } catch {
-        // Table doesn't exist yet
+    } catch (error: any) {
+        // Table doesn't exist yet or other error
+        console.error('[DB] getTwitterAccounts error:', error?.message || error);
         return [];
     }
 }
