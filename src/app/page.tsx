@@ -910,6 +910,13 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
     }
   };
 
+  const handleToggleTracking = async () => {
+    const result = await toggleSetActive(set.id);
+    if (result.success) {
+      onRefresh();
+    }
+  };
+
   return (
     <div className="animate-fade-in">
       {/* Header */}
@@ -950,6 +957,20 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
           </div>
           <p className="text-[var(--text-muted)] text-sm">{set.profiles.length} Profile</p>
         </div>
+
+        {/* Tracking Toggle */}
+        <button
+          onClick={handleToggleTracking}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${set.isActive
+              ? 'bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/30 hover:bg-[var(--success)]/20'
+              : 'bg-[var(--text-muted)]/10 text-[var(--text-muted)] border border-[var(--border)] hover:bg-[var(--card)]'
+            }`}
+          title={set.isActive ? 'Tracking deaktivieren' : 'Tracking aktivieren'}
+        >
+          <span className={`w-2 h-2 rounded-full ${set.isActive ? 'bg-[var(--success)] animate-pulse' : 'bg-[var(--text-muted)]'}`}></span>
+          {set.isActive ? 'Tracking aktiv' : 'Tracking aus'}
+        </button>
+
         <button
           onClick={handleDeleteSet}
           className="p-2 text-[var(--error)] hover:bg-[var(--error)]/20 rounded-lg transition-colors"
