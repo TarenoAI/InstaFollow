@@ -236,32 +236,73 @@ async function getInstagramFromPlayerProfile(page: Page, player: PlayerLink): Pr
 
 async function checkInstagramProfile(page: Page, username: string, playerName: string, team: string, liga: string): Promise<PlayerInfo | null> {
     try {
-        await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(2000);
+        await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.waitForTimeout(3000); // Etwas mehr Zeit für dynamische Inhalte
 
         const profileData = await page.evaluate(() => {
-            const metaDesc = document.querySelector('meta[name="description"]');
-            let followers = 0;
-            if (metaDesc) {
-                const content = metaDesc.getAttribute('content') || '';
-                const match = content.match(/([\d,\.]+)\s*(M|K|Mio|Tsd)?\s*Follower/i);
-                if (match) {
-                    let num = parseFloat(match[1].replace(/,/g, '.'));
-                    const suffix = (match[2] || '').toUpperCase();
-                    if (suffix === 'M' || suffix === 'MIO') num *= 1_000_000;
-                    if (suffix === 'K' || suffix === 'TSD') num *= 1_000;
-                    followers = Math.round(num);
-                }
+            // Methode 1: JSON-LD (Sehr zuverlässig wenn vorhanden)
+            const scriptTag = document.querySelector('script[type="application/ld+json"]');
+            if (scriptTag) {
+                try {
+                    const data = JSON.parse(scriptTag.innerHTML);
+                    const interaction = data.mainEntityofPage?.interactionStatistic || data.interactionStatistic;
+                    if (interaction && interaction.userInteractionCount) {
+                        return {
+                            followers: parseInt(interaction.userInteractionCount),
+                            isVerified: false, // Wird unten geprüft
+                            fullName: data.name || null,
+                            profilePicUrl: data.image || null
+                        };
+                    }
+                } catch (e) { }
             }
 
+            // Methode 2: Meta Tags
+            const metaDesc = document.querySelector('meta[name="description"]');
+            const metaOgDesc = document.querySelector('meta[property="og:description"]');
+            const content = (metaDesc?.getAttribute('content') || metaOgDesc?.getAttribute('content') || '');
+
+            let followers = 0;
+            // Matches: "12.5M Followers", "12,5 Mio. Follower", "1,234 Followers"
+            const match = content.match(/([\d,\.]+)\s*(M|K|Mio|Tsd|B)?\s*(Follower|Following)/i);
+            if (match) {
+                let numStr = match[1].replace(/,/g, ''); // US Format
+                if (match[1].includes(',') && match[1].includes('.')) numStr = match[1].replace(/,/g, '');
+                else if (match[1].includes(',')) numStr = match[1].replace(',', '.'); // DE Format
+
+                let num = parseFloat(numStr);
+                const suffix = (match[2] || '').toUpperCase();
+                if (suffix === 'M' || suffix === 'MIO') num *= 1_000_000;
+                if (suffix === 'K' || suffix === 'TSD') num *= 1_000;
+                followers = Math.round(num);
+            }
+
+            // Verified Badge
             const isVerified = !!document.querySelector('svg[aria-label*="Verified"], span[title*="Verified"], svg[aria-label*="verifiziert"]');
+
+            // Full Name
             const nameEl = document.querySelector('header section h2, header h1');
             const fullName = nameEl?.textContent?.trim() || null;
+
+            // Profile Pic
             const picEl = document.querySelector('header img[alt]');
             const profilePicUrl = picEl?.getAttribute('src') || null;
 
             return { followers, isVerified, fullName, profilePicUrl };
         });
+
+        // Wenn immer noch 0, versuchen wir es über den Page Title (Notlösung)
+        if (profileData.followers === 0) {
+            const title = await page.title();
+            const match = title.match(/([\d,\.]+)\s*(M|K|Mio|Tsd)?\s*Follower/i);
+            if (match) {
+                let num = parseFloat(match[1].replace(/,/g, '.'));
+                const suffix = (match[2] || '').toUpperCase();
+                if (suffix === 'M' || suffix === 'MIO') num *= 1_000_000;
+                if (suffix === 'K' || suffix === 'TSD') num *= 1_000;
+                profileData.followers = Math.round(num);
+            }
+        }
 
         return {
             playerName,
@@ -274,6 +315,7 @@ async function checkInstagramProfile(page: Page, username: string, playerName: s
             profilePicUrl: profileData.profilePicUrl
         };
     } catch (error) {
+        console.error(`   ⚠️ Fehler bei Instagram @${username}:`, error);
         return null;
     }
 }
