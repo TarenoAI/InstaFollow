@@ -448,7 +448,18 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
             }
         }
 
-        console.log(`      ⚠️ Keine Methode hat funktioniert`);
+        // DEBUG: Auto-Screenshot bei Fehler
+        console.log(`      ⚠️ Keine Methode hat funktioniert - mache Debug-Screenshot...`);
+        const debugPath = path.join(process.cwd(), '.incidents', `debug-${username}-${Date.now()}.png`);
+        try {
+            await page.screenshot({ path: debugPath });
+            console.log(`      📸 Debug: ${debugPath}`);
+            // Auto-push to git
+            const { exec } = await import('child_process');
+            exec(`cd ${process.cwd()} && git add .incidents/ && git commit -m "debug: ${username} profile issue" && git push origin main`,
+                (err) => { if (!err) console.log('      📤 Debug gepusht'); });
+        } catch { }
+
         return null;
     } catch (err: any) {
         console.log(`      ❌ getFollowingCount Error: ${err.message}`);
