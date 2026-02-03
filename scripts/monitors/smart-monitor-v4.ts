@@ -383,13 +383,29 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
  */
 async function getFollowingCount(page: Page, username: string): Promise<number | null> {
     try {
+        console.log(`      🌐 Lade Profil...`);
         await page.goto(`https://www.instagram.com/${username}/`, {
-            waitUntil: 'domcontentloaded',
-            timeout: 30000
+            waitUntil: 'networkidle',  // Warte bis Netzwerk ruhig ist
+            timeout: 45000
         });
-        await page.waitForTimeout(4000);
+
+        // Warte auf echten Seiteninhalt
+        await page.waitForTimeout(3000);
         await dismissPopups(page);
         await page.waitForTimeout(1000);
+
+        // Prüfe ob Seite überhaupt geladen ist
+        const bodyText = await page.evaluate(() => document.body?.innerText?.length || 0);
+        console.log(`      📄 Body text length: ${bodyText}`);
+
+        if (bodyText < 100) {
+            console.log(`      ⚠️ Seite scheint leer zu sein!`);
+            // Full page screenshot für Debug
+            const debugPath = path.join(process.cwd(), '.incidents', `empty-page-${username}-${Date.now()}.png`);
+            await page.screenshot({ path: debugPath, fullPage: true });
+            console.log(`      📸 Empty page debug: ${debugPath}`);
+            return null;
+        }
 
         // Methode 1: Link mit "following" im href
         const followingLink = await page.$('a[href*="following"]');
