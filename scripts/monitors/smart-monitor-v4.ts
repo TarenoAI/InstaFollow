@@ -379,7 +379,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 }
 
 /**
- * Quick-Check: Nur Following-Zahl abrufen
+ * Quick-Check: Nur Following-Zahl abrufen (mit mehreren Fallback-Methoden)
  */
 async function getFollowingCount(page: Page, username: string): Promise<number | null> {
     try {
@@ -387,17 +387,71 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
             waitUntil: 'domcontentloaded',
             timeout: 30000
         });
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(4000);
         await dismissPopups(page);
+        await page.waitForTimeout(1000);
 
+        // Methode 1: Link mit "following" im href
         const followingLink = await page.$('a[href*="following"]');
         if (followingLink) {
             const text = await followingLink.innerText();
             const match = text.match(/[\d,.]+/);
-            if (match) return parseInt(match[0].replace(/[,.]/g, ''));
+            if (match) {
+                const count = parseInt(match[0].replace(/[,.]/g, ''));
+                console.log(`      [M1] Following via Link: ${count}`);
+                return count;
+            }
         }
+
+        // Methode 2: Meta Description
+        const metaDesc = await page.$eval('meta[name="description"]', (el: any) => el.content).catch(() => '');
+        if (metaDesc) {
+            // Pattern: "123 Following" oder "123 Gefolgt" oder "123 abonniert"
+            const match = metaDesc.match(/([\d,\.]+)\s*(Following|Gefolgt|abonniert)/i);
+            if (match) {
+                let numStr = match[1].replace(/[,\.]/g, '');
+                const count = parseInt(numStr);
+                console.log(`      [M2] Following via Meta: ${count}`);
+                return count;
+            }
+        }
+
+        // Methode 3: Suche im Header nach Stats
+        const stats = await page.$$eval('header section ul li, header ul li', (lis: any[]) => {
+            return lis.map(li => li.innerText.trim());
+        });
+
+        for (const stat of stats) {
+            if (stat.toLowerCase().includes('following') || stat.toLowerCase().includes('abonniert') || stat.toLowerCase().includes('gefolgt')) {
+                const match = stat.match(/[\d,.]+/);
+                if (match) {
+                    const count = parseInt(match[0].replace(/[,.]/g, ''));
+                    console.log(`      [M3] Following via Stats: ${count}`);
+                    return count;
+                }
+            }
+        }
+
+        // Methode 4: Alle Links durchsuchen
+        const allLinks = await page.$$eval('a', (links: any[]) => {
+            return links.map(l => ({ href: l.href, text: l.innerText.trim() }));
+        });
+
+        for (const link of allLinks) {
+            if (link.href.includes('/following')) {
+                const match = link.text.match(/[\d,.]+/);
+                if (match) {
+                    const count = parseInt(match[0].replace(/[,.]/g, ''));
+                    console.log(`      [M4] Following via All Links: ${count}`);
+                    return count;
+                }
+            }
+        }
+
+        console.log(`      ⚠️ Keine Methode hat funktioniert`);
         return null;
-    } catch {
+    } catch (err: any) {
+        console.log(`      ❌ getFollowingCount Error: ${err.message}`);
         return null;
     }
 }
