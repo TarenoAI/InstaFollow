@@ -786,33 +786,6 @@ async function main() {
     console.log(`🕵️ SMART MONITORING v4 - ${new Date().toLocaleString()}`);
     console.log('═'.repeat(60) + '\n');
 
-    // Lock-File prüfen um überlappende Runs zu verhindern
-    if (fs.existsSync(LOCK_FILE)) {
-        const lockTime = fs.statSync(LOCK_FILE).mtime;
-        const lockAge = (Date.now() - lockTime.getTime()) / 1000 / 60; // in Minuten
-
-        if (lockAge < 60) { // Maximal 60 Minuten Lock
-            console.log(`🔒 ABBRUCH: Ein anderer Prozess läuft bereits (Lock: ${lockAge.toFixed(1)} Min alt)`);
-            console.log(`   Lock-File: ${LOCK_FILE}`);
-            console.log(`   Falls dies ein Fehler ist, lösche die Datei manuell.\n`);
-            return;
-        } else {
-            console.log(`⚠️ Stale Lock gefunden (${lockAge.toFixed(1)} Min alt) - wird überschrieben`);
-        }
-    }
-
-    // Lock setzen
-    fs.writeFileSync(LOCK_FILE, new Date().toISOString());
-    console.log(`🔓 Lock gesetzt`);
-
-    // Cleanup bei Exit
-    const cleanup = () => {
-        try { fs.unlinkSync(LOCK_FILE); } catch { }
-    };
-    process.on('exit', cleanup);
-    process.on('SIGINT', () => { cleanup(); process.exit(); });
-    process.on('SIGTERM', () => { cleanup(); process.exit(); });
-
     const db = createClient({
         url: process.env.TURSO_DATABASE_URL!,
         authToken: process.env.TURSO_AUTH_TOKEN!
@@ -832,6 +805,9 @@ async function main() {
 
     const page = await context.newPage();
 
+    let createdLock = false;
+    const targetUsername = process.argv[2];
+
     try {
         // Login Check für Instagram
         console.log('🌐 Prüfe Instagram Login...');
@@ -844,10 +820,41 @@ async function main() {
             await browser.close();
             return;
         }
-        console.log('✅ Eingeloggt!\n');
 
-        // Alle Profile laden (inkl. screenshotUrl um zu prüfen ob Screenshot existiert)
-        const profiles = await db.execute("SELECT id, username, followingCount, isBaselineComplete, screenshotUrl FROM MonitoredProfile");
+        // Check for single profile argument
+        let query = "SELECT id, username, followingCount, isBaselineComplete, screenshotUrl FROM MonitoredProfile";
+        let args: any[] = [];
+
+        if (targetUsername) {
+            console.log(`🎯 Modus: Einzel-Profil Check (@${targetUsername})`);
+            query += " WHERE username = ?";
+            args.push(targetUsername);
+        } else {
+            // LOCK-System (nur bei Full Run)
+            if (fs.existsSync(LOCK_FILE)) {
+                const stats = fs.statSync(LOCK_FILE);
+                const ageMinutes = (Date.now() - stats.mtimeMs) / (1000 * 60);
+                if (ageMinutes < 60) {
+                    console.log(`\n🔒 ABBRUCH: Ein anderer Prozess läuft bereits (Lock: ${ageMinutes.toFixed(1)} Min alt)`);
+                    console.log(`   Lock-File: ${LOCK_FILE}\n   Falls dies ein Fehler ist, lösche die Datei manuell.\n`);
+                    await browser.close();
+                    return;
+                }
+                fs.unlinkSync(LOCK_FILE);
+            }
+            fs.writeFileSync(LOCK_FILE, Date.now().toString());
+            createdLock = true;
+            console.log(`🔓 Lock gesetzt`);
+        }
+
+        // Profile laden
+        const profiles = await db.execute({ sql: query, args });
+
+        if (profiles.rows.length === 0) {
+            console.log(targetUsername ? `❌ Profil @${targetUsername} nicht in der Datenbank gefunden.` : `⚠️ Keine Profile zum Überwachen gefunden.`);
+            return;
+        }
+
         console.log(`📋 ${profiles.rows.length} Profile zu prüfen:\n`);
 
         for (const row of profiles.rows) {
@@ -1168,6 +1175,9 @@ async function main() {
     } catch (err: any) {
         console.error('\n❌ Fehler:', err.message);
     } finally {
+        if (createdLock && fs.existsSync(LOCK_FILE)) {
+            try { fs.unlinkSync(LOCK_FILE); } catch { }
+        }
         await browser.close();
     }
 
