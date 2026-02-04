@@ -509,6 +509,16 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
             bodyLen = await page.evaluate(() => document.body?.innerText?.length || 0);
         }
 
+        // Letzter Versuch: Direkte Navigation falls Suche fehlgeschlagen
+        if (bodyLen < 200) {
+            console.log(`      🔄 Letzter Versuch mit direkter URL...`);
+            await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { });
+            await page.waitForTimeout(3000);
+            await dismissPopups(page);
+            bodyLen = await page.evaluate(() => document.body?.innerText?.length || 0);
+            console.log(`      📄 Nach direkter URL: ${bodyLen}`);
+        }
+
         if (bodyLen < 200) {
             const debugPath = path.join(process.cwd(), '.incidents', `empty-page-${username}-${Date.now()}.png`);
             await page.screenshot({ path: debugPath, fullPage: true });
