@@ -16,7 +16,7 @@ import axios from 'axios';
 // === KONFIGURATION ===
 const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
 const TWITTER_SESSION_PATH = path.join(process.cwd(), 'data/sessions/twitter-session.json');
-const SCREENSHOTS_DIR = path.join(process.cwd(), 'artifacts/screenshots');
+const SCREENSHOTS_DIR = path.join(process.cwd(), 'public/screenshots');
 const iPhone = devices['iPhone 13 Pro'];
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 const TWITTER_USERNAME = process.env.TWITTER_USERNAME;
@@ -50,6 +50,32 @@ interface WebhookPayload {
 // === HELPER ===
 async function humanDelay(minMs: number, maxMs: number) {
     await new Promise(r => setTimeout(r, minMs + Math.random() * (maxMs - minMs)));
+}
+
+/**
+ * Macht einen Screenshot vom aktuellen Profil und speichert ihn
+ * Gibt den relativen Pfad zurück (für die Datenbank)
+ */
+async function captureProfileScreenshot(page: Page, username: string): Promise<string | null> {
+    try {
+        // Erstelle Screenshots-Ordner falls nicht vorhanden
+        if (!fs.existsSync(SCREENSHOTS_DIR)) {
+            fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+        }
+
+        const timestamp = Date.now();
+        const filename = `${username}-${timestamp}.png`;
+        const filepath = path.join(SCREENSHOTS_DIR, filename);
+
+        await page.screenshot({ path: filepath, fullPage: false });
+        console.log(`   📸 Screenshot gespeichert: ${filename}`);
+
+        // Relativer Pfad für Web-Zugriff
+        return `/screenshots/${filename}`;
+    } catch (err: any) {
+        console.log(`   ⚠️ Screenshot fehlgeschlagen: ${err.message}`);
+        return null;
+    }
 }
 
 async function dismissPopups(page: Page) {
@@ -849,6 +875,15 @@ async function main() {
 
             if (currentCount !== lastCount) {
                 console.log(`   🚨 ÄNDERUNG: ${lastCount} → ${currentCount}`);
+
+                // 📸 Screenshot vom Profil machen
+                const screenshotUrl = await captureProfileScreenshot(page, username);
+                if (screenshotUrl) {
+                    await db.execute({
+                        sql: `UPDATE MonitoredProfile SET screenshotUrl = ? WHERE id = ?`,
+                        args: [screenshotUrl, profileId]
+                    });
+                }
 
                 // Full Scrape
                 const currentFollowing = await getFollowingList(page, username, currentCount);

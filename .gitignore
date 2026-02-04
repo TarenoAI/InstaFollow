@@ -46,3 +46,4 @@ next-env.d.ts
 config.json
 dev.db
 dev.db-journal
+public/screenshots/*.png

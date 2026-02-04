@@ -962,8 +962,8 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
         <button
           onClick={handleToggleTracking}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${set.isActive
-              ? 'bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/30 hover:bg-[var(--success)]/20'
-              : 'bg-[var(--text-muted)]/10 text-[var(--text-muted)] border border-[var(--border)] hover:bg-[var(--card)]'
+            ? 'bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/30 hover:bg-[var(--success)]/20'
+            : 'bg-[var(--text-muted)]/10 text-[var(--text-muted)] border border-[var(--border)] hover:bg-[var(--card)]'
             }`}
           title={set.isActive ? 'Tracking deaktivieren' : 'Tracking aktivieren'}
         >
@@ -1343,6 +1343,29 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
             </div>
           </div>
         </div>
+
+        {/* Screenshot Preview */}
+        {profile?.screenshotUrl && (
+          <div className="px-8 py-4 border-b border-[var(--border)] bg-[var(--card)]/30">
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0">
+                <span className="text-xs uppercase tracking-wider text-[var(--text-muted)]">📸 Letzter Screenshot</span>
+              </div>
+              <div className="flex-1 flex justify-center">
+                <div className="relative group cursor-pointer" onClick={() => window.open(profile.screenshotUrl, '_blank')}>
+                  <img
+                    src={profile.screenshotUrl}
+                    alt={`Screenshot von @${username}`}
+                    className="h-32 rounded-lg border border-[var(--border)] object-contain hover:scale-105 transition-transform"
+                  />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                    <span className="text-white text-sm">🔍 Vergrößern</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex px-8 border-b border-[var(--border)] bg-[var(--card)]/30">
