@@ -100,5 +100,6 @@
       "secure": true,
       "sameSite": "Lax"
     }
-  ]
+  ],
+  "origins": []
 }

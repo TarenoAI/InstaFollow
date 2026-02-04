@@ -414,35 +414,38 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
             await dismissPopups(page);
         }
 
-        // Jetzt zum Profil
+        // Jetzt zum Profil - mit domcontentloaded statt networkidle
         await page.goto(`https://www.instagram.com/${username}/`, {
-            waitUntil: 'networkidle',
-            timeout: 45000
-        });
+            waitUntil: 'domcontentloaded',
+            timeout: 30000
+        }).catch(() => console.log(`      ⚠️ Navigation timeout, versuche weiter...`));
 
-        // Warte auf echten Seiteninhalt
-        await page.waitForTimeout(3000);
-        await dismissPopups(page);
-        await page.waitForTimeout(1000);
+        // Warte auf Content mit Polling
+        let bodyLen = 0;
+        for (let i = 0; i < 5; i++) {
+            bodyLen = await page.evaluate(() => document.body?.innerText?.length || 0);
+            if (bodyLen > 200) break;
 
-        // Prüfe ob Seite überhaupt geladen ist
-        const bodyText = await page.evaluate(() => document.body?.innerText?.length || 0);
-        console.log(`      📄 Body text length: ${bodyText}`);
+            console.log(`      ⏳ Warte auf Content (${i + 1}/5)...`);
+            await page.waitForTimeout(2000);
+            await dismissPopups(page);
+        }
 
-        if (bodyText < 100) {
-            console.log(`      ⚠️ Seite scheint leer - versuche Reload...`);
-            await page.reload({ waitUntil: 'networkidle', timeout: 30000 });
-            await page.waitForTimeout(3000);
+        console.log(`      📄 Body text length: ${bodyLen}`);
 
-            const bodyTextRetry = await page.evaluate(() => document.body?.innerText?.length || 0);
-            console.log(`      📄 Body nach Reload: ${bodyTextRetry}`);
+        if (bodyLen < 200) {
+            console.log(`      ⚠️ Seite ist leer - versuche Reload...`);
+            await page.reload({ waitUntil: 'load', timeout: 30000 }).catch(() => { });
+            await page.waitForTimeout(5000);
+            await dismissPopups(page);
+            bodyLen = await page.evaluate(() => document.body?.innerText?.length || 0);
+        }
 
-            if (bodyTextRetry < 100) {
-                const debugPath = path.join(process.cwd(), '.incidents', `empty-page-${username}-${Date.now()}.png`);
-                await page.screenshot({ path: debugPath, fullPage: true });
-                console.log(`      📸 Empty page debug: ${debugPath}`);
-                return null;
-            }
+        if (bodyLen < 200) {
+            const debugPath = path.join(process.cwd(), '.incidents', `empty-page-${username}-${Date.now()}.png`);
+            await page.screenshot({ path: debugPath, fullPage: true });
+            console.log(`      📸 Empty page debug: ${debugPath}`);
+            return null;
         }
 
         // Methode 1: Link mit "following" im href
