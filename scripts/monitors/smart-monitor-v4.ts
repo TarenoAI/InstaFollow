@@ -836,8 +836,8 @@ async function main() {
         }
         console.log('✅ Eingeloggt!\n');
 
-        // Alle Profile laden
-        const profiles = await db.execute("SELECT id, username, followingCount, isBaselineComplete FROM MonitoredProfile");
+        // Alle Profile laden (inkl. screenshotUrl um zu prüfen ob Screenshot existiert)
+        const profiles = await db.execute("SELECT id, username, followingCount, isBaselineComplete, screenshotUrl FROM MonitoredProfile");
         console.log(`📋 ${profiles.rows.length} Profile zu prüfen:\n`);
 
         for (const row of profiles.rows) {
@@ -845,6 +845,7 @@ async function main() {
             const username = row.username as string;
             const lastCount = (row.followingCount as number) || 0;
             const isBaselineComplete = Boolean(row.isBaselineComplete);
+            const existingScreenshot = row.screenshotUrl as string | null;
 
             console.log('─'.repeat(60));
             console.log(`🔍 @${username} (DB: ${lastCount})`);
@@ -857,6 +858,18 @@ async function main() {
             }
 
             console.log(`   Aktuell: ${currentCount}`);
+
+            // 📸 Screenshot für Profile OHNE existierenden Screenshot (einmalig)
+            if (!existingScreenshot) {
+                console.log(`   📸 Erster Screenshot für @${username}...`);
+                const newScreenshotUrl = await captureProfileScreenshot(page, username);
+                if (newScreenshotUrl) {
+                    await db.execute({
+                        sql: `UPDATE MonitoredProfile SET screenshotUrl = ? WHERE id = ?`,
+                        args: [newScreenshotUrl, profileId]
+                    });
+                }
+            }
 
             // ⚠️ Skip Profile mit zu vielen Followings (nicht zuverlässig scrapbar)
             const MAX_FOLLOWING = 1000;
@@ -877,7 +890,8 @@ async function main() {
             if (currentCount !== lastCount) {
                 console.log(`   🚨 ÄNDERUNG: ${lastCount} → ${currentCount}`);
 
-                // 📸 Screenshot vom Profil machen
+                // 📸 Neuer Screenshot bei Änderung (aktualisiert existierenden)
+                console.log(`   📸 Screenshot-Update wegen Änderung...`);
                 const screenshotUrl = await captureProfileScreenshot(page, username);
                 if (screenshotUrl) {
                     await db.execute({
