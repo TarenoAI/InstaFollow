@@ -364,7 +364,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 await page.mouse.wheel(0, 800);
             }
 
-            await humanDelay(1200, 2000);
+            await humanDelay(3000, 5000);
 
             // Alle 10 Scrolls: Extra warten für Lazy Loading
             if (scroll % 10 === 9) {
@@ -802,7 +802,7 @@ async function main() {
                     args: [currentCount, profileId]
                 });
 
-                await humanDelay(3000, 5000);
+                await humanDelay(8000, 12000);
                 continue;
             }
 
@@ -839,7 +839,7 @@ async function main() {
                         args: [currentCount, profileId]
                     });
 
-                    await humanDelay(5000, 10000);
+                    await humanDelay(10000, 15000);
                     continue; // Zum nächsten Profil
                 }
 
@@ -896,7 +896,7 @@ async function main() {
 
                         console.log(`   ✅ Baseline erstellt (${currentFollowing.length} Einträge) - KEINE Changes gemeldet`);
                         console.log(`   ℹ️ Ab jetzt werden Änderungen erkannt!\n`);
-                        await humanDelay(5000, 10000);
+                        await humanDelay(10000, 15000);
                         continue; // Zum nächsten Profil!
                     }
 
@@ -917,7 +917,7 @@ async function main() {
                                 console.log(`      → @${targetUsername}`);
                                 const info = await getProfileInfo(page, targetUsername, true);
                                 if (info) addedProfiles.push(info);
-                                await humanDelay(2000, 4000);
+                                await humanDelay(5000, 8000);
                             }
 
                             if (addedProfiles.length > 0) {
@@ -964,7 +964,7 @@ async function main() {
                                 console.log(`      → @${targetUsername}`);
                                 const info = await getProfileInfo(page, targetUsername, true);
                                 if (info) removedProfiles.push(info);
-                                await humanDelay(2000, 4000);
+                                await humanDelay(5000, 8000);
                             }
 
                             if (removedProfiles.length > 0) {
@@ -1050,7 +1050,7 @@ async function main() {
             }
 
             console.log('');
-            await humanDelay(5000, 10000);
+            await humanDelay(10000, 15000);
         }
 
         await context.storageState({ path: SESSION_PATH });
