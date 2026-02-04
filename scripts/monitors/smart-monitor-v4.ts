@@ -403,24 +403,65 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
  */
 async function getFollowingCount(page: Page, username: string): Promise<number | null> {
     try {
-        console.log(`      🌐 Lade Profil...`);
+        console.log(`      🔍 Suche @${username}...`);
 
-        // WICHTIG: Erst zur Startseite um Session zu aktivieren (falls noch nicht dort)
+        // Stelle sicher dass wir auf Instagram sind
         const currentUrl = page.url();
         if (!currentUrl.includes('instagram.com') || currentUrl.includes('login')) {
-            console.log(`      🏠 Navigiere erst zur Startseite...`);
-            await page.goto('https://www.instagram.com/', { waitUntil: 'networkidle', timeout: 30000 });
+            await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
             await page.waitForTimeout(2000);
             await dismissPopups(page);
         }
 
-        // Jetzt zum Profil - mit domcontentloaded statt networkidle
-        await page.goto(`https://www.instagram.com/${username}/`, {
-            waitUntil: 'domcontentloaded',
-            timeout: 30000
-        }).catch(() => console.log(`      ⚠️ Navigation timeout, versuche weiter...`));
+        // 🧑 MENSCHLICHES VERHALTEN: Über Suche zum Profil navigieren
+        const useSearch = Math.random() > 0.3; // 70% via Suche, 30% direkt (Mix ist natürlicher)
 
-        // Warte auf Content mit Polling
+        if (useSearch) {
+            try {
+                // Klicke auf Suche-Icon
+                const searchIcon = await page.$('svg[aria-label="Suchen"]') || await page.$('svg[aria-label="Search"]');
+                if (searchIcon) {
+                    await searchIcon.click();
+                    await page.waitForTimeout(1000);
+
+                    // Username eintippen (menschliche Geschwindigkeit)
+                    const searchInput = await page.$('input[placeholder*="Suchen"]') || await page.$('input[placeholder*="Search"]');
+                    if (searchInput) {
+                        await searchInput.click();
+                        await page.waitForTimeout(500);
+
+                        // Tippe langsam
+                        for (const char of username) {
+                            await searchInput.type(char, { delay: 50 + Math.random() * 100 });
+                        }
+                        await page.waitForTimeout(1500); // Warte auf Suchergebnisse
+
+                        // Klicke auf erstes Ergebnis
+                        const firstResult = await page.$(`a[href="/${username}/"]`);
+                        if (firstResult) {
+                            await firstResult.click();
+                            await page.waitForTimeout(2000);
+                            console.log(`      ✅ Via Suche gefunden`);
+                        } else {
+                            // Fallback: Direkte Navigation
+                            await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                        }
+                    } else {
+                        await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                    }
+                } else {
+                    await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                }
+            } catch {
+                // Bei Fehler: Direkte Navigation
+                await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { });
+            }
+        } else {
+            // Manchmal direkt navigieren (auch natürlich, z.B. aus Lesezeichen)
+            await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { });
+        }
+
+        // Warte auf Content
         let bodyLen = 0;
         for (let i = 0; i < 5; i++) {
             bodyLen = await page.evaluate(() => document.body?.innerText?.length || 0);
