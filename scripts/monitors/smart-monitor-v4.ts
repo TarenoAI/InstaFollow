@@ -54,7 +54,7 @@ async function humanDelay(minMs: number, maxMs: number) {
 
 /**
  * Macht einen Screenshot vom aktuellen Profil und speichert ihn
- * Gibt den relativen Pfad zurück (für die Datenbank)
+ * Gibt die GitHub RAW URL zurück (für Vercel-Zugriff)
  */
 async function captureProfileScreenshot(page: Page, username: string): Promise<string | null> {
     try {
@@ -70,8 +70,9 @@ async function captureProfileScreenshot(page: Page, username: string): Promise<s
         await page.screenshot({ path: filepath, fullPage: false });
         console.log(`   📸 Screenshot gespeichert: ${filename}`);
 
-        // Relativer Pfad für Web-Zugriff
-        return `/screenshots/${filename}`;
+        // GitHub Raw URL für Vercel-Zugriff
+        const githubRawUrl = `https://raw.githubusercontent.com/TarenoAI/InstaFollow/main/public/screenshots/${filename}`;
+        return githubRawUrl;
     } catch (err: any) {
         console.log(`   ⚠️ Screenshot fehlgeschlagen: ${err.message}`);
         return null;
@@ -1131,6 +1132,14 @@ async function main() {
 
         await context.storageState({ path: SESSION_PATH });
         console.log('💾 Instagram Session gespeichert');
+
+        // 📤 Screenshots zu Git pushen (für Vercel-Zugriff)
+        const { exec } = await import('child_process');
+        exec(`cd ${process.cwd()} && git add public/screenshots/ && git commit -m "screenshots: auto-update" && git push origin main`,
+            (err) => {
+                if (!err) console.log('📤 Screenshots zu Git gepusht');
+                else if (!err?.message?.includes('nothing to commit')) console.log('ℹ️ Keine neuen Screenshots');
+            });
 
     } catch (err: any) {
         console.error('\n❌ Fehler:', err.message);
