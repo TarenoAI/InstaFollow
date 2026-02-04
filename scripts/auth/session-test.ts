@@ -103,10 +103,38 @@ async function main() {
         // Teste einen konkreten Account
         console.log('🔍 Teste Profil-Zugriff...');
         await page.goto('https://www.instagram.com/fcbayern/', {
-            waitUntil: 'domcontentloaded',
+            waitUntil: 'networkidle',
             timeout: 30000
         });
         await page.waitForTimeout(3000);
+
+        // Schließe "View in App" Popup
+        console.log('   🔇 Schließe Popups...');
+        try {
+            // ESC drücken
+            await page.keyboard.press('Escape');
+            await page.waitForTimeout(500);
+            await page.keyboard.press('Escape');
+            await page.waitForTimeout(500);
+
+            // X-Button suchen und klicken
+            const closeButtons = ['[aria-label="Schließen"]', '[aria-label="Close"]', 'div[role="dialog"] button'];
+            for (const sel of closeButtons) {
+                const btn = await page.$(sel);
+                if (btn && await btn.isVisible()) {
+                    await btn.click({ force: true });
+                    console.log(`   ✓ Geschlossen via ${sel}`);
+                    await page.waitForTimeout(500);
+                }
+            }
+
+            // Klicke außerhalb
+            await page.mouse.click(10, 10);
+            await page.waitForTimeout(500);
+        } catch { }
+
+        await page.screenshot({ path: 'session-test-after-popup.png' });
+        console.log('   📸 Screenshot nach Popup-Schließung: session-test-after-popup.png');
 
         const followingLink = await page.$('a[href*="following"]');
         if (followingLink) {

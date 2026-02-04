@@ -68,7 +68,7 @@ async function dismissPopups(page: Page) {
         // Turn on notifications
         'button:has-text("Nicht aktivieren")',
         'button:has-text("Not Now")',
-        // Close buttons
+        // Close buttons (X icons)
         '[aria-label="Schließen"]',
         '[aria-label="Close"]',
         'svg[aria-label="Schließen"]',
@@ -76,6 +76,13 @@ async function dismissPopups(page: Page) {
         // Cancel/Dismiss
         'button:has-text("Abbrechen")',
         'button:has-text("Cancel")',
+        // "View profile in app" popup - X button at top right
+        'div[role="dialog"] button[type="button"]',
+        'div[role="dialog"] svg[aria-label="Schließen"]',
+        'div[role="dialog"] svg[aria-label="Close"]',
+        // The X button specifically
+        'button svg[aria-label="Schließen"]',
+        'button svg[aria-label="Close"]',
     ];
 
     for (const sel of selectors) {
@@ -84,6 +91,7 @@ async function dismissPopups(page: Page) {
             if (btn && await btn.isVisible()) {
                 await btn.click({ force: true });
                 await page.waitForTimeout(300);
+                console.log(`      🔇 Popup geschlossen: ${sel}`);
             }
         } catch { }
     }
@@ -92,6 +100,18 @@ async function dismissPopups(page: Page) {
     try {
         await page.keyboard.press('Escape');
         await page.waitForTimeout(200);
+        await page.keyboard.press('Escape'); // Nochmal für hartnäckige Popups
+        await page.waitForTimeout(200);
+    } catch { }
+
+    // Klicke außerhalb des Dialogs um ihn zu schließen
+    try {
+        const dialog = await page.$('div[role="dialog"]');
+        if (dialog) {
+            // Klicke auf den Hintergrund
+            await page.mouse.click(10, 10);
+            await page.waitForTimeout(300);
+        }
     } catch { }
 }
 
@@ -479,6 +499,48 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
                     console.log(`      [M4] Following via All Links: ${count}`);
                     return count;
                 }
+            }
+        }
+
+        // Methode 5: Suche im ganzen Seitentext nach "X Gefolgt" oder "X Following"
+        const pageText = await page.evaluate(() => document.body?.innerText || '');
+        // Pattern: "78 Gefolgt" oder "78 Following" oder "123 abonniert"
+        const textMatches = pageText.match(/(\d+[\d,.]*)\s*(Gefolgt|Following|abonniert)/gi);
+        if (textMatches && textMatches.length > 0) {
+            for (const m of textMatches) {
+                const numMatch = m.match(/[\d,.]+/);
+                if (numMatch) {
+                    const count = parseInt(numMatch[0].replace(/[,.]/g, ''));
+                    console.log(`      [M5] Following via Page Text: ${count} (found: "${m}")`);
+                    return count;
+                }
+            }
+        }
+
+        // Methode 6: Suche nach Header-Text mit Follower/Following
+        const headerText = await page.$eval('header', (h: any) => h.innerText).catch(() => '');
+        if (headerText) {
+            // Pattern: "44,1 Mio. Follower • 78 Gefolgt"
+            const followingMatch = headerText.match(/(\d+[\d,.\s]*(?:Mio\.?|K|M)?)\s*(Gefolgt|Following)/i);
+            if (followingMatch) {
+                let numStr = followingMatch[1].replace(/[,.\s]/g, '');
+                // Handle "Mio" = Millionen
+                if (followingMatch[1].toLowerCase().includes('mio')) {
+                    numStr = numStr.replace(/mio/i, '');
+                    const num = parseFloat(numStr) * 1000000;
+                    console.log(`      [M6] Following via Header: ${num}`);
+                    return Math.round(num);
+                }
+                // Handle K = Tausend
+                if (followingMatch[1].toLowerCase().includes('k')) {
+                    numStr = numStr.replace(/k/i, '');
+                    const num = parseFloat(numStr) * 1000;
+                    console.log(`      [M6] Following via Header: ${num}`);
+                    return Math.round(num);
+                }
+                const count = parseInt(numStr);
+                console.log(`      [M6] Following via Header: ${count}`);
+                return count;
             }
         }
 
