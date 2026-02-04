@@ -1157,12 +1157,12 @@ async function main() {
         await context.storageState({ path: SESSION_PATH });
         console.log('💾 Instagram Session gespeichert');
 
-        // 📤 Screenshots zu Git pushen (für Vercel-Zugriff)
+        // 📤 Screenshots UND Incidents zu Git pushen
         const { exec } = await import('child_process');
-        exec(`cd ${process.cwd()} && git add public/screenshots/ && git commit -m "screenshots: auto-update" && git push origin main`,
+        exec(`cd ${process.cwd()} && git add public/screenshots/ .incidents/ && git commit -m "auto: screenshots + incidents" && git push origin main`,
             (err) => {
-                if (!err) console.log('📤 Screenshots zu Git gepusht');
-                else if (!err?.message?.includes('nothing to commit')) console.log('ℹ️ Keine neuen Screenshots');
+                if (!err) console.log('📤 Screenshots & Incidents zu Git gepusht');
+                else if (!err?.message?.includes('nothing to commit')) console.log('ℹ️ Keine neuen Dateien');
             });
 
     } catch (err: any) {
