@@ -384,8 +384,19 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 async function getFollowingCount(page: Page, username: string): Promise<number | null> {
     try {
         console.log(`      🌐 Lade Profil...`);
+
+        // WICHTIG: Erst zur Startseite um Session zu aktivieren (falls noch nicht dort)
+        const currentUrl = page.url();
+        if (!currentUrl.includes('instagram.com') || currentUrl.includes('login')) {
+            console.log(`      🏠 Navigiere erst zur Startseite...`);
+            await page.goto('https://www.instagram.com/', { waitUntil: 'networkidle', timeout: 30000 });
+            await page.waitForTimeout(2000);
+            await dismissPopups(page);
+        }
+
+        // Jetzt zum Profil
         await page.goto(`https://www.instagram.com/${username}/`, {
-            waitUntil: 'networkidle',  // Warte bis Netzwerk ruhig ist
+            waitUntil: 'networkidle',
             timeout: 45000
         });
 
@@ -399,12 +410,19 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
         console.log(`      📄 Body text length: ${bodyText}`);
 
         if (bodyText < 100) {
-            console.log(`      ⚠️ Seite scheint leer zu sein!`);
-            // Full page screenshot für Debug
-            const debugPath = path.join(process.cwd(), '.incidents', `empty-page-${username}-${Date.now()}.png`);
-            await page.screenshot({ path: debugPath, fullPage: true });
-            console.log(`      📸 Empty page debug: ${debugPath}`);
-            return null;
+            console.log(`      ⚠️ Seite scheint leer - versuche Reload...`);
+            await page.reload({ waitUntil: 'networkidle', timeout: 30000 });
+            await page.waitForTimeout(3000);
+
+            const bodyTextRetry = await page.evaluate(() => document.body?.innerText?.length || 0);
+            console.log(`      📄 Body nach Reload: ${bodyTextRetry}`);
+
+            if (bodyTextRetry < 100) {
+                const debugPath = path.join(process.cwd(), '.incidents', `empty-page-${username}-${Date.now()}.png`);
+                await page.screenshot({ path: debugPath, fullPage: true });
+                console.log(`      📸 Empty page debug: ${debugPath}`);
+                return null;
+            }
         }
 
         // Methode 1: Link mit "following" im href
