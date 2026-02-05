@@ -1233,6 +1233,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [updatingSets, setUpdatingSets] = useState(false);
+  const [hoveredPoint, setHoveredPoint] = useState<any>(null);
 
   useEffect(() => {
     if (isOpen && profileId) {
@@ -1682,7 +1683,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                         </div>
                       ) : (() => {
                         const days = timeRange === 'week' ? 7 : 30;
-                        const dataPoints: { date: string, label: string, followers: number }[] = [];
+                        const dataPoints: { date: string, label: string, followers: number, followed: string[], unfollowed: string[] }[] = [];
                         let currentRef = profile?.followingCount || 0;
 
                         // Create data points for the timeline
@@ -1690,6 +1691,12 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                           const date = new Date();
                           date.setDate(date.getDate() - (days - 1 - i));
                           const dateStr = date.toISOString().split('T')[0];
+
+                          // Changes on this specific day for tooltip
+                          const dayChanges = historyList.filter(h => {
+                            const d = typeof h.detectedAt === 'string' ? h.detectedAt.split('T')[0] : new Date(h.detectedAt).toISOString().split('T')[0];
+                            return d === dateStr;
+                          });
 
                           // How many changes happened AFTER this date up to now?
                           // We work backwards to estimate the count at this point
@@ -1707,7 +1714,9 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                           dataPoints.push({
                             date: dateStr,
                             label: date.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' }),
-                            followers: estimatedCount
+                            followers: estimatedCount,
+                            followed: dayChanges.filter(c => c.type === 'FOLLOW').map(c => c.targetUsername),
+                            unfollowed: dayChanges.filter(c => c.type === 'UNFOLLOW').map(c => c.targetUsername)
                           });
                         }
 
@@ -1743,8 +1752,8 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                             <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
                               <defs>
                                 <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.3" />
-                                  <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+                                  <stop offset="0%" stopColor="var(--accent-solid)" stopOpacity="0.3" />
+                                  <stop offset="100%" stopColor="var(--accent-solid)" stopOpacity="0" />
                                 </linearGradient>
                               </defs>
 
@@ -1776,19 +1785,68 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                                 const x = (i / (days - 1)) * width;
                                 const y = height - ((p.followers - chartMin) / chartRange) * height;
                                 return (
-                                  <g key={i} className="cursor-pointer group/point">
+                                  <g
+                                    key={i}
+                                    className="cursor-pointer group/point"
+                                    onMouseEnter={() => setHoveredPoint({ ...p, index: i })}
+                                    onMouseLeave={() => setHoveredPoint(null)}
+                                  >
                                     <circle
                                       cx={x} cy={y} r="6"
-                                      fill="var(--background)" stroke="var(--accent)" strokeWidth="3"
+                                      fill="white" stroke="var(--accent-solid)" strokeWidth="3"
                                       className="transition-all group-hover/point:r-8"
                                     />
-                                    {/* Tooltip on hover - Simplified */}
-                                    <rect x={x - 40} y={y - 45} width="80" height="35" rx="8" fill="var(--card)" className="opacity-0 group-hover/point:opacity-100 transition-opacity border border-[var(--border)] shadow-xl" />
-                                    <text x={x} y={y - 23} textAnchor="middle" fill="var(--foreground)" className="opacity-0 group-hover/point:opacity-100 text-[12px] font-black pointer-events-none">{p.followers}</text>
                                   </g>
                                 );
                               })}
                             </svg>
+
+                            {/* Enhanced HTML Tooltip */}
+                            {hoveredPoint && (
+                              <div
+                                className="absolute pointer-events-none bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 shadow-2xl backdrop-blur-md z-50 text-[10px] min-w-[140px] animate-scale-in"
+                                style={{
+                                  left: `${(hoveredPoint.index / (days - 1)) * 100}%`,
+                                  top: `${height - ((hoveredPoint.followers - chartMin) / chartRange) * height / 400 * 100}%`,
+                                  transform: 'translate(-50%, -110%)',
+                                }}
+                              >
+                                <p className="font-bold border-b border-[var(--border)] pb-1 mb-2 flex justify-between">
+                                  <span>{hoveredPoint.label}</span>
+                                  <span className="text-[var(--accent-solid)]">{hoveredPoint.followers}</span>
+                                </p>
+                                <div className="space-y-1.5 overflow-y-auto max-h-40">
+                                  {hoveredPoint.followed.length === 0 && hoveredPoint.unfollowed.length === 0 ? (
+                                    <p className="text-[var(--text-muted)] italic">Keine Änderungen detektiert</p>
+                                  ) : (
+                                    <>
+                                      {hoveredPoint.followed.length > 0 && (
+                                        <div>
+                                          <p className="text-[var(--success)] font-black text-[9px] uppercase mb-1">➕ Neu gefolgt:</p>
+                                          {hoveredPoint.followed.slice(0, 5).map((name: string) => (
+                                            <p key={name} className="font-medium text-[var(--foreground)] truncate">@{name}</p>
+                                          ))}
+                                          {hoveredPoint.followed.length > 5 && (
+                                            <p className="text-[var(--text-muted)] text-[8px] italic">...und {hoveredPoint.followed.length - 5} weitere</p>
+                                          )}
+                                        </div>
+                                      )}
+                                      {hoveredPoint.unfollowed.length > 0 && (
+                                        <div className={hoveredPoint.followed.length > 0 ? "pt-1 mt-1 border-t border-[var(--border)]/30" : ""}>
+                                          <p className="text-[var(--error)] font-black text-[9px] uppercase mb-1">➖ Entfolgt:</p>
+                                          {hoveredPoint.unfollowed.slice(0, 5).map((name: string) => (
+                                            <p key={name} className="font-medium text-[var(--foreground)] truncate">@{name}</p>
+                                          ))}
+                                          {hoveredPoint.unfollowed.length > 5 && (
+                                            <p className="text-[var(--text-muted)] text-[8px] italic">...und {hoveredPoint.unfollowed.length - 5} weitere</p>
+                                          )}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )}
 
                             {/* X-Axis Labels */}
                             <div className="absolute -bottom-8 left-0 right-0 flex justify-between px-1">
@@ -1804,7 +1862,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                               {[0, 0.25, 0.5, 0.75, 1].map((p, idx) => {
                                 const value = Math.round(chartMax - (p * chartRange));
                                 return (
-                                  <span key={idx} className="text-[10px] font-bold text-[var(--text-muted)] text-right w-12">
+                                  <span key={idx} className="text-[10px] font-bold text-[var(--foreground)] opacity-70 text-right w-12">
                                     {value}
                                   </span>
                                 );

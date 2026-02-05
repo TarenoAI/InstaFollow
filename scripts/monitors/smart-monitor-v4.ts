@@ -488,41 +488,68 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
             await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { });
         }
 
-        // Warte auf Content
+        // Warte auf Content - prüfe Instagram-spezifische Elemente statt nur Body-Länge
+        let pageReady = false;
         let bodyLen = 0;
         for (let i = 0; i < 5; i++) {
+            // Check 1: Body text length
             bodyLen = await page.evaluate(() => document.body?.innerText?.length || 0);
-            if (bodyLen > 200) break;
 
-            console.log(`      ⏳ Warte auf Content (${i + 1}/5)...`);
+            // Check 2: Instagram-spezifische Elemente
+            const hasFollowingLink = await page.$('a[href*="following"]').then(el => !!el).catch(() => false);
+            const hasHeader = await page.$('header').then(el => !!el).catch(() => false);
+            const hasAvatar = await page.$('img[alt*="Profilbild"], img[alt*="profile picture"]').then(el => !!el).catch(() => false);
+
+            if (bodyLen > 150 || hasFollowingLink || (hasHeader && hasAvatar)) {
+                pageReady = true;
+                break;
+            }
+
+            console.log(`      ⏳ Warte auf Content (${i + 1}/5)... [bodyLen=${bodyLen}]`);
             await page.waitForTimeout(2000);
             await dismissPopups(page);
         }
 
-        console.log(`      📄 Body text length: ${bodyLen}`);
+        console.log(`      📄 Body text length: ${bodyLen}, pageReady: ${pageReady}`);
 
-        if (bodyLen < 200) {
-            console.log(`      ⚠️ Seite ist leer - versuche Reload...`);
+        if (!pageReady) {
+            console.log(`      ⚠️ Seite nicht bereit - versuche Reload...`);
             await page.reload({ waitUntil: 'load', timeout: 30000 }).catch(() => { });
             await page.waitForTimeout(5000);
             await dismissPopups(page);
+
+            // Nochmal checken
+            const hasFollowingLink = await page.$('a[href*="following"]').then(el => !!el).catch(() => false);
             bodyLen = await page.evaluate(() => document.body?.innerText?.length || 0);
+            pageReady = bodyLen > 150 || hasFollowingLink;
         }
 
         // Letzter Versuch: Direkte Navigation falls Suche fehlgeschlagen
-        if (bodyLen < 200) {
+        if (!pageReady) {
             console.log(`      🔄 Letzter Versuch mit direkter URL...`);
             await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { });
             await page.waitForTimeout(3000);
             await dismissPopups(page);
+
+            const hasFollowingLink = await page.$('a[href*="following"]').then(el => !!el).catch(() => false);
             bodyLen = await page.evaluate(() => document.body?.innerText?.length || 0);
-            console.log(`      📄 Nach direkter URL: ${bodyLen}`);
+            pageReady = bodyLen > 150 || hasFollowingLink;
+            console.log(`      📄 Nach direkter URL: bodyLen=${bodyLen}, hasFollowing=${hasFollowingLink}`);
         }
 
-        if (bodyLen < 200) {
-            const debugPath = path.join(process.cwd(), '.incidents', `empty-page-${username}-${Date.now()}.png`);
+        if (!pageReady) {
+            // Detailliertes Incident erstellen
+            const timestamp = Date.now();
+            const debugPath = path.join(process.cwd(), '.incidents', `empty-page-${username}-${timestamp}.png`);
             await page.screenshot({ path: debugPath, fullPage: true });
+
+            // Zusätzliche Debug-Infos
+            const pageUrl = page.url();
+            const pageTitle = await page.title().catch(() => 'unknown');
             console.log(`      📸 Empty page debug: ${debugPath}`);
+            console.log(`      🔍 URL: ${pageUrl}`);
+            console.log(`      🔍 Title: ${pageTitle}`);
+            console.log(`      🔍 Body length: ${bodyLen}`);
             return null;
         }
 
