@@ -1233,7 +1233,6 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
   const [followingList, setFollowingList] = useState<any[]>([]);
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [screenshots, setScreenshots] = useState<any[]>([]);
-  const [selectedScreenshotIdx, setSelectedScreenshotIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [updatingSets, setUpdatingSets] = useState(false);
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
@@ -1251,7 +1250,6 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
       // Always load screenshots when opening
       const screenshotList = await getProfileScreenshots(username);
       setScreenshots(screenshotList);
-      setSelectedScreenshotIdx(0);
 
       if (activeTab === 'list') {
         const [prof, list] = await Promise.all([
@@ -1356,89 +1354,35 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
             </div>
           </div>
         </div>
-
-        {/* Screenshot Gallery */}
+        {/* Compact Screenshot Strip */}
         {screenshots.length > 0 && (
-          <div className="px-8 py-4 border-b border-[var(--border)] bg-[var(--card)]/30">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold">
-                📸 Screenshots ({screenshots.length})
-              </span>
-              {screenshots[selectedScreenshotIdx] && (
-                <span className="text-xs text-[var(--text-muted)]">
-                  {screenshots[selectedScreenshotIdx].displayDate}
-                </span>
-              )}
-            </div>
-
-            {/* Main Screenshot with Navigation */}
+          <div className="px-8 py-2 border-b border-[var(--border)] bg-[var(--card)]/30">
             <div className="flex items-center gap-3">
-              {/* Prev Button */}
-              <button
-                onClick={() => setSelectedScreenshotIdx(i => Math.max(0, i - 1))}
-                disabled={selectedScreenshotIdx === 0}
-                className="p-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--foreground)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-
-              {/* Screenshot Display */}
-              <div className="flex-1 flex justify-center">
-                <div
-                  className="relative group cursor-pointer"
-                  onClick={() => window.open(screenshots[selectedScreenshotIdx]?.url, '_blank')}
-                >
-                  <img
-                    src={screenshots[selectedScreenshotIdx]?.url}
-                    alt={`Screenshot von @${username}`}
-                    className="h-40 rounded-xl border border-[var(--border)] object-contain hover:scale-[1.02] transition-transform shadow-lg"
-                  />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">🔍 Vollbild</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Next Button */}
-              <button
-                onClick={() => setSelectedScreenshotIdx(i => Math.min(screenshots.length - 1, i + 1))}
-                disabled={selectedScreenshotIdx === screenshots.length - 1}
-                className="p-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--foreground)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Thumbnail Strip */}
-            {screenshots.length > 1 && (
-              <div className="flex gap-2 mt-3 overflow-x-auto py-1 custom-scrollbar">
-                {screenshots.slice(0, 10).map((ss, idx) => (
+              <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-bold flex-shrink-0">
+                📸 {screenshots.length}
+              </span>
+              <div className="flex gap-1.5 overflow-x-auto py-1 flex-1">
+                {screenshots.slice(0, 8).map((ss, idx) => (
                   <button
                     key={ss.filename}
-                    onClick={() => setSelectedScreenshotIdx(idx)}
-                    className={`flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${idx === selectedScreenshotIdx
-                      ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/30'
-                      : 'border-[var(--border)] opacity-60 hover:opacity-100'
-                      }`}
+                    onClick={() => window.open(ss.url, '_blank')}
+                    className="flex-shrink-0 rounded-md overflow-hidden border border-[var(--border)] hover:border-[var(--accent)] hover:ring-1 hover:ring-[var(--accent)]/30 transition-all group relative"
+                    title={ss.displayDate}
                   >
                     <img
                       src={ss.url}
                       alt={`Screenshot ${idx + 1}`}
-                      className="h-12 w-auto object-contain"
+                      className="h-8 w-auto object-contain opacity-70 group-hover:opacity-100 transition-opacity"
                     />
                   </button>
                 ))}
-                {screenshots.length > 10 && (
-                  <span className="flex-shrink-0 px-3 py-1 text-xs text-[var(--text-muted)] self-center">
-                    +{screenshots.length - 10} mehr
+                {screenshots.length > 8 && (
+                  <span className="flex-shrink-0 px-2 text-[10px] text-[var(--text-muted)] self-center">
+                    +{screenshots.length - 8}
                   </span>
                 )}
               </div>
-            )}
+            </div>
           </div>
         )}
 
