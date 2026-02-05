@@ -1236,6 +1236,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
   const [loading, setLoading] = useState(false);
   const [updatingSets, setUpdatingSets] = useState(false);
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
+  const isStatsTab = activeTab === 'stats';
 
   useEffect(() => {
     if (isOpen && profileId) {
@@ -1303,7 +1304,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="glass-card w-full max-w-2xl h-[85vh] flex flex-col mx-4 animate-scale-in overflow-hidden"
+        className={`glass-card w-full ${isStatsTab ? 'max-w-5xl lg:max-w-6xl h-[90vh] md:h-[92vh]' : 'max-w-2xl h-[85vh]'} flex flex-col mx-4 animate-scale-in overflow-hidden`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header Section */}
@@ -1438,7 +1439,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-[var(--background)]">
+        <div className={`flex-1 min-h-0 ${isStatsTab ? 'overflow-hidden' : 'overflow-y-auto'} p-8 custom-scrollbar bg-[var(--background)]`}>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 animate-pulse">
               <div className="spinner w-10 h-10 mb-4" />
@@ -1626,10 +1627,10 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
               )}
 
               {activeTab === 'stats' && (
-                <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+                <div className="h-full min-h-0 flex flex-col gap-4 animate-in fade-in duration-500">
                   {/* Summary Stats Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--accent)]/30 transition-all">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--accent)]/30 transition-all">
                       <p className="text-[var(--text-muted)] text-[10px] font-bold uppercase tracking-wider mb-1">Total Following</p>
                       <p className="text-3xl font-black text-[var(--foreground)]">{profile?.followingCount || 0}</p>
                       <div className="mt-2 flex items-center gap-1 text-[var(--success)] text-[10px] font-bold bg-[var(--success)]/10 px-2 py-0.5 rounded-full w-fit">
@@ -1639,12 +1640,12 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                         Live
                       </div>
                     </div>
-                    <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--success)]/30 transition-all">
+                    <div className="bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--success)]/30 transition-all">
                       <p className="text-[var(--text-muted)] text-[10px] font-bold uppercase tracking-wider mb-1">Gerade abonniert</p>
                       <p className="text-3xl font-black text-[var(--success)]">+{historyList.filter(h => h.type === 'FOLLOW').length}</p>
                       <p className="mt-2 text-[var(--text-muted)] text-[10px] font-medium">{timeRange === 'week' ? 'Letzte 7 Tage' : 'Letzte 30 Tage'}</p>
                     </div>
-                    <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--error)]/30 transition-all">
+                    <div className="bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--error)]/30 transition-all">
                       <p className="text-[var(--text-muted)] text-[10px] font-bold uppercase tracking-wider mb-1">Entfolgt</p>
                       <p className="text-3xl font-black text-[var(--error)]">-{historyList.filter(h => h.type === 'UNFOLLOW').length}</p>
                       <p className="mt-2 text-[var(--text-muted)] text-[10px] font-medium">{timeRange === 'week' ? 'Letzte 7 Tage' : 'Letzte 30 Tage'}</p>
@@ -1652,11 +1653,11 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                   </div>
 
                   {/* Main Chart Section */}
-                  <div className="bg-[var(--card)] p-6 rounded-2xl border border-[var(--border)] shadow-md">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+                  <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-md flex-1 min-h-0 flex flex-col">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
                       <div>
                         <h3 className="text-base font-bold flex items-center gap-2">
-                          <svg className="w-5 h-5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-5 h-5 text-[var(--accent-solid)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                           </svg>
                           Trend-Analyse
@@ -1664,29 +1665,62 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                         <p className="text-xs text-[var(--text-muted)]">Verlauf der Abonnements im Zeitverlauf</p>
                       </div>
 
-                      <div className="flex bg-[var(--background)] p-1 rounded-xl border border-[var(--border)]">
-                        <button
-                          onClick={() => setTimeRange('week')}
-                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${timeRange === 'week'
-                            ? 'bg-[var(--foreground)] text-[var(--background)]'
-                            : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
-                            }`}
-                        >
-                          7 Tage
-                        </button>
-                        <button
-                          onClick={() => setTimeRange('month')}
-                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${timeRange === 'month'
-                            ? 'bg-[var(--foreground)] text-[var(--background)]'
-                            : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
-                            }`}
-                        >
-                          30 Tage
-                        </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex bg-[var(--background)] p-1 rounded-xl border border-[var(--border)]">
+                          <button
+                            onClick={() => setTimeRange('week')}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${timeRange === 'week'
+                              ? 'bg-[var(--foreground)] text-[var(--background)]'
+                              : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
+                              }`}
+                          >
+                            7 Tage
+                          </button>
+                          <button
+                            onClick={() => setTimeRange('month')}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${timeRange === 'month'
+                              ? 'bg-[var(--foreground)] text-[var(--background)]'
+                              : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
+                              }`}
+                          >
+                            30 Tage
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              const csv = [['Datum', 'Typ', 'Benutzername'], ...historyList.map(h => [new Date(h.detectedAt).toLocaleString('de-DE'), h.type, h.targetUsername])].map(e => e.join(',')).join('\n');
+                              const blob = new Blob([csv], { type: 'text/csv' });
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a'); a.href = url; a.download = `${username}_history.csv`; a.click();
+                            }}
+                            title="CSV Bericht"
+                            aria-label="CSV Bericht"
+                            className="p-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--text-muted)] hover:text-[var(--foreground)] hover:border-[var(--accent-solid)]/40 transition-all"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => {
+                              const text = `📊 Update für @${username}: ${profile?.followingCount} Abonnements. Trend: ${historyList.length} Änderungen detektiert.`;
+                              navigator.clipboard.writeText(text); alert('Snapshot kopiert!');
+                            }}
+                            title="Snapshot kopieren"
+                            aria-label="Snapshot kopieren"
+                            className="p-2 bg-[var(--foreground)] text-[var(--background)] rounded-lg hover:opacity-90 transition-all"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16h8m-8-4h8m2 8H6a2 2 0 01-2-2V6a2 2 0 012-2h8l6 6v8a2 2 0 01-2 2z" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="h-80 w-full relative">
+                    <div className="flex-1 min-h-[240px] w-full relative">
                       {historyList.length < 1 ? (
                         <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] border-2 border-dashed border-[var(--border)] rounded-xl bg-[var(--background)]/50">
                           <p className="text-xs font-bold">Warte auf mehr Datenpunkte...</p>
@@ -1698,23 +1732,29 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
 
                         for (let i = 0; i < days; i++) {
                           const date = new Date();
+                          date.setHours(0, 0, 0, 0);
                           date.setDate(date.getDate() - (days - 1 - i));
-                          const dateStr = date.toISOString().split('T')[0];
+
+                          const dayStart = new Date(date);
+                          const dayEnd = new Date(date);
+                          dayEnd.setHours(23, 59, 59, 999);
 
                           const dayChanges = historyList.filter(h => {
-                            const d = typeof h.detectedAt === 'string' ? h.detectedAt.split('T')[0] : new Date(h.detectedAt).toISOString().split('T')[0];
-                            return d === dateStr;
+                            const d = new Date(h.detectedAt);
+                            return d >= dayStart && d <= dayEnd;
                           });
 
                           const changesAfter = historyList.filter(h => {
-                            const d = typeof h.detectedAt === 'string' ? h.detectedAt : new Date(h.detectedAt).toISOString();
-                            return d > dateStr;
+                            const d = new Date(h.detectedAt);
+                            return d > dayEnd;
                           });
 
-                          const followingAtTime = currentCount - changesAfter.filter(h => h.type === 'FOLLOW').length + changesAfter.filter(h => h.type === 'UNFOLLOW').length;
+                          const followingAtTime = currentCount
+                            - changesAfter.filter(h => h.type === 'FOLLOW').length
+                            + changesAfter.filter(h => h.type === 'UNFOLLOW').length;
 
                           dataPoints.push({
-                            date: dateStr,
+                            date: dayStart.toISOString(),
                             label: date.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric' }),
                             followers: followingAtTime,
                             followed: dayChanges.filter(c => c.type === 'FOLLOW').map(c => c.targetUsername),
@@ -1737,82 +1777,100 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
 
                         return (
                           <div className="w-full h-full relative">
-                            {/* Y-Axis Labels */}
-                            <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between py-1 text-[8px] font-bold text-[var(--text-muted)] opacity-50 z-0">
-                              {[0, 0.25, 0.5, 0.75, 1].map(p => (
-                                <div key={p} className="flex items-center gap-2">
-                                  <span>{Math.round(yMax - p * (yMax - yMin))}</span>
-                                  <div className="w-[calc(100vw-400px)] h-[1px] bg-[var(--border)] border-dashed border-b border-[var(--border)]/30"></div>
-                                </div>
-                              ))}
+                            <div className="absolute inset-0 rounded-xl bg-[var(--background)]/40 border border-[var(--border)]/60"></div>
+
+                            {/* Y-Axis Labels + Grid */}
+                            <div className="absolute inset-0 pt-3 pb-10 px-2 pointer-events-none z-0">
+                              <div className="h-full flex flex-col justify-between text-[10px] font-bold text-[var(--text-muted)] opacity-70">
+                                {[0, 0.25, 0.5, 0.75, 1].map(p => (
+                                  <div key={p} className="flex items-center gap-2">
+                                    <span className="w-10 text-right">{Math.round(yMax - p * (yMax - yMin))}</span>
+                                    <div className="flex-1 h-px bg-[var(--border)]/40"></div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
 
-                            <svg className="w-full h-full overflow-visible relative z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
-                              <defs>
-                                <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.2" />
-                                  <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
-                                </linearGradient>
-                              </defs>
+                            <div className="absolute inset-0 pl-12 pr-2 pt-3 pb-10 z-10">
+                              <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                <defs>
+                                  <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="var(--accent-solid)" stopOpacity="0.25" />
+                                    <stop offset="100%" stopColor="var(--accent-solid)" stopOpacity="0" />
+                                  </linearGradient>
+                                </defs>
 
-                              <path d={`M0,100 ${pointsStr} 100,100 Z`} fill="url(#chartFill)" />
-                              <polyline points={pointsStr} fill="none" stroke="var(--accent)" strokeWidth="0.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+                                <path d={`M0,100 ${pointsStr} 100,100 Z`} fill="url(#chartFill)" />
+                                <polyline points={pointsStr} fill="none" stroke="var(--accent-solid)" strokeWidth="0.8" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
 
-                              {dataPoints.map((p, i) => (
-                                <g key={i} className="group/dot">
-                                  <circle
-                                    cx={getX(i)}
-                                    cy={getY(p.followers)}
-                                    r={(p.followed.length > 0 || p.unfollowed.length > 0) ? 1.5 : 0.8}
-                                    fill="var(--background)"
-                                    stroke="var(--accent)"
-                                    strokeWidth="0.5"
-                                    vectorEffect="non-scaling-stroke"
-                                    className="cursor-pointer transition-all hover:r-3"
-                                    onMouseEnter={(e) => {
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      setHoveredPoint({ ...p, x: rect.left, y: rect.top });
-                                    }}
-                                    onMouseLeave={() => setHoveredPoint(null)}
-                                  />
-                                </g>
-                              ))}
-                            </svg>
+                                {dataPoints.map((p, i) => (
+                                  <g key={i}>
+                                    <circle
+                                      cx={getX(i)}
+                                      cy={getY(p.followers)}
+                                      r={(p.followed.length > 0 || p.unfollowed.length > 0) ? 2.2 : 1.2}
+                                      fill="rgba(248, 250, 252, 0.95)"
+                                      stroke="rgba(148, 163, 184, 0.7)"
+                                      strokeWidth="0.6"
+                                      vectorEffect="non-scaling-stroke"
+                                      className="cursor-pointer transition-all"
+                                      onMouseEnter={(e) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setHoveredPoint({ ...p, x: rect.left + rect.width / 2, y: rect.top });
+                                      }}
+                                      onMouseLeave={() => setHoveredPoint(null)}
+                                    />
+                                  </g>
+                                ))}
+                              </svg>
+                            </div>
 
                             {/* Tooltip */}
                             {hoveredPoint && (
                               <div
-                                className="fixed z-[100] translate-x-[-50%] translate-y-[-100%] pointer-events-none mb-4"
+                                className="fixed z-[100] pointer-events-none"
                                 style={{ left: hoveredPoint.x, top: hoveredPoint.y }}
                               >
-                                <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl p-3 min-w-[160px] animate-in zoom-in duration-200">
-                                  <div className="flex justify-between items-center border-b border-[var(--border)] pb-2 mb-2">
-                                    <span className="text-[10px] font-bold text-[var(--text-muted)]">{hoveredPoint.label}</span>
-                                    <span className="text-xs font-black">{hoveredPoint.followers}</span>
-                                  </div>
-                                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                                    {hoveredPoint.followed.length > 0 && (
-                                      <div>
-                                        <p className="text-[8px] font-bold text-[var(--success)] uppercase">➕ Gefolgt</p>
-                                        {hoveredPoint.followed.map((u: string) => <p key={u} className="text-[10px] truncate">@{u}</p>)}
-                                      </div>
-                                    )}
-                                    {hoveredPoint.unfollowed.length > 0 && (
-                                      <div className="pt-1 border-t border-[var(--border)]/30 mt-1">
-                                        <p className="text-[8px] font-bold text-[var(--error)] uppercase">➖ Entfolgt</p>
-                                        {hoveredPoint.unfollowed.map((u: string) => <p key={u} className="text-[10px] truncate">@{u}</p>)}
-                                      </div>
-                                    )}
-                                    {hoveredPoint.followed.length === 0 && hoveredPoint.unfollowed.length === 0 && (
-                                      <p className="text-[10px] text-[var(--text-muted)] italic text-center">Keine Änderungen</p>
-                                    )}
+                                <div className="translate-x-[-50%] translate-y-[-100%] pb-3">
+                                  <div className="bg-[rgba(8,10,20,0.96)] border border-[var(--border)] rounded-xl shadow-2xl p-3 min-w-[180px] animate-in zoom-in duration-150">
+                                    <div className="flex justify-between items-center border-b border-[var(--border)]/60 pb-2 mb-2">
+                                      <span className="text-[10px] font-bold text-[var(--text-muted)]">{hoveredPoint.label}</span>
+                                      <span className="text-xs font-black">
+                                        {Number(hoveredPoint.followers).toLocaleString('de-DE')}
+                                      </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {hoveredPoint.followed.length > 0 && (
+                                        <div>
+                                          <p className="text-[9px] font-bold text-[var(--success)] uppercase">Gefolgt</p>
+                                          <div className="mt-1 space-y-0.5">
+                                            {hoveredPoint.followed.map((u: string) => (
+                                              <p key={u} className="text-[11px] text-[var(--success)] truncate">+ @{u}</p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {hoveredPoint.unfollowed.length > 0 && (
+                                        <div>
+                                          <p className="text-[9px] font-bold text-[var(--error)] uppercase">Entfolgt</p>
+                                          <div className="mt-1 space-y-0.5">
+                                            {hoveredPoint.unfollowed.map((u: string) => (
+                                              <p key={u} className="text-[11px] text-[var(--error)] truncate">- @{u}</p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {hoveredPoint.followed.length === 0 && hoveredPoint.unfollowed.length === 0 && (
+                                        <p className="text-[10px] text-[var(--text-muted)] italic text-center">Keine Änderungen</p>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
                             )}
 
                             {/* X-Axis Labels */}
-                            <div className="absolute -bottom-6 left-0 right-0 flex justify-between px-1 text-[8px] font-bold text-[var(--text-muted)]">
+                            <div className="absolute left-12 right-2 bottom-2 flex justify-between text-[9px] font-bold text-[var(--text-muted)] pointer-events-none z-10">
                               {dataPoints.filter((_, i) => i % (timeRange === 'week' ? 1 : 5) === 0 || i === days - 1).map((p, i) => (
                                 <span key={i} className="transform -translate-x-1/2" style={{ left: `${getX(dataPoints.indexOf(p))}%` }}>{p.label}</span>
                               ))}
@@ -1821,31 +1879,6 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                         );
                       })()}
                     </div>
-                  </div>
-
-                  {/* Export Actions */}
-                  <div className="flex gap-4 items-center justify-end bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)]">
-                    <button
-                      onClick={() => {
-                        const csv = [['Datum', 'Typ', 'Benutzername'], ...historyList.map(h => [new Date(h.detectedAt).toLocaleString('de-DE'), h.type, h.targetUsername])].map(e => e.join(',')).join('\n');
-                        const blob = new Blob([csv], { type: 'text/csv' });
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a'); a.href = url; a.download = `${username}_history.csv`; a.click();
-                      }}
-                      className="px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-bold hover:bg-[var(--card)] transition-all flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                      CSV Bericht
-                    </button>
-                    <button
-                      onClick={() => {
-                        const text = `📊 Update für @${username}: ${profile?.followingCount} Abonnements. Trend: ${historyList.length} Änderungen detektiert.`;
-                        navigator.clipboard.writeText(text); alert('Snapshot kopiert!');
-                      }}
-                      className="px-4 py-2 bg-[var(--foreground)] text-[var(--background)] rounded-xl text-xs font-bold hover:opacity-90 transition-all flex items-center gap-2"
-                    >
-                      Snapshot kopieren
-                    </button>
                   </div>
                 </div>
               )}
