@@ -998,12 +998,14 @@ async function main() {
                     console.log(`   🚫 ABBRUCH: Nur ${currentFollowing.length}/${currentCount} gescrapt (${scrapeQuote}%)`);
                     console.log(`      Benötigt: mindestens ${Math.ceil(currentCount * 0.95)} (95%)`);
                     console.log(`      ➡️ Keine Changes werden verarbeitet um falsche Unfollows zu vermeiden!`);
-                    console.log(`      ➡️ Nur den Count aktualisieren, kein Post.\n`);
+                    console.log(`      ➡️ Count wird NICHT aktualisiert - nächster Lauf wird erneut Änderung erkennen!`);
+                    console.log(`      ➡️ DB bleibt bei: ${lastCount} (Live: ${currentCount})\n`);
 
-                    // Nur Count aktualisieren, NICHT die FollowingEntry-Liste!
+                    // ❌ KEIN COUNT-UPDATE! Nur lastCheckedAt aktualisieren
+                    // So wird beim nächsten Lauf die Änderung erneut erkannt
                     await db.execute({
-                        sql: `UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now') WHERE id = ?`,
-                        args: [currentCount, profileId]
+                        sql: `UPDATE MonitoredProfile SET lastCheckedAt = datetime('now') WHERE id = ?`,
+                        args: [profileId]
                     });
 
                     await humanDelay(10000, 15000);
