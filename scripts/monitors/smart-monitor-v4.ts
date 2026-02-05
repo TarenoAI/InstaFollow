@@ -103,6 +103,9 @@ async function dismissPopups(page: Page) {
         // Cancel/Dismiss
         'button:has-text("Abbrechen")',
         'button:has-text("Cancel")',
+        // RATE LIMIT POPUP - "Versuche es später noch einmal"
+        'button:has-text("OK")',
+        'button:has-text("Ok")',
         // "View profile in app" popup - X button at top right
         'div[role="dialog"] button[type="button"]',
         'div[role="dialog"] svg[aria-label="Schließen"]',
@@ -110,6 +113,7 @@ async function dismissPopups(page: Page) {
         // The X button specifically
         'button svg[aria-label="Schließen"]',
         'button svg[aria-label="Close"]',
+        // Problem melden link (nicht klicken, aber OK daneben)
     ];
 
     for (const sel of selectors) {
@@ -463,12 +467,16 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 await page.mouse.wheel(0, 600);
             }
 
-            // Warte auf neue API-Responses
-            await humanDelay(2000, 3500);
+            // WICHTIG: Nach jedem Scroll auf Rate-Limit Popups prüfen
+            await dismissPopups(page);
 
-            // Alle 5 Scrolls: Extra warten für Lazy Loading
-            if (scroll % 5 === 4) {
+            // Warte auf neue API-Responses (längere Pause um Rate-Limits zu vermeiden)
+            await humanDelay(3000, 5000);
+
+            // Alle 3 Scrolls: Extra warten für Lazy Loading und Rate-Limit Vermeidung
+            if (scroll % 3 === 2) {
                 await page.waitForTimeout(2000);
+                await dismissPopups(page);
             }
         }
 
