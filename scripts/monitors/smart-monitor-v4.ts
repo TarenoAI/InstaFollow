@@ -332,22 +332,54 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         console.log(`   📦 Scroll-Container gefunden: ${!!scrollContainer}`);
 
         for (let scroll = 0; scroll < maxScrolls && noNewCount < maxNoNewCount; scroll++) {
-            // Sammle alle sichtbaren Usernames
+            // Sammle alle sichtbaren Usernames - MEHRERE STRATEGIEN
             const users = await page.evaluate(() => {
                 const links: string[] = [];
-                // Suche in Dialog nach Links
                 const dialog = document.querySelector('[role="dialog"]');
-                if (dialog) {
-                    dialog.querySelectorAll('a[role="link"]').forEach(a => {
-                        const href = a.getAttribute('href');
-                        if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/)) {
-                            const username = href.replace(/\//g, '');
-                            if (!['explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search'].includes(username)) {
-                                links.push(username);
+                if (!dialog) return links;
+
+                // Strategie 1: Alle Links mit href die wie Usernames aussehen
+                dialog.querySelectorAll('a[href]').forEach(a => {
+                    const href = a.getAttribute('href');
+                    if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/)) {
+                        const username = href.replace(/\//g, '');
+                        if (!['explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search', 'following', 'followers'].includes(username)) {
+                            links.push(username);
+                        }
+                    }
+                });
+
+                // Strategie 2: Suche nach span/div-Elementen mit Username-Pattern
+                if (links.length === 0) {
+                    dialog.querySelectorAll('span, div').forEach(el => {
+                        const text = el.textContent?.trim();
+                        if (text && text.match(/^[a-zA-Z0-9._]{1,30}$/) && !text.includes(' ')) {
+                            // Prüfe ob es ein Link-Child oder neben einem Avatar ist
+                            const parent = el.closest('a') || el.parentElement;
+                            if (parent && (parent.querySelector('img') || parent.tagName === 'A')) {
+                                links.push(text);
                             }
                         }
                     });
                 }
+
+                // Strategie 3: Alle sichtbaren Elemente die aussehen wie Profile
+                if (links.length === 0) {
+                    // Finde Elemente mit Profilbildern und extrahiere benachbarte Usernames
+                    dialog.querySelectorAll('img[src*="cdninstagram"], img[alt]').forEach(img => {
+                        const container = img.closest('div[role="button"], a, div')?.parentElement;
+                        if (container) {
+                            const textEls = container.querySelectorAll('span');
+                            textEls.forEach(span => {
+                                const text = span.textContent?.trim();
+                                if (text && text.match(/^[a-z0-9._]{1,30}$/i) && !text.includes(' ')) {
+                                    links.push(text);
+                                }
+                            });
+                        }
+                    });
+                }
+
                 return links;
             });
 
