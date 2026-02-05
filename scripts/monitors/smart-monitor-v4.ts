@@ -746,11 +746,31 @@ async function postToTwitter(
             }
 
             await page.fill('input[autocomplete="username"]', TWITTER_USERNAME);
-            await page.click('text=Weiter');
+
+            // Klicke "Weiter" / "Next" Button - mehrere Sprachen unterstützen
+            const nextButton = await page.$('text=Weiter') ||
+                await page.$('text=Next') ||
+                await page.$('[role="button"]:has-text("Next")') ||
+                await page.$('[role="button"]:has-text("Weiter")');
+            if (nextButton) {
+                await nextButton.click();
+            } else {
+                // Fallback: Drücke Enter
+                await page.keyboard.press('Enter');
+            }
             await page.waitForTimeout(2000);
 
             await page.fill('input[type="password"]', TWITTER_PASSWORD);
-            await page.click('text=Anmelden');
+
+            // Klicke "Anmelden" / "Log in" Button
+            const loginButton = await page.$('text=Anmelden') ||
+                await page.$('text=Log in') ||
+                await page.$('[data-testid="LoginForm_Login_Button"]');
+            if (loginButton) {
+                await loginButton.click();
+            } else {
+                await page.keyboard.press('Enter');
+            }
             await page.waitForTimeout(5000);
 
             // Session speichern
