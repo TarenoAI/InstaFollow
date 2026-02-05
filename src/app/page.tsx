@@ -27,6 +27,7 @@ import {
   fetchFollowing
 } from './actions/instagram';
 import { checkAppPassword } from './actions/auth';
+import { getProfileScreenshots } from './actions/github';
 
 // Helper function to proxy Instagram images through our API to avoid CORS issues
 function proxyImageUrl(url: string): string {
@@ -1231,6 +1232,8 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
   const [allSets, setAllSets] = useState<any[]>([]);
   const [followingList, setFollowingList] = useState<any[]>([]);
   const [historyList, setHistoryList] = useState<any[]>([]);
+  const [screenshots, setScreenshots] = useState<any[]>([]);
+  const [selectedScreenshotIdx, setSelectedScreenshotIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [updatingSets, setUpdatingSets] = useState(false);
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
@@ -1245,6 +1248,11 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
     if (!profileId) return;
     setLoading(true);
     try {
+      // Always load screenshots when opening
+      const screenshotList = await getProfileScreenshots(username);
+      setScreenshots(screenshotList);
+      setSelectedScreenshotIdx(0);
+
       if (activeTab === 'list') {
         const [prof, list] = await Promise.all([
           getProfileDetails(profileId),
@@ -1260,7 +1268,11 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
         setProfile(prof);
         setAllSets(sets);
       } else {
-        const history = await getRecentChanges(100, profileId);
+        const [prof, history] = await Promise.all([
+          getProfileDetails(profileId),
+          getRecentChanges(100, profileId)
+        ]);
+        setProfile(prof);
         setHistoryList(history);
       }
     } catch (e) {
@@ -1345,26 +1357,88 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
           </div>
         </div>
 
-        {/* Screenshot Preview */}
-        {profile?.screenshotUrl && (
+        {/* Screenshot Gallery */}
+        {screenshots.length > 0 && (
           <div className="px-8 py-4 border-b border-[var(--border)] bg-[var(--card)]/30">
-            <div className="flex items-center gap-4">
-              <div className="flex-shrink-0">
-                <span className="text-xs uppercase tracking-wider text-[var(--text-muted)]">📸 Letzter Screenshot</span>
-              </div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold">
+                📸 Screenshots ({screenshots.length})
+              </span>
+              {screenshots[selectedScreenshotIdx] && (
+                <span className="text-xs text-[var(--text-muted)]">
+                  {screenshots[selectedScreenshotIdx].displayDate}
+                </span>
+              )}
+            </div>
+
+            {/* Main Screenshot with Navigation */}
+            <div className="flex items-center gap-3">
+              {/* Prev Button */}
+              <button
+                onClick={() => setSelectedScreenshotIdx(i => Math.max(0, i - 1))}
+                disabled={selectedScreenshotIdx === 0}
+                className="p-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--foreground)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              {/* Screenshot Display */}
               <div className="flex-1 flex justify-center">
-                <div className="relative group cursor-pointer" onClick={() => window.open(profile.screenshotUrl, '_blank')}>
+                <div
+                  className="relative group cursor-pointer"
+                  onClick={() => window.open(screenshots[selectedScreenshotIdx]?.url, '_blank')}
+                >
                   <img
-                    src={profile.screenshotUrl}
+                    src={screenshots[selectedScreenshotIdx]?.url}
                     alt={`Screenshot von @${username}`}
-                    className="h-32 rounded-lg border border-[var(--border)] object-contain hover:scale-105 transition-transform"
+                    className="h-40 rounded-xl border border-[var(--border)] object-contain hover:scale-[1.02] transition-transform shadow-lg"
                   />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-                    <span className="text-white text-sm">🔍 Vergrößern</span>
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">🔍 Vollbild</span>
                   </div>
                 </div>
               </div>
+
+              {/* Next Button */}
+              <button
+                onClick={() => setSelectedScreenshotIdx(i => Math.min(screenshots.length - 1, i + 1))}
+                disabled={selectedScreenshotIdx === screenshots.length - 1}
+                className="p-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--foreground)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
             </div>
+
+            {/* Thumbnail Strip */}
+            {screenshots.length > 1 && (
+              <div className="flex gap-2 mt-3 overflow-x-auto py-1 custom-scrollbar">
+                {screenshots.slice(0, 10).map((ss, idx) => (
+                  <button
+                    key={ss.filename}
+                    onClick={() => setSelectedScreenshotIdx(idx)}
+                    className={`flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${idx === selectedScreenshotIdx
+                      ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/30'
+                      : 'border-[var(--border)] opacity-60 hover:opacity-100'
+                      }`}
+                  >
+                    <img
+                      src={ss.url}
+                      alt={`Screenshot ${idx + 1}`}
+                      className="h-12 w-auto object-contain"
+                    />
+                  </button>
+                ))}
+                {screenshots.length > 10 && (
+                  <span className="flex-shrink-0 px-3 py-1 text-xs text-[var(--text-muted)] self-center">
+                    +{screenshots.length - 10} mehr
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1476,80 +1550,76 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
               )}
 
               {activeTab === 'history' && (
-                <div className="space-y-4 text-left">
+                <div className="space-y-1">
                   {historyList.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-center">
-                      <div className="w-16 h-16 rounded-2xl bg-[var(--border)] flex items-center justify-center mb-4 opacity-50">
-                        <svg className="w-8 h-8 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div className="w-14 h-14 rounded-xl bg-[var(--border)] flex items-center justify-center mb-3 opacity-50">
+                        <svg className="w-7 h-7 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
-                      <h3 className="text-lg font-semibold mb-1">Keine Historie</h3>
-                      <p className="text-[var(--text-muted)] max-w-xs">
-                        Sobald Änderungen erkannt werden, erscheinen sie hier im Verlauf.
+                      <h3 className="text-base font-semibold mb-1">Keine Historie</h3>
+                      <p className="text-sm text-[var(--text-muted)] max-w-xs">
+                        Sobald Änderungen erkannt werden, erscheinen sie hier.
                       </p>
                     </div>
                   ) : (
-                    historyList.map((change) => (
-                      <div key={change.id} className="group flex flex-col gap-3 p-5 rounded-2xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-lg transition-all">
-                        <div className="flex items-center gap-5">
-                          <div className={`relative p-3 rounded-2xl flex items-center justify-center ${change.type === 'FOLLOW'
-                            ? 'bg-[var(--success)]/10 text-[var(--success)] ring-1 ring-[var(--success)]/20 shadow-[0_0_15px_-3px_rgba(var(--success-rgb),0.3)]'
-                            : 'bg-[var(--error)]/10 text-[var(--error)] ring-1 ring-[var(--error)]/20 shadow-[0_0_15px_-3px_rgba(var(--error-rgb),0.3)]'
+                    <>
+                      {/* Compact Table Header */}
+                      <div className="flex items-center gap-3 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] border-b border-[var(--border)]">
+                        <span className="w-6"></span>
+                        <span className="flex-1">Username</span>
+                        <span className="w-32 text-right">Datum</span>
+                      </div>
+
+                      {/* History Rows */}
+                      {historyList.map((change) => (
+                        <div
+                          key={change.id}
+                          className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--card)] transition-colors cursor-default"
+                        >
+                          {/* Type Indicator */}
+                          <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${change.type === 'FOLLOW'
+                            ? 'bg-[var(--success)]/15 text-[var(--success)]'
+                            : 'bg-[var(--error)]/15 text-[var(--error)]'
                             }`}>
                             {change.type === 'FOLLOW' ? (
-                              <svg className="w-5 h-5 font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                               </svg>
                             ) : (
-                              <svg className="w-5 h-5 font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
                               </svg>
                             )}
                           </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-[var(--foreground)]">
-                              <span className={change.type === 'FOLLOW' ? 'text-[var(--success)]' : 'text-[var(--error)]'}>
-                                {change.type === 'FOLLOW' ? 'Neuer Follow:' : 'Entfolgt:'}
-                              </span>
-                              {' '}
-                              <span className="font-semibold">@{change.targetUsername}</span>
-                            </p>
-                            <p className="text-xs text-[var(--text-muted)]">
-                              {new Date(change.detectedAt).toLocaleString('de-DE')}
-                            </p>
-                          </div>
-                          <img
-                            src={proxyImageUrl(change.targetPicUrl)}
-                            alt={change.targetUsername}
-                            className="w-10 h-10 rounded-full object-cover opacity-80"
-                            onError={(e) => (e.currentTarget.src = "/placeholder-avatar.png")}
-                          />
-                        </div>
 
-                        {/* Screenshot Preview */}
-                        {change.screenshotUrl && (
-                          <div className="mt-2 rounded-xl overflow-hidden border border-[var(--border)] relative group/screenshot">
+                          {/* Avatar + Username */}
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
                             <img
-                              src={`/api/screenshot?path=${encodeURIComponent(change.screenshotUrl)}`}
-                              alt="Profil Screenshot"
-                              className="w-full h-auto object-cover rounded-xl"
-                              onError={(e) => (e.currentTarget.style.display = 'none')}
+                              src={proxyImageUrl(change.targetPicUrl)}
+                              alt={change.targetUsername}
+                              className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                              onError={(e) => (e.currentTarget.src = "/placeholder-avatar.png")}
                             />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/screenshot:opacity-100 transition-opacity flex items-center justify-center">
-                              <a
-                                href={`/api/screenshot?path=${encodeURIComponent(change.screenshotUrl)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg text-white text-sm font-medium hover:bg-white/30 transition-colors"
-                              >
-                                📷 Vollbild öffnen
-                              </a>
-                            </div>
+                            <span className={`font-medium truncate ${change.type === 'FOLLOW' ? 'text-[var(--success)]' : 'text-[var(--error)]'
+                              }`}>
+                              @{change.targetUsername}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    ))
+
+                          {/* Timestamp */}
+                          <span className="text-xs text-[var(--text-muted)] w-32 text-right flex-shrink-0">
+                            {new Date(change.detectedAt).toLocaleString('de-DE', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
               )}
@@ -1673,7 +1743,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                       </div>
                     </div>
 
-                    <div className="h-64 relative">
+                    <div className="h-72 relative ml-12 mb-10">
                       {historyList.length < 1 ? (
                         <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] border-2 border-dashed border-[var(--border)] rounded-xl">
                           <svg className="w-10 h-10 mb-2 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1723,19 +1793,18 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                         const minFollowers = Math.min(...dataPoints.map(p => p.followers));
                         const maxFollowers = Math.max(...dataPoints.map(p => p.followers));
 
-                        // Ensure at least 10% range for visibility, or minimum of 5 units
+                        // Kleineres Padding für bessere Sichtbarkeit der Linie
                         const actualRange = maxFollowers - minFollowers;
-                        const minPaddingPercent = 0.1; // 10% of current value
-                        const minPadding = Math.max(5, currentRef * minPaddingPercent);
-                        const range = Math.max(actualRange, minPadding);
-                        const padding = range * 0.3; // More padding for better visibility
+                        const minPadding = Math.max(3, actualRange * 0.15); // 15% statt 30%
+                        const range = Math.max(actualRange, 1); // Mindestens 1 um Division durch 0 zu vermeiden
 
-                        const chartMin = Math.max(0, minFollowers - padding);
-                        const chartMax = maxFollowers + padding;
-                        const chartRange = chartMax - chartMin || 10; // Prevent division by zero
+                        const chartMin = Math.max(0, minFollowers - minPadding);
+                        const chartMax = maxFollowers + minPadding;
+                        const chartRange = chartMax - chartMin || 1;
 
-                        const width = 1000;
-                        const height = 400;
+                        // Größere Dimensionen für bessere Lesbarkeit
+                        const width = 800;
+                        const height = 300;
 
                         // Calculate points for the line
                         const points = dataPoints.map((p, i) => {
@@ -1749,7 +1818,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
 
                         return (
                           <div className="w-full h-full relative group">
-                            <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+                            <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
                               <defs>
                                 <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
                                   <stop offset="0%" stopColor="var(--accent-solid)" stopOpacity="0.3" />
