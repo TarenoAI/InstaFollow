@@ -1791,38 +1791,53 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                               </div>
                             </div>
 
-                            <div className="absolute inset-0 pl-12 pr-2 pt-3 pb-10 z-10">
+                            <div className="absolute left-12 right-2 top-3 bottom-10 z-10">
                               <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
                                 <defs>
                                   <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="var(--accent-solid)" stopOpacity="0.25" />
-                                    <stop offset="100%" stopColor="var(--accent-solid)" stopOpacity="0" />
+                                    <stop offset="0%" stopColor="var(--accent-solid)" stopOpacity="0.3" />
+                                    <stop offset="100%" stopColor="var(--accent-solid)" stopOpacity="0.1" />
                                   </linearGradient>
                                 </defs>
 
                                 <path d={`M0,100 ${pointsStr} 100,100 Z`} fill="url(#chartFill)" />
                                 <polyline points={pointsStr} fill="none" stroke="var(--accent-solid)" strokeWidth="0.8" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+                                <line x1="0" y1="100" x2="100" y2="100" stroke="rgba(148,163,184,0.45)" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
 
-                                {dataPoints.map((p, i) => (
-                                  <g key={i}>
-                                    <circle
-                                      cx={getX(i)}
-                                      cy={getY(p.followers)}
-                                      r={(p.followed.length > 0 || p.unfollowed.length > 0) ? 2.2 : 1.2}
-                                      fill="rgba(248, 250, 252, 0.95)"
-                                      stroke="rgba(148, 163, 184, 0.7)"
-                                      strokeWidth="0.6"
-                                      vectorEffect="non-scaling-stroke"
-                                      className="cursor-pointer transition-all"
+                                {/* X-Axis labels + ticks */}
+                                {dataPoints
+                                  .filter((_, i) => i % (timeRange === 'week' ? 1 : 5) === 0 || i === days - 1)
+                                  .map((p, i) => {
+                                    const x = getX(dataPoints.indexOf(p));
+                                    return (
+                                      <g key={`x-${i}`} transform={`translate(${x},100)`}>
+                                        <line x1="0" y1="0" x2="0" y2="-2.5" stroke="rgba(148,163,184,0.6)" strokeWidth="0.6" vectorEffect="non-scaling-stroke" />
+                                        <text x="0" y="-4" textAnchor="middle" fontSize="3" fill="rgba(148,163,184,0.9)" fontWeight="700">
+                                          {p.label}
+                                        </text>
+                                      </g>
+                                    );
+                                  })}
+                              </svg>
+
+                              {/* Points Overlay (keeps dots perfectly round) */}
+                              <div className="absolute inset-0">
+                                {dataPoints.map((p, i) => {
+                                  const hasChange = p.followed.length > 0 || p.unfollowed.length > 0;
+                                  return (
+                                    <div
+                                      key={i}
+                                      className={`absolute rounded-full border border-[rgba(148,163,184,0.7)] bg-[rgba(248,250,252,0.95)] ${hasChange ? 'w-3 h-3' : 'w-2 h-2'} transition-all`}
+                                      style={{ left: `${getX(i)}%`, top: `${getY(p.followers)}%`, transform: 'translate(-50%, -50%)' }}
                                       onMouseEnter={(e) => {
                                         const rect = e.currentTarget.getBoundingClientRect();
                                         setHoveredPoint({ ...p, x: rect.left + rect.width / 2, y: rect.top });
                                       }}
                                       onMouseLeave={() => setHoveredPoint(null)}
                                     />
-                                  </g>
-                                ))}
-                              </svg>
+                                  );
+                                })}
+                              </div>
                             </div>
 
                             {/* Tooltip */}
@@ -1869,12 +1884,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                               </div>
                             )}
 
-                            {/* X-Axis Labels */}
-                            <div className="absolute left-12 right-2 bottom-2 flex justify-between text-[9px] font-bold text-[var(--text-muted)] pointer-events-none z-10">
-                              {dataPoints.filter((_, i) => i % (timeRange === 'week' ? 1 : 5) === 0 || i === days - 1).map((p, i) => (
-                                <span key={i} className="transform -translate-x-1/2" style={{ left: `${getX(dataPoints.indexOf(p))}%` }}>{p.label}</span>
-                              ))}
-                            </div>
+                            {/* X-Axis Labels now rendered in SVG for perfect alignment */}
                           </div>
                         );
                       })()}
