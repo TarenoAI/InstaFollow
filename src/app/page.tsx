@@ -1626,260 +1626,196 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
               )}
 
               {activeTab === 'stats' && (
-                <div className="space-y-6">
-                  {/* Stats Header & Time Filter */}
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold flex items-center gap-2">
-                      <svg className="w-5 h-5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                      </svg>
-                      Profil-Analyse
-                    </h3>
-                    <div className="flex gap-1 p-1 bg-[var(--card)] rounded-xl border border-[var(--border)]">
-                      <button
-                        onClick={() => setTimeRange('week')}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${timeRange === 'week' ? 'bg-[var(--accent)] text-white shadow-lg' : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'}`}
-                      >
-                        Woche
-                      </button>
-                      <button
-                        onClick={() => setTimeRange('month')}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${timeRange === 'month' ? 'bg-[var(--accent)] text-white shadow-lg' : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'}`}
-                      >
-                        Monat
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Summary Cards */}
+                <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+                  {/* Summary Stats Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--accent)]/30 transition-all">
-                      <p className="text-[var(--text-muted)] text-xs font-bold uppercase tracking-wider mb-1">Total Following</p>
+                      <p className="text-[var(--text-muted)] text-[10px] font-bold uppercase tracking-wider mb-1">Total Following</p>
                       <p className="text-3xl font-black text-[var(--foreground)]">{profile?.followingCount || 0}</p>
-                      <div className="mt-2 flex items-center gap-1 text-[var(--success)] text-xs font-bold">
+                      <div className="mt-2 flex items-center gap-1 text-[var(--success)] text-[10px] font-bold bg-[var(--success)]/10 px-2 py-0.5 rounded-full w-fit">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                         </svg>
-                        Aktueller Stand
+                        Live
                       </div>
                     </div>
                     <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--success)]/30 transition-all">
-                      <p className="text-[var(--text-muted)] text-xs font-bold uppercase tracking-wider mb-1">Neue Follows</p>
+                      <p className="text-[var(--text-muted)] text-[10px] font-bold uppercase tracking-wider mb-1">Gerade abonniert</p>
                       <p className="text-3xl font-black text-[var(--success)]">+{historyList.filter(h => h.type === 'FOLLOW').length}</p>
-                      <p className="mt-2 text-[var(--text-muted)] text-xs font-medium">Im gewählten Zeitraum</p>
+                      <p className="mt-2 text-[var(--text-muted)] text-[10px] font-medium">{timeRange === 'week' ? 'Letzte 7 Tage' : 'Letzte 30 Tage'}</p>
                     </div>
                     <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--error)]/30 transition-all">
-                      <p className="text-[var(--text-muted)] text-xs font-bold uppercase tracking-wider mb-1">Entfolgt</p>
+                      <p className="text-[var(--text-muted)] text-[10px] font-bold uppercase tracking-wider mb-1">Entfolgt</p>
                       <p className="text-3xl font-black text-[var(--error)]">-{historyList.filter(h => h.type === 'UNFOLLOW').length}</p>
-                      <p className="mt-2 text-[var(--text-muted)] text-xs font-medium">Im gewählten Zeitraum</p>
+                      <p className="mt-2 text-[var(--text-muted)] text-[10px] font-medium">{timeRange === 'week' ? 'Letzte 7 Tage' : 'Letzte 30 Tage'}</p>
                     </div>
                   </div>
 
-                  {/* Modern Line Chart */}
-                  <div className="bg-[var(--card)] p-6 rounded-2xl border border-[var(--border)] shadow-sm">
-                    <div className="flex items-center justify-between mb-8">
+                  {/* Main Chart Section */}
+                  <div className="bg-[var(--card)] p-6 rounded-2xl border border-[var(--border)] shadow-md">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                       <div>
-                        <h4 className="font-bold text-sm">Following Entwicklung</h4>
-                        <p className="text-[var(--text-muted)] text-[10px]">Basierend auf detektierten Änderungen</p>
+                        <h3 className="text-base font-bold flex items-center gap-2">
+                          <svg className="w-5 h-5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                          </svg>
+                          Trend-Analyse
+                        </h3>
+                        <p className="text-xs text-[var(--text-muted)]">Verlauf der Abonnements im Zeitverlauf</p>
                       </div>
-                      <div className="flex gap-4 text-[10px] font-bold uppercase overflow-hidden">
-                        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[var(--accent)]"></span> Trend</span>
+
+                      <div className="flex bg-[var(--background)] p-1 rounded-xl border border-[var(--border)]">
+                        <button
+                          onClick={() => setTimeRange('week')}
+                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${timeRange === 'week'
+                            ? 'bg-[var(--foreground)] text-[var(--background)]'
+                            : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
+                            }`}
+                        >
+                          7 Tage
+                        </button>
+                        <button
+                          onClick={() => setTimeRange('month')}
+                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${timeRange === 'month'
+                            ? 'bg-[var(--foreground)] text-[var(--background)]'
+                            : 'text-[var(--text-muted)] hover:text-[var(--foreground)]'
+                            }`}
+                        >
+                          30 Tage
+                        </button>
                       </div>
                     </div>
 
-                    <div className="h-72 relative ml-12 mb-10">
+                    <div className="h-80 w-full relative">
                       {historyList.length < 1 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] border-2 border-dashed border-[var(--border)] rounded-xl">
-                          <svg className="w-10 h-10 mb-2 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                          </svg>
-                          <p className="text-xs font-bold">Keine Aktivitätsdaten vorhanden</p>
+                        <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] border-2 border-dashed border-[var(--border)] rounded-xl bg-[var(--background)]/50">
+                          <p className="text-xs font-bold">Warte auf mehr Datenpunkte...</p>
                         </div>
                       ) : (() => {
                         const days = timeRange === 'week' ? 7 : 30;
                         const dataPoints: { date: string, label: string, followers: number, followed: string[], unfollowed: string[] }[] = [];
-                        let currentRef = profile?.followingCount || 0;
+                        let currentCount = profile?.followingCount || 0;
 
-                        // Create data points for the timeline
                         for (let i = 0; i < days; i++) {
                           const date = new Date();
                           date.setDate(date.getDate() - (days - 1 - i));
                           const dateStr = date.toISOString().split('T')[0];
 
-                          // Changes on this specific day for tooltip
                           const dayChanges = historyList.filter(h => {
                             const d = typeof h.detectedAt === 'string' ? h.detectedAt.split('T')[0] : new Date(h.detectedAt).toISOString().split('T')[0];
                             return d === dateStr;
                           });
 
-                          // How many changes happened AFTER this date up to now?
-                          // We work backwards to estimate the count at this point
-                          const changesSinceThen = historyList.filter(h => {
+                          const changesAfter = historyList.filter(h => {
                             const d = typeof h.detectedAt === 'string' ? h.detectedAt : new Date(h.detectedAt).toISOString();
                             return d > dateStr;
                           });
 
-                          const followsSinceThen = changesSinceThen.filter(h => h.type === 'FOLLOW').length;
-                          const unfollowsSinceThen = changesSinceThen.filter(h => h.type === 'UNFOLLOW').length;
-
-                          // Estimate: current - (follows since then) + (unfollows since then)
-                          const estimatedCount = currentRef - followsSinceThen + unfollowsSinceThen;
+                          const followingAtTime = currentCount - changesAfter.filter(h => h.type === 'FOLLOW').length + changesAfter.filter(h => h.type === 'UNFOLLOW').length;
 
                           dataPoints.push({
                             date: dateStr,
-                            label: date.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' }),
-                            followers: estimatedCount,
+                            label: date.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric' }),
+                            followers: followingAtTime,
                             followed: dayChanges.filter(c => c.type === 'FOLLOW').map(c => c.targetUsername),
                             unfollowed: dayChanges.filter(c => c.type === 'UNFOLLOW').map(c => c.targetUsername)
                           });
                         }
 
-                        const minFollowers = Math.min(...dataPoints.map(p => p.followers));
-                        const maxFollowers = Math.max(...dataPoints.map(p => p.followers));
+                        const values = dataPoints.map(p => p.followers);
+                        const min = Math.min(...values);
+                        const max = Math.max(...values);
+                        const vRange = max - min || 1;
+                        const vPadding = vRange * 0.2 + 2;
+                        const yMin = min - vPadding;
+                        const yMax = max + vPadding;
 
-                        // Kleineres Padding für bessere Sichtbarkeit der Linie
-                        const actualRange = maxFollowers - minFollowers;
-                        const minPadding = Math.max(3, actualRange * 0.15); // 15% statt 30%
-                        const range = Math.max(actualRange, 1); // Mindestens 1 um Division durch 0 zu vermeiden
+                        const getX = (i: number) => (i / (days - 1)) * 100;
+                        const getY = (val: number) => 100 - ((val - yMin) / (yMax - yMin)) * 100;
 
-                        const chartMin = Math.max(0, minFollowers - minPadding);
-                        const chartMax = maxFollowers + minPadding;
-                        const chartRange = chartMax - chartMin || 1;
-
-                        // Größere Dimensionen für bessere Lesbarkeit
-                        const width = 800;
-                        const height = 300;
-
-                        // Calculate points for the line
-                        const points = dataPoints.map((p, i) => {
-                          const x = (i / (days - 1)) * width;
-                          const y = height - ((p.followers - chartMin) / chartRange) * height;
-                          return `${x},${y}`;
-                        }).join(' ');
-
-                        // Area path (under the line)
-                        const areaPath = `0,${height} ${points} ${width},${height} Z`;
+                        const pointsStr = dataPoints.map((p, i) => `${getX(i)},${getY(p.followers)}`).join(' ');
 
                         return (
-                          <div className="w-full h-full relative group">
-                            <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+                          <div className="w-full h-full relative">
+                            {/* Y-Axis Labels */}
+                            <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between py-1 text-[8px] font-bold text-[var(--text-muted)] opacity-50 z-0">
+                              {[0, 0.25, 0.5, 0.75, 1].map(p => (
+                                <div key={p} className="flex items-center gap-2">
+                                  <span>{Math.round(yMax - p * (yMax - yMin))}</span>
+                                  <div className="w-[calc(100vw-400px)] h-[1px] bg-[var(--border)] border-dashed border-b border-[var(--border)]/30"></div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <svg className="w-full h-full overflow-visible relative z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
                               <defs>
-                                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="var(--accent-solid)" stopOpacity="0.3" />
-                                  <stop offset="100%" stopColor="var(--accent-solid)" stopOpacity="0" />
+                                <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.2" />
+                                  <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
                                 </linearGradient>
                               </defs>
 
-                              {/* Y-Axis Grid Lines */}
-                              {[0, 0.25, 0.5, 0.75, 1].map((p, idx) => (
-                                <line
-                                  key={idx}
-                                  x1="0" y1={height * p} x2={width} y2={height * p}
-                                  stroke="var(--border)" strokeWidth="1" strokeDasharray="5,5"
-                                />
-                              ))}
+                              <path d={`M0,100 ${pointsStr} 100,100 Z`} fill="url(#chartFill)" />
+                              <polyline points={pointsStr} fill="none" stroke="var(--accent)" strokeWidth="0.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
 
-                              {/* Fill Area */}
-                              <path d={areaPath} fill="url(#chartGradient)" className="transition-all duration-700 ease-out" />
-
-                              {/* Main Line */}
-                              <polyline
-                                fill="none"
-                                stroke="var(--accent)"
-                                strokeWidth="4"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                points={points}
-                                className="transition-all duration-700 ease-out"
-                              />
-
-                              {/* Dots */}
-                              {dataPoints.map((p, i) => {
-                                const x = (i / (days - 1)) * width;
-                                const y = height - ((p.followers - chartMin) / chartRange) * height;
-                                return (
-                                  <g
-                                    key={i}
-                                    className="cursor-pointer group/point"
-                                    onMouseEnter={() => setHoveredPoint({ ...p, index: i })}
+                              {dataPoints.map((p, i) => (
+                                <g key={i} className="group/dot">
+                                  <circle
+                                    cx={getX(i)}
+                                    cy={getY(p.followers)}
+                                    r={(p.followed.length > 0 || p.unfollowed.length > 0) ? 1.5 : 0.8}
+                                    fill="var(--background)"
+                                    stroke="var(--accent)"
+                                    strokeWidth="0.5"
+                                    vectorEffect="non-scaling-stroke"
+                                    className="cursor-pointer transition-all hover:r-3"
+                                    onMouseEnter={(e) => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setHoveredPoint({ ...p, x: rect.left, y: rect.top });
+                                    }}
                                     onMouseLeave={() => setHoveredPoint(null)}
-                                  >
-                                    <circle
-                                      cx={x} cy={y} r="6"
-                                      fill="white" stroke="var(--accent-solid)" strokeWidth="3"
-                                      className="transition-all group-hover/point:r-8"
-                                    />
-                                  </g>
-                                );
-                              })}
+                                  />
+                                </g>
+                              ))}
                             </svg>
 
-                            {/* Enhanced HTML Tooltip */}
+                            {/* Tooltip */}
                             {hoveredPoint && (
                               <div
-                                className="absolute pointer-events-none bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 shadow-2xl backdrop-blur-md z-50 text-[10px] min-w-[140px] animate-scale-in"
-                                style={{
-                                  left: `${(hoveredPoint.index / (days - 1)) * 100}%`,
-                                  top: `${height - ((hoveredPoint.followers - chartMin) / chartRange) * height / 400 * 100}%`,
-                                  transform: 'translate(-50%, -110%)',
-                                }}
+                                className="fixed z-[100] translate-x-[-50%] translate-y-[-100%] pointer-events-none mb-4"
+                                style={{ left: hoveredPoint.x, top: hoveredPoint.y }}
                               >
-                                <p className="font-bold border-b border-[var(--border)] pb-1 mb-2 flex justify-between">
-                                  <span>{hoveredPoint.label}</span>
-                                  <span className="text-[var(--accent-solid)]">{hoveredPoint.followers}</span>
-                                </p>
-                                <div className="space-y-1.5 overflow-y-auto max-h-40">
-                                  {hoveredPoint.followed.length === 0 && hoveredPoint.unfollowed.length === 0 ? (
-                                    <p className="text-[var(--text-muted)] italic">Keine Änderungen detektiert</p>
-                                  ) : (
-                                    <>
-                                      {hoveredPoint.followed.length > 0 && (
-                                        <div>
-                                          <p className="text-[var(--success)] font-black text-[9px] uppercase mb-1">➕ Neu gefolgt:</p>
-                                          {hoveredPoint.followed.slice(0, 5).map((name: string) => (
-                                            <p key={name} className="font-medium text-[var(--foreground)] truncate">@{name}</p>
-                                          ))}
-                                          {hoveredPoint.followed.length > 5 && (
-                                            <p className="text-[var(--text-muted)] text-[8px] italic">...und {hoveredPoint.followed.length - 5} weitere</p>
-                                          )}
-                                        </div>
-                                      )}
-                                      {hoveredPoint.unfollowed.length > 0 && (
-                                        <div className={hoveredPoint.followed.length > 0 ? "pt-1 mt-1 border-t border-[var(--border)]/30" : ""}>
-                                          <p className="text-[var(--error)] font-black text-[9px] uppercase mb-1">➖ Entfolgt:</p>
-                                          {hoveredPoint.unfollowed.slice(0, 5).map((name: string) => (
-                                            <p key={name} className="font-medium text-[var(--foreground)] truncate">@{name}</p>
-                                          ))}
-                                          {hoveredPoint.unfollowed.length > 5 && (
-                                            <p className="text-[var(--text-muted)] text-[8px] italic">...und {hoveredPoint.unfollowed.length - 5} weitere</p>
-                                          )}
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
+                                <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl p-3 min-w-[160px] animate-in zoom-in duration-200">
+                                  <div className="flex justify-between items-center border-b border-[var(--border)] pb-2 mb-2">
+                                    <span className="text-[10px] font-bold text-[var(--text-muted)]">{hoveredPoint.label}</span>
+                                    <span className="text-xs font-black">{hoveredPoint.followers}</span>
+                                  </div>
+                                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                                    {hoveredPoint.followed.length > 0 && (
+                                      <div>
+                                        <p className="text-[8px] font-bold text-[var(--success)] uppercase">➕ Gefolgt</p>
+                                        {hoveredPoint.followed.map((u: string) => <p key={u} className="text-[10px] truncate">@{u}</p>)}
+                                      </div>
+                                    )}
+                                    {hoveredPoint.unfollowed.length > 0 && (
+                                      <div className="pt-1 border-t border-[var(--border)]/30 mt-1">
+                                        <p className="text-[8px] font-bold text-[var(--error)] uppercase">➖ Entfolgt</p>
+                                        {hoveredPoint.unfollowed.map((u: string) => <p key={u} className="text-[10px] truncate">@{u}</p>)}
+                                      </div>
+                                    )}
+                                    {hoveredPoint.followed.length === 0 && hoveredPoint.unfollowed.length === 0 && (
+                                      <p className="text-[10px] text-[var(--text-muted)] italic text-center">Keine Änderungen</p>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             )}
 
                             {/* X-Axis Labels */}
-                            <div className="absolute -bottom-8 left-0 right-0 flex justify-between px-1">
-                              {dataPoints.filter((_, i) => i % (timeRange === 'week' ? 1 : 5) === 0).map((p, i) => (
-                                <span key={i} className="text-[10px] font-bold text-[var(--text-muted)] rotate-[-15deg] origin-top-left whitespace-nowrap">
-                                  {p.label}
-                                </span>
+                            <div className="absolute -bottom-6 left-0 right-0 flex justify-between px-1 text-[8px] font-bold text-[var(--text-muted)]">
+                              {dataPoints.filter((_, i) => i % (timeRange === 'week' ? 1 : 5) === 0 || i === days - 1).map((p, i) => (
+                                <span key={i} className="transform -translate-x-1/2" style={{ left: `${getX(dataPoints.indexOf(p))}%` }}>{p.label}</span>
                               ))}
-                            </div>
-
-                            {/* Y-Axis Labels - 5 evenly spaced */}
-                            <div className="absolute -left-14 top-0 bottom-0 flex flex-col justify-between py-1">
-                              {[0, 0.25, 0.5, 0.75, 1].map((p, idx) => {
-                                const value = Math.round(chartMax - (p * chartRange));
-                                return (
-                                  <span key={idx} className="text-[10px] font-bold text-[var(--foreground)] opacity-70 text-right w-12">
-                                    {value}
-                                  </span>
-                                );
-                              })}
                             </div>
                           </div>
                         );
@@ -1887,42 +1823,28 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                     </div>
                   </div>
 
-                  {/* Actions & Sharing */}
-                  <div className="flex flex-wrap gap-4 pt-4">
+                  {/* Export Actions */}
+                  <div className="flex gap-4 items-center justify-end bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)]">
                     <button
                       onClick={() => {
-                        const text = `📊 Monitoring Report für @${username}\n\n` +
-                          `📈 Entwicklung: von ${profile?.followingCount - (historyList.filter(h => h.type === 'FOLLOW').length - historyList.filter(h => h.type === 'UNFOLLOW').length)} auf ${profile?.followingCount} Following\n` +
-                          `✅ Neu gefolgt: ${historyList.filter(h => h.type === 'FOLLOW').length}\n` +
-                          `❌ Entfolgt: ${historyList.filter(h => h.type === 'UNFOLLOW').length}\n\n` +
-                          `#Instagram #Monitoring #Analytics`;
-                        navigator.clipboard.writeText(text);
-                        alert('Social Media Report kopiert! ✨');
+                        const csv = [['Datum', 'Typ', 'Benutzername'], ...historyList.map(h => [new Date(h.detectedAt).toLocaleString('de-DE'), h.type, h.targetUsername])].map(e => e.join(',')).join('\n');
+                        const blob = new Blob([csv], { type: 'text/csv' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a'); a.href = url; a.download = `${username}_history.csv`; a.click();
                       }}
-                      className="flex-1 min-w-[200px] flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] text-white rounded-2xl font-black text-sm shadow-lg shadow-[var(--accent)]/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      className="px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-bold hover:bg-[var(--card)] transition-all flex items-center gap-2"
                     >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.84 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" /></svg>
-                      Social Media Post kopieren
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                      CSV Bericht
                     </button>
                     <button
                       onClick={() => {
-                        const csv = [
-                          ['Datum', 'Typ', 'Benutzername'],
-                          ...historyList.map(h => [h.detectedAt, h.type, h.targetUsername])
-                        ].map(e => e.join(',')).join('\n');
-                        const blob = new Blob([csv], { type: 'text/csv' });
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.setAttribute('href', url);
-                        a.setAttribute('download', `${username}_stats.csv`);
-                        a.click();
+                        const text = `📊 Update für @${username}: ${profile?.followingCount} Abonnements. Trend: ${historyList.length} Änderungen detektiert.`;
+                        navigator.clipboard.writeText(text); alert('Snapshot kopiert!');
                       }}
-                      className="px-6 py-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl font-bold text-sm text-[var(--foreground)] hover:bg-[var(--background)] transition-all flex items-center gap-2"
+                      className="px-4 py-2 bg-[var(--foreground)] text-[var(--background)] rounded-xl text-xs font-bold hover:opacity-90 transition-all flex items-center gap-2"
                     >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      CSV Export
+                      Snapshot kopieren
                     </button>
                   </div>
                 </div>
