@@ -401,6 +401,12 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 console.log(`   Scroll ${scroll + 1}/${maxScrolls}: DOM=${domFollowing.size} | API=${apiFollowing.size}`);
             }
 
+            // Debug: Screenshot nach 10 Scrolls um zu prüfen ob gescrollt wird
+            if (scroll === 10) {
+                await page.screenshot({ path: `.incidents/scroll-debug-${Date.now()}.png` });
+                console.log(`   📸 Scroll-Debug Screenshot gespeichert`);
+            }
+
             // ROBUSTES SCROLLING: Mehrere Strategien
             try {
                 // Strategie 1: Finde das scrollbare Element und scrolle es
@@ -424,28 +430,36 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                     return false;
                 });
 
+                // Log scroll success nur einmal
+                if (scroll === 0) {
+                    console.log(`   📜 JS-Scroll funktioniert: ${scrolled}`);
+                }
+
                 await page.waitForTimeout(300);
 
-                // Strategie 2: Klicke in den Dialog und nutze Keyboard
-                if (!scrolled) {
-                    // Fokussiere den Dialog durch Klick auf ein sichtbares Element
-                    const dialogContent = await page.$('[role="dialog"] div');
-                    if (dialogContent) {
-                        await dialogContent.click().catch(() => { });
-                        await page.waitForTimeout(200);
+                // Strategie 2: Mouse wheel direkt im Dialog-Bereich
+                const dialogBox = await page.$('[role="dialog"]');
+                if (dialogBox) {
+                    const box = await dialogBox.boundingBox();
+                    if (box) {
+                        // Scroll im Zentrum des Dialogs
+                        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+                        await page.mouse.wheel(0, 400);
                     }
                 }
 
-                // Keyboard scrolling - funktioniert oft besser
-                await page.keyboard.press('PageDown');
                 await page.waitForTimeout(200);
-                await page.keyboard.press('ArrowDown');
+
+                // Strategie 3: Keyboard scrolling
+                await page.keyboard.press('PageDown');
+                await page.waitForTimeout(100);
                 await page.keyboard.press('ArrowDown');
                 await page.keyboard.press('ArrowDown');
 
-            } catch (scrollErr) {
-                // Fallback: Mouse wheel im Dialog-Bereich
-                await page.mouse.move(400, 400);
+            } catch (scrollErr: any) {
+                // Fallback: Mouse wheel
+                if (scroll === 0) console.log(`   ⚠️ Scroll-Fehler: ${scrollErr.message}`);
+                await page.mouse.move(200, 400);
                 await page.mouse.wheel(0, 600);
             }
 
