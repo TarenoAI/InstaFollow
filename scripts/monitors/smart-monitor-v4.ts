@@ -403,38 +403,58 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 
             // ROBUSTES SCROLLING: Mehrere Strategien
             try {
-                // Strategie 1: Scroll im Dialog mit JavaScript
-                await page.evaluate(() => {
+                // Strategie 1: Finde das scrollbare Element und scrolle es
+                const scrolled = await page.evaluate(() => {
                     const dialog = document.querySelector('[role="dialog"]');
-                    if (dialog) {
-                        // Finde das scrollbare Element im Dialog
-                        const scrollables = dialog.querySelectorAll('div');
-                        for (const el of scrollables) {
-                            if (el.scrollHeight > el.clientHeight) {
-                                el.scrollTop += 800;
-                                return;
+                    if (!dialog) return false;
+
+                    // Finde alle scrollbaren Elemente
+                    const allDivs = dialog.querySelectorAll('div');
+                    for (const el of allDivs) {
+                        // Prüfe ob das Element scrollbar ist
+                        if (el.scrollHeight > el.clientHeight + 10) {
+                            const oldTop = el.scrollTop;
+                            el.scrollTop += 600;
+                            // Prüfe ob tatsächlich gescrollt wurde
+                            if (el.scrollTop !== oldTop) {
+                                return true;
                             }
                         }
                     }
+                    return false;
                 });
 
-                await page.waitForTimeout(500);
-
-                // Strategie 2: Keyboard scrolling
-                await page.keyboard.press('End');
                 await page.waitForTimeout(300);
+
+                // Strategie 2: Klicke in den Dialog und nutze Keyboard
+                if (!scrolled) {
+                    // Fokussiere den Dialog durch Klick auf ein sichtbares Element
+                    const dialogContent = await page.$('[role="dialog"] div');
+                    if (dialogContent) {
+                        await dialogContent.click().catch(() => { });
+                        await page.waitForTimeout(200);
+                    }
+                }
+
+                // Keyboard scrolling - funktioniert oft besser
                 await page.keyboard.press('PageDown');
+                await page.waitForTimeout(200);
+                await page.keyboard.press('ArrowDown');
+                await page.keyboard.press('ArrowDown');
+                await page.keyboard.press('ArrowDown');
 
             } catch (scrollErr) {
-                // Fallback: Mouse wheel
-                await page.mouse.wheel(0, 800);
+                // Fallback: Mouse wheel im Dialog-Bereich
+                await page.mouse.move(400, 400);
+                await page.mouse.wheel(0, 600);
             }
 
-            await humanDelay(3000, 5000);
+            // Warte auf neue API-Responses
+            await humanDelay(2000, 3500);
 
-            // Alle 10 Scrolls: Extra warten für Lazy Loading
-            if (scroll % 10 === 9) {
-                await page.waitForTimeout(2500);
+            // Alle 5 Scrolls: Extra warten für Lazy Loading
+            if (scroll % 5 === 4) {
+                await page.waitForTimeout(2000);
             }
         }
 
