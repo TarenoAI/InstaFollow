@@ -155,32 +155,65 @@ async function postToTwitter(text: string): Promise<string | null> {
 
         // WICHTIG: Schließe eventuelle Popups die den Button blockieren
         console.log('   🔇 Schließe eventuelle Popups...');
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
 
-        // Versuche bekannte Popup-Buttons zu schließen
+        // Mehrfach Escape drücken um alle Dialoge zu schließen
+        for (let i = 0; i < 3; i++) {
+            await page.keyboard.press('Escape');
+            await page.waitForTimeout(300);
+        }
+
+        // Ausführliche Liste aller bekannten Popup-Buttons
         const popupDismissers = [
-            'button:has-text("Nicht jetzt")',
+            // "Create Passcode" Dialog für verschlüsselte DMs
             'button:has-text("Not now")',
-            'button:has-text("Vielleicht später")',
+            'button:has-text("Nicht jetzt")',
+            'button:has-text("Skip for now")',
+            'button:has-text("Überspringen")',
             'button:has-text("Maybe later")',
+            'button:has-text("Vielleicht später")',
+            'button:has-text("Dismiss")',
+            'button:has-text("Ablehnen")',
+            'button:has-text("Cancel")',
+            'button:has-text("Abbrechen")',
+            // Close buttons
             '[aria-label="Close"]',
             '[aria-label="Schließen"]',
-            '[data-testid="xMigrationBottomBar"] button'
+            '[data-testid="xMigrationBottomBar"] button',
+            '[data-testid="sheetDialog"] button[aria-label="Close"]',
+            // Modal close buttons
+            'div[role="dialog"] button[aria-label="Close"]',
+            'div[role="dialog"] button:has-text("Not now")',
+            'div[role="dialog"] button:has-text("Nicht jetzt")',
+            // Spezifische Dialoge
+            '[data-testid="confirmationSheetDialog"] button',
+            'div[aria-modal="true"] button[aria-label="Close"]',
         ];
 
+        // Versuche alle Popup-Buttons zu finden und zu klicken
+        let popupsClosed = 0;
         for (const selector of popupDismissers) {
             try {
                 const btn = await page.$(selector);
                 if (btn && await btn.isVisible()) {
                     await btn.click({ force: true });
                     console.log(`   ✅ Popup geschlossen: ${selector}`);
+                    popupsClosed++;
                     await page.waitForTimeout(500);
                 }
             } catch { }
         }
+
+        // Falls Popups gefunden wurden, warte und versuche nochmal Escape
+        if (popupsClosed > 0) {
+            console.log(`   📢 ${popupsClosed} Popup(s) geschlossen`);
+            await page.waitForTimeout(1000);
+            await page.keyboard.press('Escape');
+            await page.waitForTimeout(500);
+        }
+
+        // Screenshot nach Popup-Handling
+        await page.screenshot({ path: 'debug-twitter-after-popups.png' });
+        console.log('   📸 Screenshot nach Popup-Handling erstellt');
 
         // Finde das Tweet-Textfeld
         const tweetBox = await page.$('[data-testid="tweetTextarea_0"]') ||
