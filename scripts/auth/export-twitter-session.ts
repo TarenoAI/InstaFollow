@@ -22,7 +22,11 @@ async function main() {
     }
 
     try {
-        const db = new Database(cookiesDb, { readonly: true });
+        // KOPIERE DB UM LOCK ZU UMGEHEN
+        const tempDb = path.join('/tmp', `cookies_temp_${Date.now()}.sqlite`);
+        fs.copyFileSync(cookiesDb, tempDb);
+
+        const db = new Database(tempDb, { readonly: true });
 
         // Hole alle x.com/twitter.com Cookies
         const cookies = db.prepare(`
