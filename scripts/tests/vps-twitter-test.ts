@@ -8,13 +8,38 @@ import 'dotenv/config';
 import { chromium } from 'playwright';
 import path from 'path';
 import fs from 'fs';
+import { exec } from 'child_process';
 
 const TWITTER_SESSION_PATH = path.join(process.cwd(), 'data/sessions/twitter-session.json');
+const TWITTER_INCIDENTS_DIR = path.join(process.cwd(), '.twitter-incidents');
 const TWITTER_USERNAME = process.env.TWITTER_USERNAME;
 const TWITTER_PASSWORD = process.env.TWITTER_PASSWORD;
 
+// Erstelle Incidents-Ordner
+if (!fs.existsSync(TWITTER_INCIDENTS_DIR)) {
+    fs.mkdirSync(TWITTER_INCIDENTS_DIR, { recursive: true });
+}
+
 async function humanDelay(minMs: number, maxMs: number) {
     await new Promise(r => setTimeout(r, minMs + Math.random() * (maxMs - minMs)));
+}
+
+// Speichert Screenshot und pusht zu Git
+async function saveIncidentScreenshot(page: any, name: string): Promise<string> {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${name}-${timestamp}.png`;
+    const filepath = path.join(TWITTER_INCIDENTS_DIR, filename);
+
+    await page.screenshot({ path: filepath, fullPage: true });
+    console.log(`   📸 Incident Screenshot: ${filename}`);
+
+    // Auto-push zu Git
+    exec(`cd ${process.cwd()} && git add .twitter-incidents/ && git commit -m "debug: Twitter incident ${name}" && git push origin main`,
+        (err) => {
+            if (!err) console.log('   📤 Screenshot zu Git gepusht!');
+        });
+
+    return filepath;
 }
 
 async function postToTwitter(text: string): Promise<string | null> {
@@ -240,13 +265,13 @@ async function postToTwitter(text: string): Promise<string | null> {
         }
 
         console.log('\n⚠️ Post-Status unklar. Prüfe manuell: https://x.com/BuliFollows');
-        console.log('   Screenshot wurde gespeichert: debug-twitter-after-post.png');
+        await saveIncidentScreenshot(page, 'post-unclear');
         await browser.close();
         return null;
 
     } catch (err: any) {
         console.log(`\n❌ Fehler: ${err.message}\n`);
-        await page.screenshot({ path: 'debug-twitter-error.png' }).catch(() => { });
+        await saveIncidentScreenshot(page, 'error').catch(() => { });
         await browser.close();
         return null;
     }
