@@ -301,7 +301,70 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         await page.waitForTimeout(4000);
         await dismissPopups(page);
 
-        await page.click('a[href*="following"]', { timeout: 10000 });
+        // Screenshot vor dem Klick für Debugging
+        await page.screenshot({ path: `debug-before-following-click-${username}.png` });
+
+        // Versuche verschiedene Selektoren für den Following-Link
+        const followingSelectors = [
+            `a[href="/${username}/following/"]`,  // Exakter Pfad
+            `a[href*="/following"]`,              // Enthält /following
+            'a[href*="following"]',               // Enthält following
+            'li:nth-child(3) a',                  // Drittes Element in Stats (Posts, Followers, Following)
+            'header ul li:nth-child(3) a',        // Im Header
+            'section ul li:nth-child(3) a',       // In Section
+        ];
+
+        let clickedFollowing = false;
+        for (const selector of followingSelectors) {
+            try {
+                const followingLink = await page.$(selector);
+                if (followingLink) {
+                    const text = await followingLink.innerText().catch(() => '');
+                    // Prüfe ob es wirklich der Following-Link ist
+                    if (text.toLowerCase().includes('following') ||
+                        text.toLowerCase().includes('gefolgt') ||
+                        text.toLowerCase().includes('abonniert') ||
+                        text.match(/\d+/)) {
+                        console.log(`   ✅ Following-Link gefunden mit: ${selector}`);
+                        await followingLink.click({ timeout: 5000 });
+                        clickedFollowing = true;
+                        break;
+                    }
+                }
+            } catch (e) {
+                // Weiter zum nächsten Selektor
+            }
+        }
+
+        if (!clickedFollowing) {
+            // Letzter Versuch: Via JavaScript klicken
+            console.log('   ⚠️ Versuche JavaScript-Klick auf Following...');
+            clickedFollowing = await page.evaluate((uname) => {
+                const links = document.querySelectorAll('a');
+                for (const link of links) {
+                    if (link.href.includes('following') || link.href.includes('/following')) {
+                        (link as HTMLElement).click();
+                        return true;
+                    }
+                }
+                // Fallback: Suche nach Text "Gefolgt" oder "Following"
+                for (const link of links) {
+                    const text = link.innerText.toLowerCase();
+                    if (text.includes('gefolgt') || text.includes('following')) {
+                        (link as HTMLElement).click();
+                        return true;
+                    }
+                }
+                return false;
+            }, username);
+        }
+
+        if (!clickedFollowing) {
+            console.log('   ❌ Following-Link nicht gefunden');
+            await page.screenshot({ path: `debug-no-following-link-${username}.png` });
+            return [];
+        }
+
         await page.waitForTimeout(4000);
         // NICHT dismissPopups aufrufen, da dies das Following-Fenster schließt!
 
