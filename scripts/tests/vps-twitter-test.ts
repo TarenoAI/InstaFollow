@@ -128,6 +128,35 @@ async function postToTwitter(text: string): Promise<string | null> {
         // Post erstellen
         console.log('📝 Erstelle Post...');
 
+        // WICHTIG: Schließe eventuelle Popups die den Button blockieren
+        console.log('   🔇 Schließe eventuelle Popups...');
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(500);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(500);
+
+        // Versuche bekannte Popup-Buttons zu schließen
+        const popupDismissers = [
+            'button:has-text("Nicht jetzt")',
+            'button:has-text("Not now")',
+            'button:has-text("Vielleicht später")',
+            'button:has-text("Maybe later")',
+            '[aria-label="Close"]',
+            '[aria-label="Schließen"]',
+            '[data-testid="xMigrationBottomBar"] button'
+        ];
+
+        for (const selector of popupDismissers) {
+            try {
+                const btn = await page.$(selector);
+                if (btn && await btn.isVisible()) {
+                    await btn.click({ force: true });
+                    console.log(`   ✅ Popup geschlossen: ${selector}`);
+                    await page.waitForTimeout(500);
+                }
+            } catch { }
+        }
+
         // Finde das Tweet-Textfeld
         const tweetBox = await page.$('[data-testid="tweetTextarea_0"]') ||
             await page.$('div[role="textbox"][contenteditable="true"]');
@@ -141,7 +170,7 @@ async function postToTwitter(text: string): Promise<string | null> {
 
         // Text eingeben
         console.log('   ⌨️ Tippe Text...');
-        await tweetBox.click();
+        await tweetBox.click({ force: true });
         await page.waitForTimeout(500);
         await tweetBox.fill(text);
         await humanDelay(1000, 2000);
@@ -161,7 +190,8 @@ async function postToTwitter(text: string): Promise<string | null> {
         }
 
         console.log('   ✅ Post-Button gefunden - klicke...');
-        await postButton.click();
+        // force: true umgeht das "element intercepts pointer events" Problem
+        await postButton.click({ force: true });
         await page.waitForTimeout(5000);
 
         // Prüfe ob Post erfolgreich war
