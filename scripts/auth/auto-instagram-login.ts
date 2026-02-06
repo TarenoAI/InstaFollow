@@ -67,25 +67,23 @@ async function autoLogin(): Promise<boolean> {
     console.log(`👤 Username: ${INSTAGRAM_USERNAME}`);
     console.log('');
 
-    // Stelle sicher, dass der Sessions-Ordner existiert
-    const sessionDir = path.dirname(SESSION_PATH);
-    if (!fs.existsSync(sessionDir)) {
-        fs.mkdirSync(sessionDir, { recursive: true });
+    // Stelle sicher, dass der Browser-Profil-Ordner existiert
+    const BROWSER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/instagram');
+    if (!fs.existsSync(BROWSER_PROFILE_DIR)) {
+        fs.mkdirSync(BROWSER_PROFILE_DIR, { recursive: true });
     }
 
-    const browser = await chromium.launch({
+    // Nutze PERSISTENT CONTEXT für langlebige Sessions
+    // Speichert alles: Cookies, LocalStorage, IndexedDB, Cache, etc.
+    const context = await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, {
         headless: false,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-blink-features=AutomationControlled'
-        ]
-    });
-
-    const context = await browser.newContext({
+        ],
         ...iPhone,
-        storageState: fs.existsSync(SESSION_PATH) ? SESSION_PATH : undefined,
         locale: 'de-DE',
         timezoneId: 'Europe/Berlin'
     });
@@ -119,7 +117,7 @@ async function autoLogin(): Promise<boolean> {
             if (!page.url().includes('login')) {
                 console.log('✅ Session ist gültig!');
                 await context.storageState({ path: SESSION_PATH });
-                await browser.close();
+                await context.close();
                 return true;
             }
         }
@@ -146,7 +144,7 @@ async function autoLogin(): Promise<boolean> {
         if (!usernameInput) {
             console.log('❌ Username-Feld nicht gefunden');
             await page.screenshot({ path: 'debug-instagram-no-username.png' });
-            await browser.close();
+            await context.close();
             return false;
         }
 
@@ -162,7 +160,7 @@ async function autoLogin(): Promise<boolean> {
 
         if (!passwordInput) {
             console.log('❌ Passwort-Feld nicht gefunden');
-            await browser.close();
+            await context.close();
             return false;
         }
 
@@ -198,7 +196,7 @@ async function autoLogin(): Promise<boolean> {
         if (errorMessage) {
             const errorText = await errorMessage.innerText().catch(() => '');
             console.log(`❌ Login-Fehler: ${errorText}`);
-            await browser.close();
+            await context.close();
             return false;
         }
 
@@ -217,7 +215,7 @@ async function autoLogin(): Promise<boolean> {
             console.log('');
             console.log('   ➡️ Bitte manuell über VNC einloggen!');
             await page.screenshot({ path: 'debug-instagram-challenge.png' });
-            await browser.close();
+            await context.close();
             return false;
         }
 
@@ -233,13 +231,13 @@ async function autoLogin(): Promise<boolean> {
         await context.storageState({ path: SESSION_PATH });
         console.log(`✅ Session gespeichert: ${SESSION_PATH}`);
 
-        await browser.close();
+        await context.close();
         return true;
 
     } catch (err: any) {
         console.log(`❌ Fehler: ${err.message}`);
         await page.screenshot({ path: 'debug-instagram-error.png' }).catch(() => { });
-        await browser.close();
+        await context.close();
         return false;
     }
 }

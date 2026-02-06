@@ -1027,16 +1027,28 @@ async function main() {
         authToken: process.env.TURSO_AUTH_TOKEN!
     });
 
-    const browser = await chromium.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    });
+    // Nutze PERSISTENT CONTEXT für langlebige Sessions
+    // Speichert alles: Cookies, LocalStorage, IndexedDB, Cache, etc.
+    const BROWSER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/instagram');
 
-    const context = await browser.newContext({
+    // Erstelle Profil-Ordner wenn nicht vorhanden
+    if (!fs.existsSync(BROWSER_PROFILE_DIR)) {
+        fs.mkdirSync(BROWSER_PROFILE_DIR, { recursive: true });
+    }
+
+    console.log('🌐 Starte Browser mit persistentem Profil...');
+
+    const context = await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, {
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled'
+        ],
         ...iPhone,
         locale: 'de-DE',
-        timezoneId: 'Europe/Berlin',
-        storageState: fs.existsSync(SESSION_PATH) ? SESSION_PATH : undefined
+        timezoneId: 'Europe/Berlin'
     });
 
     const page = await context.newPage();
@@ -1053,7 +1065,7 @@ async function main() {
 
         if (page.url().includes('login')) {
             console.log('❌ Nicht eingeloggt! Bitte Session erneuern.');
-            await browser.close();
+            await context.close();
             return;
         }
 
@@ -1073,7 +1085,7 @@ async function main() {
                 if (ageMinutes < 60) {
                     console.log(`\n🔒 ABBRUCH: Ein anderer Prozess läuft bereits (Lock: ${ageMinutes.toFixed(1)} Min alt)`);
                     console.log(`   Lock-File: ${LOCK_FILE}\n   Falls dies ein Fehler ist, lösche die Datei manuell.\n`);
-                    await browser.close();
+                    await context.close();
                     return;
                 }
                 fs.unlinkSync(LOCK_FILE);
@@ -1267,7 +1279,7 @@ async function main() {
                                     : monitoredProfileInfo.screenshotPath;
 
                                 const tweetUrl = await postToTwitter(
-                                    browser,
+                                    context.browser()!,
                                     tweetText,
                                     screenshotToUse
                                 );
@@ -1309,7 +1321,7 @@ async function main() {
                                 const tweetText = formatTweetText('UNFOLLOW', monitoredProfileInfo, removedProfiles);
 
                                 const tweetUrl = await postToTwitter(
-                                    browser,
+                                    context.browser()!,
                                     tweetText,
                                     removedProfiles[0]?.screenshotPath || monitoredProfileInfo.screenshotPath
                                 );
@@ -1408,7 +1420,7 @@ async function main() {
         if (createdLock && fs.existsSync(LOCK_FILE)) {
             try { fs.unlinkSync(LOCK_FILE); } catch { }
         }
-        await browser.close();
+        await context.close();
     }
 
     console.log('\n' + '═'.repeat(60));

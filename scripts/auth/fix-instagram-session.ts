@@ -1,8 +1,8 @@
 /**
  * 🔧 INSTAGRAM VNC SESSION FIX
  * 
- * Öffnet Chromium mit sichtbarem Browser, damit du
- * dich bei Instagram einloggen kannst.
+ * Öffnet Chromium mit sichtbarem Browser und persistentem Profil,
+ * damit du dich bei Instagram einloggen kannst.
  * 
  * Verwendung in VNC oder mit xvfb:
  * export DISPLAY=:99
@@ -14,33 +14,29 @@ import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
 
-const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
 const iPhone = devices['iPhone 13 Pro'];
 
 async function main() {
     console.log('═'.repeat(50));
-    console.log('🔧 INSTAGRAM SESSION FIX');
+    console.log('🔧 INSTAGRAM SESSION FIX (Persistent Profile)');
     console.log('═'.repeat(50));
     console.log('');
 
-    // Stelle sicher, dass der Sessions-Ordner existiert
-    const sessionDir = path.dirname(SESSION_PATH);
-    if (!fs.existsSync(sessionDir)) {
-        fs.mkdirSync(sessionDir, { recursive: true });
+    // Stelle sicher, dass der Browser-Profil-Ordner existiert
+    const BROWSER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/instagram');
+    if (!fs.existsSync(BROWSER_PROFILE_DIR)) {
+        fs.mkdirSync(BROWSER_PROFILE_DIR, { recursive: true });
     }
 
-    console.log('🚀 Starte Chromium Browser (Mobile-Ansicht)...');
+    console.log('🚀 Starte Chromium Browser mit persistentem Profil...');
+    console.log(`   Profil-Ordner: ${BROWSER_PROFILE_DIR}`);
     console.log('');
 
-    const browser = await chromium.launch({
+    // Nutze PERSISTENT CONTEXT für langlebige Sessions
+    const context = await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, {
         headless: false,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-
-    // Lade existierende Session wenn vorhanden
-    const context = await browser.newContext({
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled'],
         ...iPhone,
-        storageState: fs.existsSync(SESSION_PATH) ? SESSION_PATH : undefined,
         locale: 'de-DE',
         timezoneId: 'Europe/Berlin'
     });
@@ -89,16 +85,16 @@ async function main() {
     });
 
     console.log('');
-    console.log('💾 Speichere Session...');
-    await context.storageState({ path: SESSION_PATH });
-
-    console.log('✅ Session gespeichert in: ' + SESSION_PATH);
+    console.log('💾 Session automatisch im Browser-Profil gespeichert!');
     console.log('');
 
-    await browser.close();
+    await context.close();
 
     console.log('═'.repeat(50));
     console.log('🎉 FERTIG!');
+    console.log('');
+    console.log('Die Session ist jetzt im persistenten Profil gespeichert.');
+    console.log('Sie bleibt auch nach Browser-Neustarts erhalten!');
     console.log('');
     console.log('Teste jetzt mit:');
     console.log('  npx tsx scripts/monitors/smart-monitor-v4.ts morewatchez');
