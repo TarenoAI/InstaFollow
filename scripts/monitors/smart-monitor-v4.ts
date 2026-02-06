@@ -859,9 +859,14 @@ async function postToTwitter(
 
     console.log('\n   🐦 Poste auf Twitter...');
 
-    // Starte separaten Browser für Twitter mit headless: false
-    // Dies verhindert dass der "Create Passcode" Dialog erscheint
-    const twitterBrowser = await chromium.launch({
+    // Nutze PERSISTENT CONTEXT für Twitter (wie bei Instagram)
+    const TWITTER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/twitter');
+    if (!fs.existsSync(TWITTER_PROFILE_DIR)) {
+        fs.mkdirSync(TWITTER_PROFILE_DIR, { recursive: true });
+    }
+
+    // Starte Browser mit persistentem Profil
+    const twitterContext = await chromium.launchPersistentContext(TWITTER_PROFILE_DIR, {
         headless: false, // WICHTIG: false um Twitter-Popups zu vermeiden
         args: [
             '--no-sandbox',
@@ -870,16 +875,12 @@ async function postToTwitter(
             '--disable-blink-features=AutomationControlled',
             '--disable-infobars',
             '--window-size=1280,800'
-        ]
-    });
-
-    const context = await twitterBrowser.newContext({
-        storageState: fs.existsSync(TWITTER_SESSION_PATH) ? TWITTER_SESSION_PATH : undefined,
+        ],
         viewport: { width: 1280, height: 800 },
         locale: 'de-DE',
         timezoneId: 'Europe/Berlin'
     });
-    const page = await context.newPage();
+    const page = await twitterContext.newPage();
 
     try {
         // Prüfe ob eingeloggt
@@ -924,7 +925,7 @@ async function postToTwitter(
             await page.waitForTimeout(5000);
 
             // Session speichern
-            await context.storageState({ path: TWITTER_SESSION_PATH });
+            // Session automatisch im persistenten Profil gespeichert
         }
 
         console.log('   ✅ Twitter eingeloggt');
@@ -966,13 +967,13 @@ async function postToTwitter(
 
         console.log(`   ✅ Tweet gepostet! ${tweetUrl}`);
 
-        await context.storageState({ path: TWITTER_SESSION_PATH });
-        await twitterBrowser.close();
+        // Session automatisch im persistenten Profil gespeichert
+        await twitterContext.close();
 
         return tweetUrl;
     } catch (err: any) {
         console.log(`   ❌ Twitter Fehler: ${err.message}`);
-        await twitterBrowser.close().catch(() => { });
+        await twitterContext.close().catch(() => { });
         return null;
     }
 }
