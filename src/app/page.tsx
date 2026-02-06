@@ -1039,11 +1039,28 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
                 )}
 
                 <div className="relative flex items-center gap-4 z-10">
-                  <img
-                    src={proxyImageUrl(profile.profilePicUrl || '')}
-                    alt={profile.username}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
+                  <div className="relative w-12 h-12 flex-shrink-0">
+                    {profile.profilePicUrl ? (
+                      <img
+                        src={proxyImageUrl(profile.profilePicUrl)}
+                        alt={profile.username}
+                        className="w-12 h-12 rounded-full object-cover bg-[var(--card)]"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-secondary)] items-center justify-center absolute inset-0"
+                      style={{ display: profile.profilePicUrl ? 'none' : 'flex' }}
+                    >
+                      <span className="text-sm font-bold text-white uppercase">
+                        {profile.username.substring(0, 2)}
+                      </span>
+                    </div>
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <a
@@ -1321,12 +1338,27 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-secondary)] rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-              <img
-                src={proxyImageUrl(profile?.profilePicUrl)}
-                alt={username}
-                className="relative w-24 h-24 rounded-full border-4 border-[var(--background)] shadow-xl object-cover"
-                onError={(e) => (e.currentTarget.src = "/placeholder-avatar.png")}
-              />
+              {profile?.profilePicUrl ? (
+                <img
+                  src={proxyImageUrl(profile.profilePicUrl)}
+                  alt={username}
+                  className="relative w-24 h-24 rounded-full border-4 border-[var(--background)] shadow-xl object-cover bg-[var(--card)]"
+                  onError={(e) => {
+                    // Hide the broken image and show fallback
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div
+                className="relative w-24 h-24 rounded-full border-4 border-[var(--background)] shadow-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-secondary)] items-center justify-center"
+                style={{ display: profile?.profilePicUrl ? 'none' : 'flex' }}
+              >
+                <span className="text-3xl font-black text-white uppercase">
+                  {username.substring(0, 2)}
+                </span>
+              </div>
             </div>
 
             <div className="flex-1 text-center sm:text-left pt-2">
@@ -1355,34 +1387,40 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
             </div>
           </div>
         </div>
-        {/* Compact Screenshot Strip */}
+        {/* Compact Screenshot Strip with visible dates */}
         {screenshots.length > 0 && (
-          <div className="px-8 py-2 border-b border-[var(--border)] bg-[var(--card)]/30">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-bold flex-shrink-0">
-                📸 {screenshots.length}
+          <div className="px-8 py-3 border-b border-[var(--border)] bg-[var(--card)]/30">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-bold">
+                📸 Screenshots ({screenshots.length})
               </span>
-              <div className="flex gap-1.5 overflow-x-auto py-1 flex-1">
-                {screenshots.slice(0, 8).map((ss, idx) => (
-                  <button
-                    key={ss.filename}
-                    onClick={() => window.open(ss.url, '_blank')}
-                    className="flex-shrink-0 rounded-md overflow-hidden border border-[var(--border)] hover:border-[var(--accent)] hover:ring-1 hover:ring-[var(--accent)]/30 transition-all group relative"
-                    title={ss.displayDate}
-                  >
+            </div>
+            <div className="flex gap-2 overflow-x-auto py-1 custom-scrollbar">
+              {screenshots.slice(0, 10).map((ss, idx) => (
+                <button
+                  key={ss.filename}
+                  onClick={() => window.open(ss.url, '_blank')}
+                  className="flex-shrink-0 rounded-lg overflow-hidden border border-[var(--border)] hover:border-[var(--accent)] hover:ring-2 hover:ring-[var(--accent)]/30 transition-all group bg-[var(--background)]"
+                >
+                  <div className="relative">
                     <img
                       src={ss.url}
                       alt={`Screenshot ${idx + 1}`}
-                      className="h-8 w-auto object-contain opacity-70 group-hover:opacity-100 transition-opacity"
+                      className="h-12 w-auto object-contain opacity-80 group-hover:opacity-100 transition-opacity"
                     />
-                  </button>
-                ))}
-                {screenshots.length > 8 && (
-                  <span className="flex-shrink-0 px-2 text-[10px] text-[var(--text-muted)] self-center">
-                    +{screenshots.length - 8}
-                  </span>
-                )}
-              </div>
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1.5 py-0.5">
+                      <span className="text-[8px] text-white font-medium">
+                        {ss.displayDate.split(',')[0]}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+              {screenshots.length > 10 && (
+                <span className="flex-shrink-0 px-3 py-2 text-[10px] text-[var(--text-muted)] self-center bg-[var(--card)] rounded-lg border border-[var(--border)]">
+                  +{screenshots.length - 10} mehr
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -1720,10 +1758,10 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                       </div>
                     </div>
 
-                    <div className="flex-1 min-h-[240px] w-full relative">
+                    <div className="flex-1 min-h-[360px] w-full relative">
                       {historyList.length < 1 ? (
                         <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] border-2 border-dashed border-[var(--border)] rounded-xl bg-[var(--background)]/50">
-                          <p className="text-xs font-bold">Warte auf mehr Datenpunkte...</p>
+                          <p className="text-sm font-bold">Warte auf mehr Datenpunkte...</p>
                         </div>
                       ) : (() => {
                         const days = timeRange === 'week' ? 7 : 30;
@@ -1766,7 +1804,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                         const min = Math.min(...values);
                         const max = Math.max(...values);
                         const vRange = max - min || 1;
-                        const vPadding = vRange * 0.2 + 2;
+                        const vPadding = vRange * 0.15 + 1;
                         const yMin = min - vPadding;
                         const yMax = max + vPadding;
 
@@ -1776,65 +1814,85 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                         const pointsStr = dataPoints.map((p, i) => `${getX(i)},${getY(p.followers)}`).join(' ');
 
                         return (
-                          <div className="w-full h-full relative">
-                            <div className="absolute inset-0 rounded-xl bg-[var(--background)]/40 border border-[var(--border)]/60"></div>
+                          <div className="w-full h-full relative flex flex-col">
+                            {/* Chart Area */}
+                            <div className="flex-1 relative min-h-[200px]">
+                              <div className="absolute inset-0 rounded-xl bg-[var(--background)]/40 border border-[var(--border)]/60"></div>
 
-                            {/* Y-Axis Labels + Grid */}
-                            <div className="absolute inset-0 pt-3 pb-10 px-2 pointer-events-none z-0">
-                              <div className="h-full flex flex-col justify-between text-[10px] font-bold text-[var(--text-muted)] opacity-70">
-                                {[0, 0.25, 0.5, 0.75, 1].map(p => (
-                                  <div key={p} className="flex items-center gap-2">
-                                    <span className="w-10 text-right">{Math.round(yMax - p * (yMax - yMin))}</span>
-                                    <div className="flex-1 h-px bg-[var(--border)]/40"></div>
-                                  </div>
-                                ))}
+                              {/* Y-Axis Labels + Grid */}
+                              <div className="absolute left-0 top-4 bottom-4 w-16 pointer-events-none z-0">
+                                <div className="h-full flex flex-col justify-between text-[11px] font-bold text-[var(--text-muted)]">
+                                  {[0, 0.25, 0.5, 0.75, 1].map(p => (
+                                    <div key={p} className="flex items-center justify-end pr-2">
+                                      <span className="text-right">{Math.round(yMax - p * (yMax - yMin))}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Chart Plot Area */}
+                              <div className="absolute left-16 right-4 top-4 bottom-4 z-10">
+                                {/* Grid Lines */}
+                                <div className="absolute inset-0">
+                                  {[0, 0.25, 0.5, 0.75, 1].map(p => (
+                                    <div
+                                      key={p}
+                                      className="absolute w-full h-px bg-[var(--border)]/30"
+                                      style={{ top: `${p * 100}%` }}
+                                    />
+                                  ))}
+                                </div>
+
+                                <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                  <defs>
+                                    <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="0%" stopColor="var(--accent-solid)" stopOpacity="0.25" />
+                                      <stop offset="100%" stopColor="var(--accent-solid)" stopOpacity="0.05" />
+                                    </linearGradient>
+                                  </defs>
+
+                                  <path d={`M0,100 ${pointsStr} 100,100 Z`} fill="url(#chartFill)" />
+                                  <polyline points={pointsStr} fill="none" stroke="var(--accent-solid)" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+                                </svg>
+
+                                {/* Points Overlay */}
+                                <div className="absolute inset-0">
+                                  {dataPoints.map((p, i) => {
+                                    const hasChange = p.followed.length > 0 || p.unfollowed.length > 0;
+                                    return (
+                                      <div
+                                        key={i}
+                                        className={`absolute rounded-full border-2 border-[var(--accent-solid)] bg-white shadow-sm ${hasChange ? 'w-4 h-4' : 'w-2.5 h-2.5'} transition-all hover:scale-125 cursor-pointer`}
+                                        style={{ left: `${getX(i)}%`, top: `${getY(p.followers)}%`, transform: 'translate(-50%, -50%)' }}
+                                        onMouseEnter={(e) => {
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          setHoveredPoint({ ...p, x: rect.left + rect.width / 2, y: rect.top });
+                                        }}
+                                        onMouseLeave={() => setHoveredPoint(null)}
+                                      />
+                                    );
+                                  })}
+                                </div>
                               </div>
                             </div>
 
-                            <div className="absolute left-12 right-2 top-3 bottom-10 z-10">
-                              <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                <defs>
-                                  <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="var(--accent-solid)" stopOpacity="0.3" />
-                                    <stop offset="100%" stopColor="var(--accent-solid)" stopOpacity="0.1" />
-                                  </linearGradient>
-                                </defs>
-
-                                <path d={`M0,100 ${pointsStr} 100,100 Z`} fill="url(#chartFill)" />
-                                <polyline points={pointsStr} fill="none" stroke="var(--accent-solid)" strokeWidth="0.8" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
-                                <line x1="0" y1="100" x2="100" y2="100" stroke="rgba(148,163,184,0.45)" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
-
-                                {/* X-Axis labels + ticks */}
-                                {dataPoints
-                                  .filter((_, i) => i % (timeRange === 'week' ? 1 : 5) === 0 || i === days - 1)
-                                  .map((p, i) => {
-                                    const x = getX(dataPoints.indexOf(p));
-                                    return (
-                                      <g key={`x-${i}`} transform={`translate(${x},100)`}>
-                                        <line x1="0" y1="0" x2="0" y2="-2.5" stroke="rgba(148,163,184,0.6)" strokeWidth="0.6" vectorEffect="non-scaling-stroke" />
-                                        <text x="0" y="-4" textAnchor="middle" fontSize="3" fill="rgba(148,163,184,0.9)" fontWeight="700">
-                                          {p.label}
-                                        </text>
-                                      </g>
-                                    );
-                                  })}
-                              </svg>
-
-                              {/* Points Overlay (keeps dots perfectly round) */}
-                              <div className="absolute inset-0">
+                            {/* X-Axis Labels */}
+                            <div className="h-8 relative mt-1">
+                              <div className="absolute top-0 left-16 right-4 h-px bg-[var(--border)]/60"></div>
+                              <div className="absolute top-0.5 left-16 right-4 flex justify-between">
                                 {dataPoints.map((p, i) => {
-                                  const hasChange = p.followed.length > 0 || p.unfollowed.length > 0;
+                                  const show = timeRange === 'week' ? (i % 2 === 0 || i === days - 1) : (i % 7 === 0 || i === days - 1);
+                                  if (!show) return null;
                                   return (
                                     <div
-                                      key={i}
-                                      className={`absolute rounded-full border border-[rgba(148,163,184,0.7)] bg-[rgba(248,250,252,0.95)] ${hasChange ? 'w-3 h-3' : 'w-2 h-2'} transition-all`}
-                                      style={{ left: `${getX(i)}%`, top: `${getY(p.followers)}%`, transform: 'translate(-50%, -50%)' }}
-                                      onMouseEnter={(e) => {
-                                        const rect = e.currentTarget.getBoundingClientRect();
-                                        setHoveredPoint({ ...p, x: rect.left + rect.width / 2, y: rect.top });
-                                      }}
-                                      onMouseLeave={() => setHoveredPoint(null)}
-                                    />
+                                      key={`x-${i}`}
+                                      className="flex flex-col items-center"
+                                    >
+                                      <div className="w-px h-1.5 bg-[var(--border)]/60 mb-0.5"></div>
+                                      <div className="text-[8px] font-medium text-[var(--text-muted)] text-center leading-none">
+                                        {timeRange === 'week' ? p.label.split('.')[0] : p.label.split(' ')[1]}
+                                      </div>
+                                    </div>
                                   );
                                 })}
                               </div>
@@ -1847,44 +1905,42 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                                 style={{ left: hoveredPoint.x, top: hoveredPoint.y }}
                               >
                                 <div className="translate-x-[-50%] translate-y-[-100%] pb-3">
-                                  <div className="bg-[rgba(8,10,20,0.96)] border border-[var(--border)] rounded-xl shadow-2xl p-3 min-w-[180px] animate-in zoom-in duration-150">
-                                    <div className="flex justify-between items-center border-b border-[var(--border)]/60 pb-2 mb-2">
-                                      <span className="text-[10px] font-bold text-[var(--text-muted)]">{hoveredPoint.label}</span>
-                                      <span className="text-xs font-black">
+                                  <div className="bg-[rgba(8,10,20,0.96)] border border-[var(--border)] rounded-xl shadow-2xl p-4 min-w-[200px] animate-in zoom-in duration-150">
+                                    <div className="flex justify-between items-center border-b border-[var(--border)]/60 pb-2 mb-3">
+                                      <span className="text-sm font-bold text-[var(--text-muted)]">{hoveredPoint.label}</span>
+                                      <span className="text-lg font-black text-[var(--accent)]">
                                         {Number(hoveredPoint.followers).toLocaleString('de-DE')}
                                       </span>
                                     </div>
-                                    <div className="space-y-2">
+                                    <div className="space-y-3">
                                       {hoveredPoint.followed.length > 0 && (
                                         <div>
-                                          <p className="text-[9px] font-bold text-[var(--success)] uppercase">Gefolgt</p>
-                                          <div className="mt-1 space-y-0.5">
+                                          <p className="text-[11px] font-bold text-[var(--success)] uppercase tracking-wider">Gefolgt</p>
+                                          <div className="mt-2 space-y-1">
                                             {hoveredPoint.followed.map((u: string) => (
-                                              <p key={u} className="text-[11px] text-[var(--success)] truncate">+ @{u}</p>
+                                              <p key={u} className="text-sm text-[var(--success)] truncate">+ @{u}</p>
                                             ))}
                                           </div>
                                         </div>
                                       )}
                                       {hoveredPoint.unfollowed.length > 0 && (
                                         <div>
-                                          <p className="text-[9px] font-bold text-[var(--error)] uppercase">Entfolgt</p>
-                                          <div className="mt-1 space-y-0.5">
+                                          <p className="text-[11px] font-bold text-[var(--error)] uppercase tracking-wider">Entfolgt</p>
+                                          <div className="mt-2 space-y-1">
                                             {hoveredPoint.unfollowed.map((u: string) => (
-                                              <p key={u} className="text-[11px] text-[var(--error)] truncate">- @{u}</p>
+                                              <p key={u} className="text-sm text-[var(--error)] truncate">- @{u}</p>
                                             ))}
                                           </div>
                                         </div>
                                       )}
                                       {hoveredPoint.followed.length === 0 && hoveredPoint.unfollowed.length === 0 && (
-                                        <p className="text-[10px] text-[var(--text-muted)] italic text-center">Keine Änderungen</p>
+                                        <p className="text-sm text-[var(--text-muted)] italic text-center">Keine Änderungen</p>
                                       )}
                                     </div>
                                   </div>
                                 </div>
                               </div>
                             )}
-
-                            {/* X-Axis Labels now rendered in SVG for perfect alignment */}
                           </div>
                         );
                       })()}
