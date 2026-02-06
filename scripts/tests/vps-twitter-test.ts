@@ -193,14 +193,25 @@ async function postToTwitter(text: string): Promise<string | null> {
             return null;
         }
 
-        // Text eingeben
+        // Text eingeben - verwende type() statt fill() für realistischeres Tippen
         console.log('   ⌨️ Tippe Text...');
         await tweetBox.click({ force: true });
         await page.waitForTimeout(500);
-        await tweetBox.fill(text);
+
+        // Lösche eventuellen vorhandenen Text
+        await page.keyboard.press('Control+a');
+        await page.keyboard.press('Backspace');
+        await page.waitForTimeout(300);
+
+        // Tippe den Text Zeichen für Zeichen (realistischer)
+        await page.keyboard.type(text, { delay: 30 });
         await humanDelay(1000, 2000);
 
-        // "Posten" Button finden und klicken
+        // Screenshot VOR dem Post-Versuch
+        console.log('   📸 Screenshot vor Post-Versuch...');
+        await page.screenshot({ path: 'debug-twitter-before-post.png' });
+
+        // "Posten" Button finden
         console.log('   🚀 Suche Post-Button...');
         const postButton = await page.$('[data-testid="tweetButtonInline"]') ||
             await page.$('[data-testid="tweetButton"]') ||
@@ -214,18 +225,73 @@ async function postToTwitter(text: string): Promise<string | null> {
             return null;
         }
 
-        console.log('   ✅ Post-Button gefunden - klicke...');
-        // force: true umgeht das "element intercepts pointer events" Problem
-        await postButton.click({ force: true });
+        // Prüfe Button-Status
+        const buttonState = await postButton.evaluate((el: HTMLElement) => {
+            return {
+                disabled: el.getAttribute('aria-disabled'),
+                ariaLabel: el.getAttribute('aria-label'),
+                innerText: el.innerText,
+                className: el.className
+            };
+        });
+        console.log(`   📊 Button-Status: disabled=${buttonState.disabled}, text="${buttonState.innerText}"`);
 
-        // Warte auf die Verarbeitung
-        console.log('   ⏳ Warte auf Verarbeitung...');
+        if (buttonState.disabled === 'true') {
+            console.log('   ⚠️ Post-Button ist deaktiviert!');
+            await saveIncidentScreenshot(page, 'button-disabled');
+            await browser.close();
+            return null;
+        }
+
+        // METHODE 1: Normaler Klick
+        console.log('   🖱️ Versuche Klick auf Post-Button...');
+        try {
+            await postButton.click({ force: true, timeout: 5000 });
+            console.log('   ✅ Klick ausgeführt');
+        } catch (clickErr) {
+            console.log('   ⚠️ Klick fehlgeschlagen, versuche Alternative...');
+        }
+
+        // Warte kurz
         await page.waitForTimeout(2000);
 
+        // Prüfe ob Compose-Fenster noch offen ist
+        const composeStillOpen = await page.$('[data-testid="tweetTextarea_0"]');
+
+        if (composeStillOpen) {
+            // METHODE 2: Ctrl+Enter als Alternative
+            console.log('   ⌨️ Compose noch offen - versuche Ctrl+Enter...');
+            await tweetBox.click({ force: true });
+            await page.waitForTimeout(300);
+            await page.keyboard.press('Control+Enter');
+            await page.waitForTimeout(2000);
+        }
+
+        // Prüfe nochmal
+        const stillOpen = await page.$('[data-testid="tweetTextarea_0"]');
+        if (stillOpen) {
+            // METHODE 3: Direkter JavaScript-Klick
+            console.log('   🔧 Versuche JavaScript-Klick...');
+            await page.evaluate(() => {
+                const btn = document.querySelector('[data-testid="tweetButtonInline"]') as HTMLElement ||
+                    document.querySelector('[data-testid="tweetButton"]') as HTMLElement;
+                if (btn) {
+                    btn.click();
+                }
+            });
+            await page.waitForTimeout(2000);
+        }
+
+        // Screenshot nach den Post-Versuchen
+        console.log('   📸 Screenshot nach Post-Versuchen...');
+        await page.screenshot({ path: 'debug-twitter-after-click.png' });
+
+        // Warte auf Verarbeitung
+        console.log('   ⏳ Warte auf Verarbeitung...');
+        await page.waitForTimeout(3000);
+
         // Schließe das Compose-Fenster mit Escape
-        console.log('   🔇 Schließe Compose-Fenster...');
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(1000);
+        console.log('   🔇 Schließe eventuelle Dialoge...');
         await page.keyboard.press('Escape');
         await page.waitForTimeout(1000);
 
@@ -236,7 +302,7 @@ async function postToTwitter(text: string): Promise<string | null> {
 
         // Screenshot nach dem Posten
         await page.screenshot({ path: 'debug-twitter-after-post.png' });
-        console.log('   📸 Screenshot nach Post erstellt');
+        console.log('   📸 Screenshot nach Reload erstellt');
 
         // NEUE METHODE: Suche nach unserem Text im Feed
         console.log('   🔍 Suche nach unserem Post im Feed...');
