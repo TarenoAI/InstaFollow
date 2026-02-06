@@ -295,14 +295,42 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         page.on('response', responseHandler);
 
         await page.goto(`https://www.instagram.com/${username}/`, {
-            waitUntil: 'domcontentloaded',
-            timeout: 30000
+            waitUntil: 'networkidle',  // Warte bis Netzwerk komplett ruhig ist
+            timeout: 60000
         });
-        await page.waitForTimeout(4000);
+        await page.waitForTimeout(5000);  // Extra warten
         await dismissPopups(page);
+        await page.waitForTimeout(2000);  // Nochmal warten nach Popup-Handling
+        await dismissPopups(page);  // Nochmal Popups schließen
 
         // Screenshot vor dem Klick für Debugging
         await page.screenshot({ path: `debug-before-following-click-${username}.png` });
+
+        // DEBUG: Was ist auf der Seite?
+        const pageDebug = await page.evaluate(() => {
+            const allLinks = Array.from(document.querySelectorAll('a')).map(a => ({
+                href: a.href,
+                text: a.innerText.substring(0, 50)
+            }));
+            const bodyText = document.body?.innerText?.substring(0, 500) || '';
+            const hasDialog = !!document.querySelector('[role="dialog"]');
+            return {
+                linksCount: allLinks.length,
+                links: allLinks.filter(l => l.href.includes('following') || l.text.toLowerCase().includes('following') || l.text.toLowerCase().includes('gefolgt')),
+                bodyTextPreview: bodyText,
+                hasDialog,
+                url: window.location.href
+            };
+        });
+
+        console.log(`   🔍 DEBUG: ${pageDebug.linksCount} Links auf der Seite`);
+        console.log(`   🔍 Following-Links gefunden: ${pageDebug.links.length}`);
+        if (pageDebug.links.length > 0) {
+            console.log(`   🔗 Links:`, pageDebug.links);
+        }
+        console.log(`   📄 URL: ${pageDebug.url}`);
+        console.log(`   💬 Dialog offen: ${pageDebug.hasDialog}`);
+        console.log(`   📝 Body Preview: ${pageDebug.bodyTextPreview.substring(0, 100)}...`);
 
         // Versuche verschiedene Selektoren für den Following-Link
         const followingSelectors = [
