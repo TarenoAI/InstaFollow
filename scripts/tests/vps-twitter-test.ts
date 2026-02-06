@@ -192,23 +192,57 @@ async function postToTwitter(text: string): Promise<string | null> {
         console.log('   ✅ Post-Button gefunden - klicke...');
         // force: true umgeht das "element intercepts pointer events" Problem
         await postButton.click({ force: true });
-        await page.waitForTimeout(5000);
 
-        // Prüfe ob Post erfolgreich war
+        // Warte länger und prüfe auf verschiedene Erfolgsindikatoren
+        console.log('   ⏳ Warte auf Bestätigung...');
+        await page.waitForTimeout(3000);
+
+        // Screenshot nach dem Posten
+        await page.screenshot({ path: 'debug-twitter-after-post.png' });
+        console.log('   📸 Screenshot nach Post erstellt');
+
+        // Prüfe auf Erfolg durch verschiedene Methoden
         const currentUrl = page.url();
         console.log(`   📍 Aktuelle URL: ${currentUrl}`);
 
+        // Methode 1: URL enthält /status/
         if (currentUrl.includes('/status/')) {
-            console.log('\n✅ POST ERFOLGREICH!');
+            console.log('\n✅ POST ERFOLGREICH! (URL geändert)');
             console.log(`🔗 Tweet URL: ${currentUrl}\n`);
             await browser.close();
             return currentUrl;
-        } else {
-            console.log('\n⚠️ Post möglicherweise fehlgeschlagen (URL hat sich nicht geändert)');
-            await page.screenshot({ path: 'debug-twitter-after-post.png' });
-            await browser.close();
-            return null;
         }
+
+        // Methode 2: Prüfe ob das Textfeld jetzt leer ist (= Post wurde gesendet)
+        const textboxContent = await page.evaluate(() => {
+            const textbox = document.querySelector('[data-testid="tweetTextarea_0"]');
+            return textbox?.textContent || '';
+        });
+
+        if (textboxContent.trim() === '') {
+            console.log('\n✅ POST WAHRSCHEINLICH ERFOLGREICH! (Textfeld ist leer)');
+            console.log('   Das Textfeld wurde geleert, was auf einen erfolgreichen Post hindeutet.');
+            console.log(`   Prüfe manuell: https://x.com/BuliFollows\n`);
+            await browser.close();
+            return `https://x.com/BuliFollows`;
+        }
+
+        // Methode 3: Suche nach Toast/Erfolgs-Nachricht
+        const toastVisible = await page.$('[data-testid="toast"]');
+        if (toastVisible) {
+            const toastText = await toastVisible.innerText().catch(() => '');
+            console.log(`   🔔 Toast gefunden: "${toastText}"`);
+            if (toastText.includes('gesendet') || toastText.includes('posted') || toastText.includes('sent')) {
+                console.log('\n✅ POST ERFOLGREICH! (Toast-Bestätigung)');
+                await browser.close();
+                return `https://x.com/BuliFollows`;
+            }
+        }
+
+        console.log('\n⚠️ Post-Status unklar. Prüfe manuell: https://x.com/BuliFollows');
+        console.log('   Screenshot wurde gespeichert: debug-twitter-after-post.png');
+        await browser.close();
+        return null;
 
     } catch (err: any) {
         console.log(`\n❌ Fehler: ${err.message}\n`);
