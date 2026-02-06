@@ -218,54 +218,97 @@ async function postToTwitter(text: string): Promise<string | null> {
         // force: true umgeht das "element intercepts pointer events" Problem
         await postButton.click({ force: true });
 
-        // Warte länger und prüfe auf verschiedene Erfolgsindikatoren
-        console.log('   ⏳ Warte auf Bestätigung...');
+        // Warte auf die Verarbeitung
+        console.log('   ⏳ Warte auf Verarbeitung...');
+        await page.waitForTimeout(2000);
+
+        // Schließe das Compose-Fenster mit Escape
+        console.log('   🔇 Schließe Compose-Fenster...');
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1000);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1000);
+
+        // Warte und lade die Seite neu, um den neuen Post zu sehen
+        console.log('   🔄 Lade Feed neu...');
+        await page.goto('https://x.com/home', { waitUntil: 'networkidle', timeout: 30000 });
         await page.waitForTimeout(3000);
 
         // Screenshot nach dem Posten
         await page.screenshot({ path: 'debug-twitter-after-post.png' });
         console.log('   📸 Screenshot nach Post erstellt');
 
-        // Prüfe auf Erfolg durch verschiedene Methoden
-        const currentUrl = page.url();
-        console.log(`   📍 Aktuelle URL: ${currentUrl}`);
+        // NEUE METHODE: Suche nach unserem Text im Feed
+        console.log('   🔍 Suche nach unserem Post im Feed...');
 
-        // Methode 1: URL enthält /status/
-        if (currentUrl.includes('/status/')) {
-            console.log('\n✅ POST ERFOLGREICH! (URL geändert)');
-            console.log(`🔗 Tweet URL: ${currentUrl}\n`);
-            await browser.close();
-            return currentUrl;
-        }
+        // Extrahiere die erste Zeile des Textes für die Suche (ohne Sonderzeichen)
+        const searchText = text.split('\n')[0].replace(/[🧪#@]/g, '').trim().substring(0, 30);
+        console.log(`   🔎 Suche nach: "${searchText}"`);
 
-        // Methode 2: Prüfe ob das Textfeld jetzt leer ist (= Post wurde gesendet)
-        const textboxContent = await page.evaluate(() => {
-            const textbox = document.querySelector('[data-testid="tweetTextarea_0"]');
-            return textbox?.textContent || '';
+        // Suche im Feed nach dem Text
+        const feedContent = await page.evaluate(() => {
+            // Hole alle tweet-Artikel
+            const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+            const texts: string[] = [];
+            tweets.forEach((tweet, i) => {
+                if (i < 5) { // Nur die ersten 5 Tweets prüfen
+                    texts.push(tweet.textContent || '');
+                }
+            });
+            return texts;
         });
 
-        if (textboxContent.trim() === '') {
-            console.log('\n✅ POST WAHRSCHEINLICH ERFOLGREICH! (Textfeld ist leer)');
-            console.log('   Das Textfeld wurde geleert, was auf einen erfolgreichen Post hindeutet.');
-            console.log(`   Prüfe manuell: https://x.com/BuliFollows\n`);
+        // Prüfe ob unser Text in einem der ersten Tweets vorkommt
+        const postFound = feedContent.some(tweetText =>
+            tweetText.includes('Test-Post vom VPS') ||
+            tweetText.includes('automatisch über Playwright') ||
+            tweetText.includes('#AutomationTest')
+        );
+
+        if (postFound) {
+            console.log('\n✅ POST ERFOLGREICH VERIFIZIERT!');
+            console.log('   Der Post wurde im Feed gefunden! 🎉');
+            console.log(`   Profil: https://x.com/BuliFollows\n`);
             await browser.close();
             return `https://x.com/BuliFollows`;
         }
 
-        // Methode 3: Suche nach Toast/Erfolgs-Nachricht
-        const toastVisible = await page.$('[data-testid="toast"]');
-        if (toastVisible) {
-            const toastText = await toastVisible.innerText().catch(() => '');
-            console.log(`   🔔 Toast gefunden: "${toastText}"`);
-            if (toastText.includes('gesendet') || toastText.includes('posted') || toastText.includes('sent')) {
-                console.log('\n✅ POST ERFOLGREICH! (Toast-Bestätigung)');
-                await browser.close();
-                return `https://x.com/BuliFollows`;
-            }
+        // Alternative: Prüfe auf der Profilseite
+        console.log('   ⚠️ Nicht im Home-Feed gefunden, prüfe Profilseite...');
+        await page.goto('https://x.com/BuliFollows', { waitUntil: 'networkidle', timeout: 30000 });
+        await page.waitForTimeout(3000);
+
+        await page.screenshot({ path: 'debug-twitter-profile-check.png' });
+
+        const profileContent = await page.evaluate(() => {
+            const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+            const texts: string[] = [];
+            tweets.forEach((tweet, i) => {
+                if (i < 3) texts.push(tweet.textContent || '');
+            });
+            return texts;
+        });
+
+        const foundOnProfile = profileContent.some(tweetText =>
+            tweetText.includes('Test-Post vom VPS') ||
+            tweetText.includes('automatisch über Playwright') ||
+            tweetText.includes('#AutomationTest')
+        );
+
+        if (foundOnProfile) {
+            console.log('\n✅ POST ERFOLGREICH VERIFIZIERT! (auf Profilseite gefunden)');
+            console.log('   Der Post wurde auf dem Profil gefunden! 🎉');
+            console.log(`   Profil: https://x.com/BuliFollows\n`);
+            await browser.close();
+            return `https://x.com/BuliFollows`;
         }
 
-        console.log('\n⚠️ Post-Status unklar. Prüfe manuell: https://x.com/BuliFollows');
-        await saveIncidentScreenshot(page, 'post-unclear');
+        console.log('\n⚠️ Post wurde nicht im Feed gefunden.');
+        console.log('   Dies kann bedeuten:');
+        console.log('   - Post braucht noch Zeit zum Erscheinen');
+        console.log('   - Post wurde nicht gesendet');
+        console.log('   - Feed zeigt ältere Posts');
+        await saveIncidentScreenshot(page, 'post-not-found');
         await browser.close();
         return null;
 
