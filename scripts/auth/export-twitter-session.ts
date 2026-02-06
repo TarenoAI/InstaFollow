@@ -45,10 +45,25 @@ async function main() {
 
         // Konvertiere zu Playwright-Format
         const playwrightCookies = cookies.map((c: any) => {
-            // Fix für Expiry: Wenn 0 oder undefined, setze auf -1 (Session Cookie)
-            // Playwright mag keine 0 als Expiry
             let expiry = c.expiry;
-            if (!expiry || expiry === 0) expiry = -1;
+
+            // 1. Session Cookies (0 oder undefined) -> -1
+            if (!expiry || expiry === 0) {
+                expiry = -1;
+            }
+            // 2. Mikrosekunden zu Sekunden (wenn > 100 Jahre in Zukunft)
+            // (Manchmal speichern Browser Timestamps in µs)
+            else if (expiry > 2000000000000) {
+                expiry = Math.floor(expiry / 1000000);
+            }
+            // 3. Millisekunden zu Sekunden
+            else if (expiry > 30000000000) {
+                expiry = Math.floor(expiry / 1000);
+            }
+
+            // Sicherstellen dass es eine Nummer ist
+            expiry = Number(expiry);
+            if (isNaN(expiry)) expiry = -1;
 
             return {
                 name: c.name,
