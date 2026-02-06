@@ -330,19 +330,41 @@ async function postToTwitter(text: string): Promise<string | null> {
         console.log('   ⏳ Warte auf Verarbeitung...');
         await page.waitForTimeout(3000);
 
-        // Schließe das Compose-Fenster mit Escape
+        // PRIMÄRE ERFOLGSERKENNUNG: Prüfe ob das Compose-Fenster geschlossen wurde
+        const composeGone = !(await page.$('[data-testid="tweetTextarea_0"]'));
+
+        if (composeGone) {
+            console.log('\n✅ POST ERFOLGREICH!');
+            console.log('   Das Compose-Fenster wurde geschlossen = Post wurde gesendet! 🎉');
+            console.log(`   Profil: https://x.com/BuliFollows\n`);
+            await page.screenshot({ path: 'debug-twitter-success.png' });
+            await browser.close();
+            return `https://x.com/BuliFollows`;
+        }
+
+        // Falls Compose noch offen, versuche Escape und prüfe nochmal
         console.log('   🔇 Schließe eventuelle Dialoge...');
         await page.keyboard.press('Escape');
         await page.waitForTimeout(1000);
 
-        // Warte und lade die Seite neu, um den neuen Post zu sehen
-        console.log('   🔄 Lade Feed neu...');
-        await page.goto('https://x.com/home', { waitUntil: 'networkidle', timeout: 30000 });
+        const composeGoneAfterEscape = !(await page.$('[data-testid="tweetTextarea_0"]'));
+        if (composeGoneAfterEscape) {
+            console.log('\n✅ POST ERFOLGREICH!');
+            console.log('   Post wurde gesendet! 🎉');
+            console.log(`   Profil: https://x.com/BuliFollows\n`);
+            await page.screenshot({ path: 'debug-twitter-success.png' });
+            await browser.close();
+            return `https://x.com/BuliFollows`;
+        }
+
+        // FALLBACK: Prüfe Feed auf Profilseite
+        console.log('   ⚠️ Compose noch offen, prüfe Profilseite...');
+        await page.goto('https://x.com/BuliFollows', { waitUntil: 'networkidle', timeout: 30000 });
         await page.waitForTimeout(3000);
 
         // Screenshot nach dem Posten
         await page.screenshot({ path: 'debug-twitter-after-post.png' });
-        console.log('   📸 Screenshot nach Reload erstellt');
+        console.log('   📸 Screenshot der Profilseite erstellt');
 
         // NEUE METHODE: Suche nach unserem Text im Feed
         console.log('   🔍 Suche nach unserem Post im Feed...');
