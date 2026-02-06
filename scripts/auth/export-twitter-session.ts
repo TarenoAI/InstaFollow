@@ -44,16 +44,23 @@ async function main() {
         }
 
         // Konvertiere zu Playwright-Format
-        const playwrightCookies = cookies.map((c: any) => ({
-            name: c.name,
-            value: c.value,
-            domain: c.host,
-            path: c.path,
-            expires: c.expiry,
-            httpOnly: !!c.isHttpOnly,
-            secure: !!c.isSecure,
-            sameSite: c.sameSite === 0 ? 'None' : c.sameSite === 1 ? 'Lax' : 'Strict'
-        }));
+        const playwrightCookies = cookies.map((c: any) => {
+            // Fix für Expiry: Wenn 0 oder undefined, setze auf -1 (Session Cookie)
+            // Playwright mag keine 0 als Expiry
+            let expiry = c.expiry;
+            if (!expiry || expiry === 0) expiry = -1;
+
+            return {
+                name: c.name,
+                value: c.value,
+                domain: c.host,
+                path: c.path,
+                expires: expiry,
+                httpOnly: !!c.isHttpOnly,
+                secure: !!c.isSecure,
+                sameSite: c.sameSite === 0 ? 'None' : c.sameSite === 1 ? 'Lax' : 'Strict'
+            };
+        });
 
         // Verzeichnis sicherstellen
         const sessionDir = path.dirname(SESSION_PATH);
