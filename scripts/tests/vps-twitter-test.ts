@@ -47,17 +47,39 @@ async function postToTwitter(text: string): Promise<string | null> {
         await page.waitForTimeout(3000);
 
         // Login wenn nötig
-        if (page.url().includes('login') || await page.$('input[autocomplete="username"]')) {
+        const needsLogin = page.url().includes('login') || await page.$('input[autocomplete="username"]');
+
+        // Debug Screenshot VOR Login
+        console.log('📸 Erstelle Debug-Screenshot...');
+        await page.screenshot({ path: 'debug-twitter-before-login.png', fullPage: true });
+        console.log('   ✅ Screenshot: debug-twitter-before-login.png\n');
+
+        if (needsLogin) {
             console.log('🔐 Nicht eingeloggt - führe Login durch...\n');
 
             if (!page.url().includes('login')) {
-                await page.goto('https://twitter.com/login', { waitUntil: 'domcontentloaded' });
-                await page.waitForTimeout(2000);
+                await page.goto('https://x.com/i/flow/login', { waitUntil: 'domcontentloaded' });
+                await page.waitForTimeout(3000);
             }
 
-            // Username eingeben
+            // Warte auf Login-Seite
+            await page.screenshot({ path: 'debug-twitter-login-page.png' });
+            console.log('   📸 Login-Page Screenshot erstellt');
+
+            // Suche nach Username-Feld mit mehreren Selektoren
             console.log(`   📧 Username: ${TWITTER_USERNAME}`);
-            await page.fill('input[autocomplete="username"]', TWITTER_USERNAME);
+            const usernameInput = await page.$('input[autocomplete="username"]') ||
+                await page.$('input[name="text"]') ||
+                await page.$('input[type="text"]');
+
+            if (!usernameInput) {
+                console.log('   ❌ Username-Feld nicht gefunden!');
+                await page.screenshot({ path: 'debug-twitter-no-username-field.png' });
+                await browser.close();
+                return null;
+            }
+
+            await usernameInput.fill(TWITTER_USERNAME);
             await humanDelay(500, 1000);
 
             // "Weiter" klicken
