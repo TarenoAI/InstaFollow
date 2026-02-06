@@ -28,6 +28,7 @@ import {
 } from './actions/instagram';
 import { checkAppPassword } from './actions/auth';
 import { getProfileScreenshots } from './actions/github';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 // Helper function to proxy Instagram images through our API to avoid CORS issues
 function proxyImageUrl(url: string): string {
@@ -1552,14 +1553,15 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                       <div className="flex items-center gap-3 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] border-b border-[var(--border)]">
                         <span className="w-6"></span>
                         <span className="flex-1">Username</span>
-                        <span className="w-32 text-right">Datum</span>
+                        <span className="w-16 text-center">Screenshot</span>
+                        <span className="w-28 text-right">Datum</span>
                       </div>
 
                       {/* History Rows */}
                       {historyList.map((change) => (
                         <div
                           key={change.id}
-                          className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--card)] transition-colors cursor-default"
+                          className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--card)] transition-colors"
                         >
                           {/* Type Indicator */}
                           <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${change.type === 'FOLLOW'
@@ -1579,20 +1581,58 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
 
                           {/* Avatar + Username */}
                           <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <img
-                              src={proxyImageUrl(change.targetPicUrl)}
-                              alt={change.targetUsername}
-                              className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                              onError={(e) => (e.currentTarget.src = "/placeholder-avatar.png")}
-                            />
+                            {change.targetPicUrl ? (
+                              <img
+                                src={proxyImageUrl(change.targetPicUrl)}
+                                alt={change.targetUsername}
+                                className="w-7 h-7 rounded-full object-cover flex-shrink-0 bg-[var(--card)]"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className="w-7 h-7 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-secondary)] items-center justify-center flex-shrink-0"
+                              style={{ display: change.targetPicUrl ? 'none' : 'flex' }}
+                            >
+                              <span className="text-[10px] font-bold text-white uppercase">
+                                {change.targetUsername.substring(0, 2)}
+                              </span>
+                            </div>
                             <span className={`font-medium truncate ${change.type === 'FOLLOW' ? 'text-[var(--success)]' : 'text-[var(--error)]'
                               }`}>
                               @{change.targetUsername}
                             </span>
                           </div>
 
+                          {/* Screenshot Thumbnail */}
+                          <div className="w-16 flex justify-center flex-shrink-0">
+                            {change.screenshotUrl ? (
+                              <button
+                                onClick={() => window.open(change.screenshotUrl, '_blank')}
+                                className="relative group/ss rounded overflow-hidden border border-[var(--border)] hover:border-[var(--accent)] hover:ring-1 hover:ring-[var(--accent)]/30 transition-all"
+                                title="Screenshot ansehen"
+                              >
+                                <img
+                                  src={change.screenshotUrl}
+                                  alt="Screenshot"
+                                  className="h-8 w-auto object-contain opacity-70 group-hover/ss:opacity-100 transition-opacity"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/ss:opacity-100 transition-opacity flex items-center justify-center">
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                                  </svg>
+                                </div>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-[var(--text-muted)]">—</span>
+                            )}
+                          </div>
+
                           {/* Timestamp */}
-                          <span className="text-xs text-[var(--text-muted)] w-32 text-right flex-shrink-0">
+                          <span className="text-xs text-[var(--text-muted)] w-28 text-right flex-shrink-0">
                             {new Date(change.detectedAt).toLocaleString('de-DE', {
                               day: '2-digit',
                               month: '2-digit',
@@ -1764,6 +1804,8 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                           <p className="text-sm font-bold">Warte auf mehr Datenpunkte...</p>
                         </div>
                       ) : (() => {
+
+
                         const days = timeRange === 'week' ? 7 : 30;
                         const dataPoints: { date: string, label: string, followers: number, followed: string[], unfollowed: string[] }[] = [];
                         let currentCount = profile?.followingCount || 0;
@@ -1800,147 +1842,94 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                           });
                         }
 
-                        const values = dataPoints.map(p => p.followers);
-                        const min = Math.min(...values);
-                        const max = Math.max(...values);
-                        const vRange = max - min || 1;
-                        const vPadding = vRange * 0.15 + 1;
-                        const yMin = min - vPadding;
-                        const yMax = max + vPadding;
-
-                        const getX = (i: number) => (i / (days - 1)) * 100;
-                        const getY = (val: number) => 100 - ((val - yMin) / (yMax - yMin)) * 100;
-
-                        const pointsStr = dataPoints.map((p, i) => `${getX(i)},${getY(p.followers)}`).join(' ');
 
                         return (
-                          <div className="w-full h-full relative flex flex-col">
-                            {/* Chart Area */}
-                            <div className="flex-1 relative min-h-[200px]">
-                              <div className="absolute inset-0 rounded-xl bg-[var(--background)]/40 border border-[var(--border)]/60"></div>
-
-                              {/* Y-Axis Labels + Grid */}
-                              <div className="absolute left-0 top-4 bottom-4 w-16 pointer-events-none z-0">
-                                <div className="h-full flex flex-col justify-between text-[11px] font-bold text-[var(--text-muted)]">
-                                  {[0, 0.25, 0.5, 0.75, 1].map(p => (
-                                    <div key={p} className="flex items-center justify-end pr-2">
-                                      <span className="text-right">{Math.round(yMax - p * (yMax - yMin))}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Chart Plot Area */}
-                              <div className="absolute left-16 right-4 top-4 bottom-4 z-10">
-                                {/* Grid Lines */}
-                                <div className="absolute inset-0">
-                                  {[0, 0.25, 0.5, 0.75, 1].map(p => (
-                                    <div
-                                      key={p}
-                                      className="absolute w-full h-px bg-[var(--border)]/30"
-                                      style={{ top: `${p * 100}%` }}
-                                    />
-                                  ))}
-                                </div>
-
-                                <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                  <defs>
-                                    <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="0%" stopColor="var(--accent-solid)" stopOpacity="0.25" />
-                                      <stop offset="100%" stopColor="var(--accent-solid)" stopOpacity="0.05" />
-                                    </linearGradient>
-                                  </defs>
-
-                                  <path d={`M0,100 ${pointsStr} 100,100 Z`} fill="url(#chartFill)" />
-                                  <polyline points={pointsStr} fill="none" stroke="var(--accent-solid)" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
-                                </svg>
-
-                                {/* Points Overlay */}
-                                <div className="absolute inset-0">
-                                  {dataPoints.map((p, i) => {
-                                    const hasChange = p.followed.length > 0 || p.unfollowed.length > 0;
-                                    return (
-                                      <div
-                                        key={i}
-                                        className={`absolute rounded-full border-2 border-[var(--accent-solid)] bg-white shadow-sm ${hasChange ? 'w-4 h-4' : 'w-2.5 h-2.5'} transition-all hover:scale-125 cursor-pointer`}
-                                        style={{ left: `${getX(i)}%`, top: `${getY(p.followers)}%`, transform: 'translate(-50%, -50%)' }}
-                                        onMouseEnter={(e) => {
-                                          const rect = e.currentTarget.getBoundingClientRect();
-                                          setHoveredPoint({ ...p, x: rect.left + rect.width / 2, y: rect.top });
-                                        }}
-                                        onMouseLeave={() => setHoveredPoint(null)}
-                                      />
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* X-Axis Labels */}
-                            <div className="h-8 relative mt-1">
-                              <div className="absolute top-0 left-16 right-4 h-px bg-[var(--border)]/60"></div>
-                              <div className="absolute top-0.5 left-16 right-4 flex justify-between">
-                                {dataPoints.map((p, i) => {
-                                  const show = timeRange === 'week' ? (i % 2 === 0 || i === days - 1) : (i % 7 === 0 || i === days - 1);
-                                  if (!show) return null;
-                                  return (
-                                    <div
-                                      key={`x-${i}`}
-                                      className="flex flex-col items-center"
-                                    >
-                                      <div className="w-px h-1.5 bg-[var(--border)]/60 mb-0.5"></div>
-                                      <div className="text-[8px] font-medium text-[var(--text-muted)] text-center leading-none">
-                                        {timeRange === 'week' ? p.label.split('.')[0] : p.label.split(' ')[1]}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            {/* Tooltip */}
-                            {hoveredPoint && (
-                              <div
-                                className="fixed z-[100] pointer-events-none"
-                                style={{ left: hoveredPoint.x, top: hoveredPoint.y }}
+                          <div className="w-full h-full min-h-[300px] mt-4">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <AreaChart
+                                data={dataPoints}
+                                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                               >
-                                <div className="translate-x-[-50%] translate-y-[-100%] pb-3">
-                                  <div className="bg-[rgba(8,10,20,0.96)] border border-[var(--border)] rounded-xl shadow-2xl p-4 min-w-[200px] animate-in zoom-in duration-150">
-                                    <div className="flex justify-between items-center border-b border-[var(--border)]/60 pb-2 mb-3">
-                                      <span className="text-sm font-bold text-[var(--text-muted)]">{hoveredPoint.label}</span>
-                                      <span className="text-lg font-black text-[var(--accent)]">
-                                        {Number(hoveredPoint.followers).toLocaleString('de-DE')}
-                                      </span>
-                                    </div>
-                                    <div className="space-y-3">
-                                      {hoveredPoint.followed.length > 0 && (
-                                        <div>
-                                          <p className="text-[11px] font-bold text-[var(--success)] uppercase tracking-wider">Gefolgt</p>
-                                          <div className="mt-2 space-y-1">
-                                            {hoveredPoint.followed.map((u: string) => (
-                                              <p key={u} className="text-sm text-[var(--success)] truncate">+ @{u}</p>
-                                            ))}
+                                <defs>
+                                  <linearGradient id="colorFollowers" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--accent-solid)" stopOpacity={0.4} />
+                                    <stop offset="95%" stopColor="var(--accent-solid)" stopOpacity={0} />
+                                  </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
+                                <XAxis
+                                  dataKey="label"
+                                  tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                                  axisLine={{ stroke: 'var(--border)', opacity: 0.5 }}
+                                  tickLine={false}
+                                  interval={timeRange === 'week' ? 0 : 'preserveStartEnd'}
+                                  dy={10}
+                                />
+                                <YAxis
+                                  domain={['auto', 'auto']}
+                                  tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  width={40}
+                                  tickFormatter={(value) => value.toLocaleString()}
+                                />
+                                <Tooltip
+                                  cursor={{ stroke: 'var(--border)', strokeDasharray: '4 4' }}
+                                  content={({ active, payload, label }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-[rgba(8,10,20,0.96)] border border-[var(--border)] rounded-xl shadow-2xl p-4 min-w-[200px] backdrop-blur-md">
+                                          <div className="flex justify-between items-center border-b border-[var(--border)]/60 pb-2 mb-3">
+                                            <span className="text-sm font-bold text-[var(--text-muted)]">{data.label} (Original: {label})</span>
+                                            <span className="text-lg font-black text-[var(--accent)]">
+                                              {Number(data.followers).toLocaleString()}
+                                            </span>
+                                          </div>
+
+                                          <div className="space-y-3">
+                                            {data.followed.length > 0 && (
+                                              <div>
+                                                <p className="text-[10px] font-bold text-[var(--success)] uppercase tracking-wider">Gefolgt ({data.followed.length})</p>
+                                                <div className="mt-2 space-y-1 max-h-[100px] overflow-y-auto custom-scrollbar">
+                                                  {data.followed.map((u: string) => (
+                                                    <p key={u} className="text-sm text-[var(--success)] truncate">+ @{u}</p>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                            {data.unfollowed.length > 0 && (
+                                              <div>
+                                                <p className="text-[10px] font-bold text-[var(--error)] uppercase tracking-wider">Entfolgt ({data.unfollowed.length})</p>
+                                                <div className="mt-2 space-y-1 max-h-[100px] overflow-y-auto custom-scrollbar">
+                                                  {data.unfollowed.map((u: string) => (
+                                                    <p key={u} className="text-sm text-[var(--error)] truncate">- @{u}</p>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                            {data.followed.length === 0 && data.unfollowed.length === 0 && (
+                                              <p className="text-sm text-[var(--text-muted)] italic text-center">Keine Änderungen</p>
+                                            )}
                                           </div>
                                         </div>
-                                      )}
-                                      {hoveredPoint.unfollowed.length > 0 && (
-                                        <div>
-                                          <p className="text-[11px] font-bold text-[var(--error)] uppercase tracking-wider">Entfolgt</p>
-                                          <div className="mt-2 space-y-1">
-                                            {hoveredPoint.unfollowed.map((u: string) => (
-                                              <p key={u} className="text-sm text-[var(--error)] truncate">- @{u}</p>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-                                      {hoveredPoint.followed.length === 0 && hoveredPoint.unfollowed.length === 0 && (
-                                        <p className="text-sm text-[var(--text-muted)] italic text-center">Keine Änderungen</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Area
+                                  type="monotone"
+                                  dataKey="followers"
+                                  stroke="var(--accent-solid)"
+                                  fillOpacity={1}
+                                  fill="url(#colorFollowers)"
+                                  strokeWidth={3}
+                                  activeDot={{ r: 6, strokeWidth: 0, fill: 'var(--foreground)', stroke: 'var(--accent-solid)' }}
+                                  animationDuration={1500}
+                                />
+                              </AreaChart>
+                            </ResponsiveContainer>
                           </div>
                         );
                       })()}

@@ -1004,18 +1004,6 @@ async function main() {
 
             console.log(`   Aktuell: ${currentCount}`);
 
-            // 📸 Screenshot für Profile OHNE existierenden Screenshot (einmalig)
-            if (!existingScreenshot) {
-                console.log(`   📸 Erster Screenshot für @${username}...`);
-                const newScreenshotUrl = await captureProfileScreenshot(page, username);
-                if (newScreenshotUrl) {
-                    await db.execute({
-                        sql: `UPDATE MonitoredProfile SET screenshotUrl = ? WHERE id = ?`,
-                        args: [newScreenshotUrl, profileId]
-                    });
-                }
-            }
-
             // ⚠️ Skip Profile mit zu vielen Followings (nicht zuverlässig scrapbar)
             const MAX_FOLLOWING = 1000;
             if (currentCount > MAX_FOLLOWING) {
@@ -1032,16 +1020,20 @@ async function main() {
                 continue;
             }
 
+            // Variable für Screenshot-URL bei Änderungen
+            let changeScreenshotUrl: string | null = null;
+
             if (currentCount !== lastCount) {
                 console.log(`   🚨 ÄNDERUNG: ${lastCount} → ${currentCount}`);
 
-                // 📸 Neuer Screenshot bei Änderung (aktualisiert existierenden)
-                console.log(`   📸 Screenshot-Update wegen Änderung...`);
-                const screenshotUrl = await captureProfileScreenshot(page, username);
-                if (screenshotUrl) {
+                // 📸 Screenshot NUR bei Änderung machen!
+                console.log(`   📸 Screenshot wegen Änderung...`);
+                changeScreenshotUrl = await captureProfileScreenshot(page, username);
+                if (changeScreenshotUrl) {
+                    // Aktualisiere auch das Haupt-Screenshot im Profil
                     await db.execute({
                         sql: `UPDATE MonitoredProfile SET screenshotUrl = ? WHERE id = ?`,
-                        args: [screenshotUrl, profileId]
+                        args: [changeScreenshotUrl, profileId]
                     });
                 }
 
@@ -1181,12 +1173,12 @@ async function main() {
                                     tweetUrl: tweetUrl || undefined
                                 });
 
-                                // ChangeEvents in DB speichern
+                                // ChangeEvents in DB speichern mit korrektem Screenshot
                                 for (const target of addedProfiles) {
                                     await db.execute({
-                                        sql: `INSERT INTO ChangeEvent (id, type, targetUsername, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
-                                              VALUES (?, 'FOLLOW', ?, ?, datetime('now'), 1, 0, ?)`,
-                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, monitoredProfileInfo.screenshotPath || null, profileId]
+                                        sql: `INSERT INTO ChangeEvent (id, type, targetUsername, targetFullName, targetPicUrl, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
+                                              VALUES (?, 'FOLLOW', ?, ?, ?, ?, datetime('now'), 1, 0, ?)`,
+                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, target.fullName || null, target.profilePicUrl || null, changeScreenshotUrl, profileId]
                                     });
                                 }
                             }
@@ -1223,12 +1215,12 @@ async function main() {
                                     tweetUrl: tweetUrl || undefined
                                 });
 
-                                // ChangeEvents in DB speichern
+                                // ChangeEvents in DB speichern mit korrektem Screenshot
                                 for (const target of removedProfiles) {
                                     await db.execute({
-                                        sql: `INSERT INTO ChangeEvent (id, type, targetUsername, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
-                                              VALUES (?, 'UNFOLLOW', ?, ?, datetime('now'), 1, 0, ?)`,
-                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, monitoredProfileInfo.screenshotPath || null, profileId]
+                                        sql: `INSERT INTO ChangeEvent (id, type, targetUsername, targetFullName, targetPicUrl, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
+                                              VALUES (?, 'UNFOLLOW', ?, ?, ?, ?, datetime('now'), 1, 0, ?)`,
+                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, target.fullName || null, target.profilePicUrl || null, changeScreenshotUrl, profileId]
                                     });
                                 }
                             }

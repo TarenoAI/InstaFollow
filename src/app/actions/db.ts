@@ -314,6 +314,7 @@ export async function getRecentChanges(limit: number = 50, profileId?: string) {
         targetUsername: c.targetUsername,
         targetFullName: c.targetFullName,
         targetPicUrl: c.targetPicUrl,
+        screenshotUrl: c.screenshotUrl,
         detectedAt: c.detectedAt,
         processed: c.processed,
     }));

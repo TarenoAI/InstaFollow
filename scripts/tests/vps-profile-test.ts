@@ -221,9 +221,10 @@ async function main() {
                 console.log(`   🚨 ÄNDERUNG: ${diff} (Unfollows!)`);
             }
 
-            // Screenshot machen
+            // Screenshot NUR bei Änderung machen!
             let screenshotMade = false;
-            if (!existingScreenshot || diff !== 0) {
+            if (diff !== 0) {
+                console.log(`   📸 Screenshot wegen Änderung...`);
                 const screenshotUrl = await captureProfileScreenshot(page, username);
                 if (screenshotUrl) {
                     await db.execute({
