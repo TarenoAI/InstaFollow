@@ -1705,7 +1705,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
               )}
 
               {activeTab === 'stats' && (
-                <div className="h-full min-h-0 flex flex-col gap-4 animate-in fade-in duration-500">
+                <div className="h-full min-h-0 flex flex-col gap-4 animate-in fade-in duration-500 overflow-y-auto pb-4">
                   {/* Summary Stats Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)] shadow-sm hover:border-[var(--accent)]/30 transition-all">
@@ -1731,7 +1731,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                   </div>
 
                   {/* Main Chart Section */}
-                  <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-md flex-1 min-h-0 flex flex-col">
+                  <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-md flex flex-col">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
                       <div>
                         <h3 className="text-base font-bold flex items-center gap-2">
@@ -1798,7 +1798,7 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
                       </div>
                     </div>
 
-                    <div className="flex-1 min-h-[360px] w-full relative">
+                    <div className="w-full" style={{ minHeight: '350px' }}>
                       {historyList.length < 1 ? (
                         <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] border-2 border-dashed border-[var(--border)] rounded-xl bg-[var(--background)]/50">
                           <p className="text-sm font-bold">Warte auf mehr Datenpunkte...</p>
@@ -1844,11 +1844,11 @@ function ProfileDetailsModal({ isOpen, onClose, onRefresh, profileId, username }
 
 
                         return (
-                          <div className="w-full h-full min-h-[300px] mt-4">
-                            <ResponsiveContainer width="100%" height="100%">
+                          <div className="w-full mt-4">
+                            <ResponsiveContainer width="100%" height={320}>
                               <AreaChart
                                 data={dataPoints}
-                                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                                margin={{ top: 10, right: 30, left: 0, bottom: 20 }}
                               >
                                 <defs>
                                   <linearGradient id="colorFollowers" x1="0" y1="0" x2="0" y2="1">
