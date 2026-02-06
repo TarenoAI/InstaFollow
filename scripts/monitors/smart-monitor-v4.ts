@@ -754,9 +754,10 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
 
 /**
  * 🐦 Twitter-Post via Playwright (ohne API!)
+ * Startet separaten Browser mit headless: false um Passcode-Dialog zu vermeiden
  */
 async function postToTwitter(
-    browser: Browser,
+    _browser: Browser, // Wird nicht mehr verwendet, starten eigenen Browser
     text: string,
     imagePath?: string
 ): Promise<string | null> {
@@ -767,9 +768,25 @@ async function postToTwitter(
 
     console.log('\n   🐦 Poste auf Twitter...');
 
-    const context = await browser.newContext({
+    // Starte separaten Browser für Twitter mit headless: false
+    // Dies verhindert dass der "Create Passcode" Dialog erscheint
+    const twitterBrowser = await chromium.launch({
+        headless: false, // WICHTIG: false um Twitter-Popups zu vermeiden
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-infobars',
+            '--window-size=1280,800'
+        ]
+    });
+
+    const context = await twitterBrowser.newContext({
         storageState: fs.existsSync(TWITTER_SESSION_PATH) ? TWITTER_SESSION_PATH : undefined,
-        viewport: { width: 1280, height: 800 }
+        viewport: { width: 1280, height: 800 },
+        locale: 'de-DE',
+        timezoneId: 'Europe/Berlin'
     });
     const page = await context.newPage();
 
@@ -859,12 +876,12 @@ async function postToTwitter(
         console.log(`   ✅ Tweet gepostet! ${tweetUrl}`);
 
         await context.storageState({ path: TWITTER_SESSION_PATH });
-        await context.close();
+        await twitterBrowser.close();
 
         return tweetUrl;
     } catch (err: any) {
         console.log(`   ❌ Twitter Fehler: ${err.message}`);
-        await context.close();
+        await twitterBrowser.close().catch(() => { });
         return null;
     }
 }
