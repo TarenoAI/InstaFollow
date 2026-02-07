@@ -998,7 +998,12 @@ async function postToTwitter(
             }
             await page.waitForTimeout(2000);
 
-            await page.fill('input[type="password"]', TWITTER_PASSWORD);
+            await page.fill('input[type="password"]', TWITTER_PASSWORD, { timeout: 10000 }).catch(async () => {
+                // Password-Feld nicht gefunden - Screenshot machen
+                await page.screenshot({ path: 'debug-twitter-login.png' });
+                console.log('   ⚠️ Password-Feld nicht gefunden - siehe debug-twitter-login.png');
+                throw new Error('Twitter Login-Seite hat kein Password-Feld - evtl. Captcha oder Verification');
+            });
 
             // Klicke "Anmelden" / "Log in" Button
             const loginButton = await page.$('text=Anmelden') ||
@@ -1011,7 +1016,13 @@ async function postToTwitter(
             }
             await page.waitForTimeout(5000);
 
-            // Session speichern
+            // Prüfe ob Login erfolgreich
+            if (page.url().includes('login')) {
+                await page.screenshot({ path: 'debug-twitter-login-failed.png' });
+                console.log('   ❌ Twitter Login fehlgeschlagen - siehe debug-twitter-login-failed.png');
+                throw new Error('Twitter Login fehlgeschlagen');
+            }
+
             // Session automatisch im persistenten Profil gespeichert
         }
 
