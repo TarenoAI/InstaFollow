@@ -489,7 +489,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         // Dynamische Scroll-Anzahl: ~10 Accounts pro Scroll sichtbar
         // Bei 500 Following = 60 Scrolls, bei 1000 Following = 120 Scrolls
         const maxScrolls = Math.max(80, Math.ceil(expectedCount / 8) + 20);
-        const maxNoNewCount = 25; // Mehr Versuche bevor wir aufgeben
+        const maxNoNewCount = 10; // Nach 10 Scrolls ohne neue Daten aufhören
 
         console.log(`   📜 Max Scrolls: ${maxScrolls} (für ${expectedCount} Following)`);
 
@@ -511,7 +511,20 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 const found = new Set<string>();
                 // MOBILE: Kein Dialog, sondern Vollbild-Seite
                 const container = document.querySelector('[role="dialog"]') || document.body;
-                const excludeList = ['explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search', 'following', 'followers', 'suchen', 'folgen', 'gefolgt', 'nachricht', 'senden'];
+
+                // Erweiterte Exclude-Liste: UI-Elemente, Navigation, deutsche Begriffe
+                const excludeList = [
+                    // Englische UI
+                    'explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search',
+                    'following', 'followers', 'home', 'messages', 'notifications', 'create',
+                    'profile', 'settings', 'more', 'threads', 'meta', 'about', 'help',
+                    // Deutsche UI
+                    'suchen', 'suchensuchen', 'folgen', 'gefolgt', 'nachricht', 'nachrichten',
+                    'senden', 'startseite', 'entdecken', 'beiträge', 'beitrage', 'erstellen',
+                    'profil', 'einstellungen', 'mehr', 'abonniert', 'abonnieren',
+                    // Meta/Instagram spezifisch
+                    'instagram', 'meta.ai', 'threads', 'facebook', 'whatsapp'
+                ];
 
                 // Strategie 1: Alle Links mit href die wie Usernames aussehen
                 container.querySelectorAll('a[href]').forEach((a: Element) => {
