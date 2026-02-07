@@ -530,17 +530,18 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 ];
 
                 // Hilfsfunktion: Entferne bekannte Suffixe die durch textContent angeklebt werden
-                const cleanUsername = (text: string): string => {
+                function cleanUsername(text: string): string {
                     const suffixes = ['verifiziert', 'verified', 'gefolgt', 'folgen', 'personality',
                         'following', 'follower', 'abonniert', 'abonnieren'];
                     let cleaned = text;
-                    for (const suffix of suffixes) {
+                    for (let i = 0; i < suffixes.length; i++) {
+                        const suffix = suffixes[i];
                         if (cleaned.toLowerCase().endsWith(suffix) && cleaned.length > suffix.length) {
                             cleaned = cleaned.slice(0, -suffix.length);
                         }
                     }
                     return cleaned;
-                };
+                }
 
 
                 // Strategie 1: Alle Links mit href die wie Usernames aussehen
