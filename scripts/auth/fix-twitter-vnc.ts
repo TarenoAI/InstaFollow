@@ -1,8 +1,9 @@
 /**
- * 🔧 TWITTER VNC FIX
+ * 🔧 TWITTER VNC FIX (Persistent Profile)
  * 
- * Öffnet Chromium mit sichtbarem Browser, damit du den
- * "Create Passcode" Dialog manuell schließen kannst.
+ * Öffnet Chromium mit persistentem Browser-Profil, damit du
+ * dich bei Twitter einloggen kannst. Die Session bleibt
+ * dauerhaft im Profil-Ordner gespeichert.
  * 
  * Verwendung in VNC:
  * cd ~/InstaFollow && npx tsx scripts/auth/fix-twitter-vnc.ts
@@ -13,32 +14,33 @@ import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
 
-const SESSION_PATH = path.join(process.cwd(), 'data/sessions/twitter-session.json');
-
 async function main() {
     console.log('═'.repeat(50));
-    console.log('🔧 TWITTER VNC SESSION FIX');
+    console.log('🔧 TWITTER VNC SESSION FIX (Persistent Profile)');
     console.log('═'.repeat(50));
     console.log('');
 
-    // Stelle sicher, dass der Sessions-Ordner existiert
-    const sessionDir = path.dirname(SESSION_PATH);
-    if (!fs.existsSync(sessionDir)) {
-        fs.mkdirSync(sessionDir, { recursive: true });
+    // Stelle sicher, dass der Browser-Profil-Ordner existiert
+    const BROWSER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/twitter');
+    if (!fs.existsSync(BROWSER_PROFILE_DIR)) {
+        fs.mkdirSync(BROWSER_PROFILE_DIR, { recursive: true });
     }
 
-    console.log('🚀 Starte Chromium Browser...');
+    console.log('🚀 Starte Chromium mit persistentem Profil...');
+    console.log(`   Profil-Ordner: ${BROWSER_PROFILE_DIR}`);
     console.log('');
 
-    const browser = await chromium.launch({
+    // Nutze PERSISTENT CONTEXT für langlebige Sessions
+    const context = await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, {
         headless: false,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-
-    // Lade existierende Session wenn vorhanden
-    const context = await browser.newContext({
-        storageState: fs.existsSync(SESSION_PATH) ? SESSION_PATH : undefined,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-blink-features=AutomationControlled'
+        ],
         viewport: { width: 1280, height: 800 },
+        locale: 'de-DE',
+        timezoneId: 'Europe/Berlin'
     });
 
     const page = await context.newPage();
@@ -46,6 +48,16 @@ async function main() {
     console.log('📱 Öffne Twitter/X...');
     await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(3000);
+
+    // Prüfe ob eingeloggt
+    const isLoggedIn = !page.url().includes('login') &&
+        !(await page.$('input[autocomplete="username"]'));
+
+    if (isLoggedIn) {
+        console.log('✅ Bereits eingeloggt!');
+    } else {
+        console.log('❌ Nicht eingeloggt - Login erforderlich');
+    }
 
     console.log('');
     console.log('═'.repeat(50));
@@ -76,18 +88,19 @@ async function main() {
     });
 
     console.log('');
-    console.log('💾 Speichere Session...');
-    await context.storageState({ path: SESSION_PATH });
-
-    console.log('✅ Session gespeichert in: ' + SESSION_PATH);
+    console.log('💾 Session automatisch im Browser-Profil gespeichert!');
     console.log('');
 
-    await browser.close();
+    await context.close();
 
     console.log('═'.repeat(50));
     console.log('🎉 FERTIG!');
     console.log('');
+    console.log('Die Session ist jetzt im persistenten Profil gespeichert.');
+    console.log('Sie bleibt auch nach Browser-Neustarts erhalten!');
+    console.log('');
     console.log('Teste jetzt mit:');
+    console.log('  export DISPLAY=:99');
     console.log('  npx tsx scripts/tests/vps-twitter-test.ts');
     console.log('═'.repeat(50));
 }

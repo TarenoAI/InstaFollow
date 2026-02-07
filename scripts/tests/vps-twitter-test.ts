@@ -52,7 +52,7 @@ async function postToTwitter(text: string): Promise<string | null> {
     }
 
     const browser = await chromium.launch({
-        headless: true,
+        headless: false, // WICHTIG: false um Twitter-Popups zu vermeiden
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
