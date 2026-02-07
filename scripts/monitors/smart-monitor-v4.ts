@@ -1302,6 +1302,18 @@ async function main() {
                     console.log(`      ➡️ Count wird NICHT aktualisiert - nächster Lauf wird erneut Änderung erkennen!`);
                     console.log(`      ➡️ DB bleibt bei: ${lastCount} (Live: ${currentCount})\n`);
 
+                    // 📊 Log: PARTIAL Scrape
+                    await saveMonitoringLog(db, {
+                        profileId,
+                        profileUsername: username,
+                        status: 'PARTIAL',
+                        followingCountLive: currentCount,
+                        followingCountDb: lastCount,
+                        scrapedCount: currentFollowing.length,
+                        scrapeQuote: parseFloat(scrapeQuote),
+                        errorMessage: `Nur ${scrapeQuote}% gescrapt, benötigt 95%`
+                    });
+
                     // ❌ KEIN COUNT-UPDATE! Nur lastCheckedAt aktualisieren
                     // So wird beim nächsten Lauf die Änderung erneut erkannt
                     await db.execute({
@@ -1510,9 +1522,34 @@ async function main() {
                             args: [currentCount, profileId]
                         });
                     }
+
+                    // 📊 Log: SUCCESS mit Änderungen
+                    await saveMonitoringLog(db, {
+                        profileId,
+                        profileUsername: username,
+                        status: 'SUCCESS',
+                        followingCountLive: currentCount,
+                        followingCountDb: lastCount,
+                        scrapedCount: currentFollowing.length,
+                        scrapeQuote: parseFloat(scrapeQuote),
+                        newFollowsCount: addedUsernames.length,
+                        unfollowsCount: removedUsernames.length,
+                        newFollows: addedUsernames.slice(0, 20), // Max 20 speichern
+                        unfollows: removedUsernames.slice(0, 20)
+                    });
                 }
             } else {
                 console.log('   ✅ Keine Änderung');
+
+                // 📊 Log: NO_CHANGE
+                await saveMonitoringLog(db, {
+                    profileId,
+                    profileUsername: username,
+                    status: 'NO_CHANGE',
+                    followingCountLive: currentCount,
+                    followingCountDb: lastCount
+                });
+
                 await db.execute({
                     sql: "UPDATE MonitoredProfile SET lastCheckedAt = datetime('now') WHERE id = ?",
                     args: [profileId]

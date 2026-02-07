@@ -711,6 +711,178 @@ function ScrapeModal({ isOpen, onClose, profile, setId, onComplete }: ScrapeModa
   );
 }
 
+// ============ MONITORING LOGS PANEL ============
+interface MonitoringLog {
+  id: string;
+  status: 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'NO_CHANGE' | 'SKIPPED';
+  followingCountLive: number | null;
+  followingCountDb: number | null;
+  scrapedCount: number | null;
+  scrapeQuote: number | null;
+  newFollowsCount: number;
+  unfollowsCount: number;
+  newFollows: string[] | null;
+  unfollows: string[] | null;
+  errorMessage: string | null;
+  durationMs: number | null;
+  createdAt: string;
+}
+
+interface MonitoringLogsPanelProps {
+  profileId: string;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+function MonitoringLogsPanel({ profileId, isOpen, onClose }: MonitoringLogsPanelProps) {
+  const [logs, setLogs] = useState<MonitoringLog[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [dateFilter, setDateFilter] = useState<'all' | '7d' | '30d'>('7d');
+
+  useEffect(() => {
+    if (isOpen && profileId) {
+      loadLogs();
+    }
+  }, [isOpen, profileId, dateFilter]);
+
+  const loadLogs = async () => {
+    setLoading(true);
+    try {
+      let fromDate: string | undefined;
+      if (dateFilter === '7d') {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        fromDate = d.toISOString().split('T')[0];
+      } else if (dateFilter === '30d') {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        fromDate = d.toISOString().split('T')[0];
+      }
+
+      const url = `/api/monitoring-logs?profileId=${profileId}${fromDate ? `&from=${fromDate}` : ''}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.success) {
+        setLogs(data.logs);
+      }
+    } catch (err) {
+      console.error('Failed to load logs:', err);
+    }
+    setLoading(false);
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'SUCCESS': return '✅';
+      case 'PARTIAL': return '⚠️';
+      case 'FAILED': return '❌';
+      case 'NO_CHANGE': return '➖';
+      case 'SKIPPED': return '⏭️';
+      default: return '❓';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'SUCCESS': return 'text-green-400';
+      case 'PARTIAL': return 'text-yellow-400';
+      case 'FAILED': return 'text-red-400';
+      case 'NO_CHANGE': return 'text-gray-400';
+      default: return 'text-gray-500';
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="glass-card p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">📊 Monitoring Logs</h2>
+          <button onClick={onClose} className="p-2 hover:bg-[var(--card)] rounded-lg">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Date Filter */}
+        <div className="flex gap-2 mb-4">
+          {(['7d', '30d', 'all'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setDateFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${dateFilter === f
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--card)] text-[var(--text-muted)] hover:text-white'
+                }`}
+            >
+              {f === '7d' ? 'Letzte 7 Tage' : f === '30d' ? 'Letzte 30 Tage' : 'Alle'}
+            </button>
+          ))}
+        </div>
+
+        {/* Logs List */}
+        <div className="flex-1 overflow-y-auto space-y-2">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="spinner" />
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="text-center py-8 text-[var(--text-muted)]">
+              Keine Logs gefunden
+            </div>
+          ) : (
+            logs.map(log => (
+              <div key={log.id} className="p-3 bg-[var(--card)] rounded-xl border border-[var(--border)]">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{getStatusIcon(log.status)}</span>
+                    <span className={`font-medium ${getStatusColor(log.status)}`}>{log.status}</span>
+                  </div>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {new Date(log.createdAt).toLocaleString('de-DE')}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  {log.scrapeQuote !== null && (
+                    <div className="bg-[var(--background)] p-2 rounded-lg">
+                      <span className="text-[var(--text-muted)]">Quote: </span>
+                      <span className={log.scrapeQuote >= 95 ? 'text-green-400' : 'text-yellow-400'}>
+                        {log.scrapeQuote.toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
+                  {log.newFollowsCount > 0 && (
+                    <div className="bg-[var(--background)] p-2 rounded-lg">
+                      <span className="text-green-400">+{log.newFollowsCount} Neu</span>
+                    </div>
+                  )}
+                  {log.unfollowsCount > 0 && (
+                    <div className="bg-[var(--background)] p-2 rounded-lg">
+                      <span className="text-red-400">-{log.unfollowsCount} Entfolgt</span>
+                    </div>
+                  )}
+                </div>
+
+                {log.errorMessage && (
+                  <div className="mt-2 text-xs text-red-400 bg-red-500/10 p-2 rounded">
+                    {log.errorMessage}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============ SET DETAIL VIEW ============
 interface SetDetailProps {
   set: SetInfo;
@@ -735,6 +907,9 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
   const [newProfile, setNewProfile] = useState('');
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
+
+  // Logs Panel State
+  const [logsProfileId, setLogsProfileId] = useState<string | null>(null);
 
   // Aktive Scrape-Jobs pro Profil (username -> status)
   const [activeJobs, setActiveJobs] = useState<Map<string, ScrapeJobStatus>>(new Map());
@@ -920,298 +1095,318 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
   };
 
   return (
-    <div className="animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <button
-          onClick={onBack}
-          className="p-2 hover:bg-[var(--card)] rounded-lg transition-colors"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold">{set.name}</h2>
+    <>
+      <div className="animate-fade-in">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-[var(--card)] rounded-lg transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold">{set.name}</h2>
 
-            {/* Twitter Account Selector */}
-            <div className="relative group/x">
-              <select
-                value={set.twitterAccount?.id || ''}
-                onChange={handleTwitterAccountChange}
-                className="appearance-none pl-8 pr-8 py-1 bg-[var(--card)] border border-[var(--border)] rounded-full text-xs font-medium hover:border-[var(--accent)] transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-[var(--accent)]/50"
-              >
-                <option value="">Kein X-Account</option>
-                {twitterAccounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>
-                    @{acc.username}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-hover/x:text-[#1DA1F2]">
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zl-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>
-              </div>
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              {/* Twitter Account Selector */}
+              <div className="relative group/x">
+                <select
+                  value={set.twitterAccount?.id || ''}
+                  onChange={handleTwitterAccountChange}
+                  className="appearance-none pl-8 pr-8 py-1 bg-[var(--card)] border border-[var(--border)] rounded-full text-xs font-medium hover:border-[var(--accent)] transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-[var(--accent)]/50"
+                >
+                  <option value="">Kein X-Account</option>
+                  {twitterAccounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>
+                      @{acc.username}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-hover/x:text-[#1DA1F2]">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zl-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>
+                </div>
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </div>
               </div>
             </div>
+            <p className="text-[var(--text-muted)] text-sm">{set.profiles.length} Profile</p>
           </div>
-          <p className="text-[var(--text-muted)] text-sm">{set.profiles.length} Profile</p>
-        </div>
 
-        {/* Tracking Toggle */}
-        <button
-          onClick={handleToggleTracking}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${set.isActive
-            ? 'bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/30 hover:bg-[var(--success)]/20'
-            : 'bg-[var(--text-muted)]/10 text-[var(--text-muted)] border border-[var(--border)] hover:bg-[var(--card)]'
-            }`}
-          title={set.isActive ? 'Tracking deaktivieren' : 'Tracking aktivieren'}
-        >
-          <span className={`w-2 h-2 rounded-full ${set.isActive ? 'bg-[var(--success)] animate-pulse' : 'bg-[var(--text-muted)]'}`}></span>
-          {set.isActive ? 'Tracking aktiv' : 'Tracking aus'}
-        </button>
-
-        <button
-          onClick={handleDeleteSet}
-          className="p-2 text-[var(--error)] hover:bg-[var(--error)]/20 rounded-lg transition-colors"
-          title="Set löschen"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Add Profile Input */}
-      <div className="glass-card p-4 mb-6 bg-[var(--card)]/50">
-        <p className="text-sm font-medium mb-3">Profil hinzufügen</p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            className="input-field"
-            placeholder="@benutzername"
-            value={newProfile}
-            onChange={(e) => setNewProfile(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAddProfile()}
-          />
+          {/* Tracking Toggle */}
           <button
-            onClick={handleAddProfile}
-            disabled={adding}
-            className="btn-primary whitespace-nowrap px-6"
+            onClick={handleToggleTracking}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${set.isActive
+              ? 'bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/30 hover:bg-[var(--success)]/20'
+              : 'bg-[var(--text-muted)]/10 text-[var(--text-muted)] border border-[var(--border)] hover:bg-[var(--card)]'
+              }`}
+            title={set.isActive ? 'Tracking deaktivieren' : 'Tracking aktivieren'}
           >
-            {adding ? <div className="spinner w-4 h-4" /> : '+ Hinzufügen'}
+            <span className={`w-2 h-2 rounded-full ${set.isActive ? 'bg-[var(--success)] animate-pulse' : 'bg-[var(--text-muted)]'}`}></span>
+            {set.isActive ? 'Tracking aktiv' : 'Tracking aus'}
+          </button>
+
+          <button
+            onClick={handleDeleteSet}
+            className="p-2 text-[var(--error)] hover:bg-[var(--error)]/20 rounded-lg transition-colors"
+            title="Set löschen"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
           </button>
         </div>
-        {error && (
-          <p className="text-[var(--error)] text-sm mt-2">{error}</p>
+
+        {/* Add Profile Input */}
+        <div className="glass-card p-4 mb-6 bg-[var(--card)]/50">
+          <p className="text-sm font-medium mb-3">Profil hinzufügen</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              className="input-field"
+              placeholder="@benutzername"
+              value={newProfile}
+              onChange={(e) => setNewProfile(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddProfile()}
+            />
+            <button
+              onClick={handleAddProfile}
+              disabled={adding}
+              className="btn-primary whitespace-nowrap px-6"
+            >
+              {adding ? <div className="spinner w-4 h-4" /> : '+ Hinzufügen'}
+            </button>
+          </div>
+          {error && (
+            <p className="text-[var(--error)] text-sm mt-2">{error}</p>
+          )}
+        </div>
+
+        {/* Profiles List */}
+        {set.profiles.length > 0 ? (
+          <div className="space-y-2">
+            {set.profiles.map((profile: ProfileInfo) => {
+              const job = activeJobs.get(profile.username);
+              const isActive = !!job;
+
+              return (
+                <div
+                  key={profile.username}
+                  className="follower-card group relative overflow-hidden"
+                >
+                  {/* Inline Progress Bar (Hintergrund) */}
+                  {isActive && job.status !== 'done' && job.status !== 'error' && (
+                    <div
+                      className="absolute inset-0 bg-gradient-to-r from-[var(--accent)]/20 to-purple-500/20 transition-all duration-500"
+                      style={{ width: `${job.progress}%` }}
+                    />
+                  )}
+
+                  {/* Done overlay */}
+                  {isActive && job.status === 'done' && (
+                    <div className="absolute inset-0 bg-[var(--success)]/10 animate-pulse" />
+                  )}
+
+                  {/* Error overlay */}
+                  {isActive && job.status === 'error' && (
+                    <div className="absolute inset-0 bg-[var(--error)]/10" />
+                  )}
+
+                  <div className="relative flex items-center gap-4 z-10">
+                    <div className="relative w-12 h-12 flex-shrink-0">
+                      {profile.profilePicUrl ? (
+                        <img
+                          src={proxyImageUrl(profile.profilePicUrl)}
+                          alt={profile.username}
+                          className="w-12 h-12 rounded-full object-cover bg-[var(--card)]"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-secondary)] items-center justify-center absolute inset-0"
+                        style={{ display: profile.profilePicUrl ? 'none' : 'flex' }}
+                      >
+                        <span className="text-sm font-bold text-white uppercase">
+                          {profile.username.substring(0, 2)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={`https://www.instagram.com/${profile.username}/`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold truncate hover:text-[var(--accent)] transition-colors flex items-center gap-1"
+                        >
+                          {profile.username}
+                          <svg className="w-3.5 h-3.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                        {profile.isVerified && (
+                          <span className="text-[var(--accent)] text-xs">
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                              <path fillRule="evenodd" d="M8.603 3.799A4.49 4.49 0 0112 2.25c1.357 0 2.573.6 3.397 1.549a4.49 4.49 0 013.498 1.307 4.491 4.491 0 011.307 3.497A4.49 4.49 0 0121.75 12a4.49 4.49 0 01-1.549 3.397 4.491 4.491 0 01-1.307 3.497 4.491 4.491 0 01-3.497 1.307A4.49 4.49 0 0112 21.75a4.49 4.49 0 01-3.397-1.549 4.49 4.49 0 01-3.498-1.306 4.491 4.491 0 01-1.307-3.498A4.49 4.49 0 012.25 12c0-1.357.6-2.573 1.549-3.397a4.49 4.49 0 011.307-3.497 4.49 4.49 0 013.497-1.307zm7.007 6.387a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <p className="text-sm text-[var(--text-muted)] truncate">
+                          {profile.fullName || profile.username}
+                        </p>
+
+                        {/* Scrape Status inline */}
+                        {isActive ? (
+                          <div className="flex items-center gap-2">
+                            {job.status === 'done' ? (
+                              <p className="text-xs text-[var(--success)] flex items-center gap-1">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                {job.found.toLocaleString()} Following gescrapt
+                              </p>
+                            ) : job.status === 'error' ? (
+                              <p className="text-xs text-[var(--error)] flex items-center gap-1">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                {job.error || 'Fehler'}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-[var(--accent)] flex items-center gap-2">
+                                <div className="spinner w-3 h-3" />
+                                <span>
+                                  {job.status === 'queued' && `In Warteschlange${job.queuePosition ? ` (Position ${job.queuePosition})` : ''}`}
+                                  {job.status === 'counting' && 'Lade Profil...'}
+                                  {job.status === 'scraping' && `${job.found}/${job.total} (${Math.round(job.progress)}%)`}
+                                  {job.status === 'saving' && 'Speichern...'}
+                                  {job.status === 'starting' && 'Starte...'}
+                                </span>
+                                {job.estimatedSeconds > 0 && (
+                                  <span className="text-[var(--text-muted)]">
+                                    ~{Math.max(0, job.estimatedSeconds - job.elapsedSeconds)}s
+                                  </span>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-xs text-[var(--text-muted)] truncate">
+                              {profile.followerCount?.toLocaleString() || 0} Follower • {profile.followingCount?.toLocaleString() || 0} Following
+                            </p>
+                            {profile.lastCheckedAt && (
+                              <p className="text-xs text-[var(--success)] flex items-center gap-1 mt-0.5 animate-fade-in">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]"></span>
+                                Geprüft: {new Date(profile.lastCheckedAt).toLocaleString('de-DE', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  day: '2-digit',
+                                  month: '2-digit'
+                                })}
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Scrape Button */}
+                    <button
+                      onClick={() => startScrape(profile)}
+                      disabled={isActive}
+                      className={`p-2 rounded-lg transition-colors ${isActive
+                        ? 'opacity-50 cursor-not-allowed text-[var(--text-muted)]'
+                        : 'hover:bg-[var(--accent)]/20 text-[var(--text-muted)] hover:text-[var(--accent)]'
+                        }`}
+                      title={isActive ? 'Scrape läuft...' : 'Jetzt scrapen'}
+                    >
+                      {isActive && job.status !== 'done' && job.status !== 'error' ? (
+                        <div className="spinner w-5 h-5" />
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      )}
+                    </button>
+
+                    {/* Logs Button */}
+                    <button
+                      onClick={() => setLogsProfileId(profile.id)}
+                      className="p-2 hover:bg-purple-500/20 rounded-lg transition-colors text-[var(--text-muted)] hover:text-purple-400"
+                      title="Monitoring Logs"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </button>
+
+                    <button
+                      onClick={() => onShowDetails(profile.id, profile.username)}
+                      className="p-2 hover:bg-[var(--card-hover)] rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--accent)]"
+                      title="Details & Verlauf anzeigen"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </button>
+                    <a
+                      href={`/api/screenshot/latest?username=${encodeURIComponent(profile.username)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 hover:bg-[var(--card-hover)] rounded-lg transition-colors text-[var(--text-muted)] hover:text-green-400"
+                      title="Screenshot anzeigen"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </a>
+                    <button
+                      onClick={() => handleRemoveProfile(profile.username)}
+                      className="p-2 hover:bg-[var(--error)]/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                      title="Aus Set entfernen"
+                    >
+                      <svg className="w-5 h-5 text-[var(--error)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="glass-card p-12 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--card)] flex items-center justify-center">
+              <svg className="w-8 h-8 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Noch keine Profile</h3>
+            <p className="text-[var(--text-muted)]">
+              Füge Instagram-Profile zu diesem Set hinzu.
+            </p>
+          </div>
         )}
       </div>
 
-      {/* Profiles List */}
-      {set.profiles.length > 0 ? (
-        <div className="space-y-2">
-          {set.profiles.map((profile: ProfileInfo) => {
-            const job = activeJobs.get(profile.username);
-            const isActive = !!job;
-
-            return (
-              <div
-                key={profile.username}
-                className="follower-card group relative overflow-hidden"
-              >
-                {/* Inline Progress Bar (Hintergrund) */}
-                {isActive && job.status !== 'done' && job.status !== 'error' && (
-                  <div
-                    className="absolute inset-0 bg-gradient-to-r from-[var(--accent)]/20 to-purple-500/20 transition-all duration-500"
-                    style={{ width: `${job.progress}%` }}
-                  />
-                )}
-
-                {/* Done overlay */}
-                {isActive && job.status === 'done' && (
-                  <div className="absolute inset-0 bg-[var(--success)]/10 animate-pulse" />
-                )}
-
-                {/* Error overlay */}
-                {isActive && job.status === 'error' && (
-                  <div className="absolute inset-0 bg-[var(--error)]/10" />
-                )}
-
-                <div className="relative flex items-center gap-4 z-10">
-                  <div className="relative w-12 h-12 flex-shrink-0">
-                    {profile.profilePicUrl ? (
-                      <img
-                        src={proxyImageUrl(profile.profilePicUrl)}
-                        alt={profile.username}
-                        className="w-12 h-12 rounded-full object-cover bg-[var(--card)]"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                          if (fallback) fallback.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-secondary)] items-center justify-center absolute inset-0"
-                      style={{ display: profile.profilePicUrl ? 'none' : 'flex' }}
-                    >
-                      <span className="text-sm font-bold text-white uppercase">
-                        {profile.username.substring(0, 2)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <a
-                        href={`https://www.instagram.com/${profile.username}/`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-semibold truncate hover:text-[var(--accent)] transition-colors flex items-center gap-1"
-                      >
-                        {profile.username}
-                        <svg className="w-3.5 h-3.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                      </a>
-                      {profile.isVerified && (
-                        <span className="text-[var(--accent)] text-xs">
-                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                            <path fillRule="evenodd" d="M8.603 3.799A4.49 4.49 0 0112 2.25c1.357 0 2.573.6 3.397 1.549a4.49 4.49 0 013.498 1.307 4.491 4.491 0 011.307 3.497A4.49 4.49 0 0121.75 12a4.49 4.49 0 01-1.549 3.397 4.491 4.491 0 01-1.307 3.497 4.491 4.491 0 01-3.497 1.307A4.49 4.49 0 0112 21.75a4.49 4.49 0 01-3.397-1.549 4.49 4.49 0 01-3.498-1.306 4.491 4.491 0 01-1.307-3.498A4.49 4.49 0 012.25 12c0-1.357.6-2.573 1.549-3.397a4.49 4.49 0 011.307-3.497 4.49 4.49 0 013.497-1.307zm7.007 6.387a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
-                          </svg>
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <p className="text-sm text-[var(--text-muted)] truncate">
-                        {profile.fullName || profile.username}
-                      </p>
-
-                      {/* Scrape Status inline */}
-                      {isActive ? (
-                        <div className="flex items-center gap-2">
-                          {job.status === 'done' ? (
-                            <p className="text-xs text-[var(--success)] flex items-center gap-1">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              {job.found.toLocaleString()} Following gescrapt
-                            </p>
-                          ) : job.status === 'error' ? (
-                            <p className="text-xs text-[var(--error)] flex items-center gap-1">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                              {job.error || 'Fehler'}
-                            </p>
-                          ) : (
-                            <p className="text-xs text-[var(--accent)] flex items-center gap-2">
-                              <div className="spinner w-3 h-3" />
-                              <span>
-                                {job.status === 'queued' && `In Warteschlange${job.queuePosition ? ` (Position ${job.queuePosition})` : ''}`}
-                                {job.status === 'counting' && 'Lade Profil...'}
-                                {job.status === 'scraping' && `${job.found}/${job.total} (${Math.round(job.progress)}%)`}
-                                {job.status === 'saving' && 'Speichern...'}
-                                {job.status === 'starting' && 'Starte...'}
-                              </span>
-                              {job.estimatedSeconds > 0 && (
-                                <span className="text-[var(--text-muted)]">
-                                  ~{Math.max(0, job.estimatedSeconds - job.elapsedSeconds)}s
-                                </span>
-                              )}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <>
-                          <p className="text-xs text-[var(--text-muted)] truncate">
-                            {profile.followerCount?.toLocaleString() || 0} Follower • {profile.followingCount?.toLocaleString() || 0} Following
-                          </p>
-                          {profile.lastCheckedAt && (
-                            <p className="text-xs text-[var(--success)] flex items-center gap-1 mt-0.5 animate-fade-in">
-                              <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]"></span>
-                              Geprüft: {new Date(profile.lastCheckedAt).toLocaleString('de-DE', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                day: '2-digit',
-                                month: '2-digit'
-                              })}
-                            </p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Scrape Button */}
-                  <button
-                    onClick={() => startScrape(profile)}
-                    disabled={isActive}
-                    className={`p-2 rounded-lg transition-colors ${isActive
-                      ? 'opacity-50 cursor-not-allowed text-[var(--text-muted)]'
-                      : 'hover:bg-[var(--accent)]/20 text-[var(--text-muted)] hover:text-[var(--accent)]'
-                      }`}
-                    title={isActive ? 'Scrape läuft...' : 'Jetzt scrapen'}
-                  >
-                    {isActive && job.status !== 'done' && job.status !== 'error' ? (
-                      <div className="spinner w-5 h-5" />
-                    ) : (
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => onShowDetails(profile.id, profile.username)}
-                    className="p-2 hover:bg-[var(--card-hover)] rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--accent)]"
-                    title="Details & Verlauf anzeigen"
-                  >
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </button>
-                  <a
-                    href={`/api/screenshot/latest?username=${encodeURIComponent(profile.username)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 hover:bg-[var(--card-hover)] rounded-lg transition-colors text-[var(--text-muted)] hover:text-green-400"
-                    title="Screenshot anzeigen"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </a>
-                  <button
-                    onClick={() => handleRemoveProfile(profile.username)}
-                    className="p-2 hover:bg-[var(--error)]/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                    title="Aus Set entfernen"
-                  >
-                    <svg className="w-5 h-5 text-[var(--error)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="glass-card p-12 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--card)] flex items-center justify-center">
-            <svg className="w-8 h-8 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold mb-2">Noch keine Profile</h3>
-          <p className="text-[var(--text-muted)]">
-            Füge Instagram-Profile zu diesem Set hinzu.
-          </p>
-        </div>
-      )}
-    </div>
+      {/* Monitoring Logs Panel */}
+      <MonitoringLogsPanel
+        profileId={logsProfileId || ''}
+        isOpen={!!logsProfileId}
+        onClose={() => setLogsProfileId(null)}
+      />
+    </>
   );
 }
 
