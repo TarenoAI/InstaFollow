@@ -507,7 +507,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 
         for (let scroll = 0; scroll < maxScrolls && noNewCount < maxNoNewCount; scroll++) {
             // Sammle alle sichtbaren Usernames - ALLE STRATEGIEN PARALLEL
-            const users = await page.evaluate(() => {
+            const users = await page.evaluate(function () {
                 const found = new Set<string>();
                 // MOBILE: Kein Dialog, sondern Vollbild-Seite
                 const container = document.querySelector('[role="dialog"]') || document.body;
@@ -545,7 +545,9 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 
 
                 // Strategie 1: Alle Links mit href die wie Usernames aussehen
-                container.querySelectorAll('a[href]').forEach((a: Element) => {
+                const links = container.querySelectorAll('a[href]');
+                for (let i = 0; i < links.length; i++) {
+                    const a = links[i];
                     const href = a.getAttribute('href');
                     if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/)) {
                         const username = href.replace(/\//g, '');
@@ -553,10 +555,12 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                             found.add(username);
                         }
                     }
-                });
+                }
 
                 // Strategie 2: IMMER span/div-Elemente mit Username-Pattern durchsuchen
-                container.querySelectorAll('span, div').forEach((el: Element) => {
+                const textElements = container.querySelectorAll('span, div');
+                for (let i = 0; i < textElements.length; i++) {
+                    const el = textElements[i];
                     const text = el.textContent?.trim();
                     if (text && text.match(/^[a-zA-Z0-9._]{2,30}$/) && !text.includes(' ')) {
                         const lower = text.toLowerCase();
@@ -574,13 +578,17 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                             }
                         }
                     }
-                });
+                }
 
                 // Strategie 3: IMMER Profilbilder durchsuchen
-                container.querySelectorAll('img').forEach((img: Element) => {
+                const images = container.querySelectorAll('img');
+                for (let j = 0; j < images.length; j++) {
+                    const img = images[j];
                     let imgContainer = img.parentElement;
                     for (let i = 0; i < 4 && imgContainer; i++) {
-                        imgContainer.querySelectorAll('span').forEach((span: Element) => {
+                        const spans = imgContainer.querySelectorAll('span');
+                        for (let k = 0; k < spans.length; k++) {
+                            const span = spans[k];
                             const text = span.textContent?.trim();
                             if (text && text.match(/^[a-z0-9._]{2,30}$/i) && !text.includes(' ')) {
                                 const cleaned = cleanUsername(text);
@@ -589,10 +597,10 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                                     found.add(cleaned);
                                 }
                             }
-                        });
+                        }
                         imgContainer = imgContainer.parentElement;
                     }
-                });
+                }
 
                 return Array.from(found);
             });
