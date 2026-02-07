@@ -529,6 +529,20 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                     'aidragontech'
                 ];
 
+                // Hilfsfunktion: Entferne bekannte Suffixe die durch textContent angeklebt werden
+                const cleanUsername = (text: string): string => {
+                    const suffixes = ['verifiziert', 'verified', 'gefolgt', 'folgen', 'personality',
+                        'following', 'follower', 'abonniert', 'abonnieren'];
+                    let cleaned = text;
+                    for (const suffix of suffixes) {
+                        if (cleaned.toLowerCase().endsWith(suffix) && cleaned.length > suffix.length) {
+                            cleaned = cleaned.slice(0, -suffix.length);
+                        }
+                    }
+                    return cleaned;
+                };
+
+
                 // Strategie 1: Alle Links mit href die wie Usernames aussehen
                 container.querySelectorAll('a[href]').forEach((a: Element) => {
                     const href = a.getAttribute('href');
@@ -550,10 +564,12 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                             !lower.includes('follower') &&
                             !lower.includes('beitr') &&
                             !lower.includes('abonniert')) {
-                            // Prüfe ob es neben einem Avatar ist
                             const parent = el.closest('a') || el.parentElement;
                             if (parent && (parent.querySelector('img') || parent.tagName === 'A')) {
-                                found.add(text);
+                                const cleaned = cleanUsername(text);
+                                if (cleaned.length >= 2 && !excludeList.includes(cleaned.toLowerCase())) {
+                                    found.add(cleaned);
+                                }
                             }
                         }
                     }
@@ -566,9 +582,10 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                         imgContainer.querySelectorAll('span').forEach((span: Element) => {
                             const text = span.textContent?.trim();
                             if (text && text.match(/^[a-z0-9._]{2,30}$/i) && !text.includes(' ')) {
-                                const lower = text.toLowerCase();
-                                if (!excludeList.includes(lower) && text.length >= 3) {
-                                    found.add(text);
+                                const cleaned = cleanUsername(text);
+                                const lower = cleaned.toLowerCase();
+                                if (!excludeList.includes(lower) && cleaned.length >= 3) {
+                                    found.add(cleaned);
                                 }
                             }
                         });
