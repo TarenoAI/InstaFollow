@@ -1225,11 +1225,12 @@ async function main() {
                     console.log(`      3. Netzwerk-Latenz auf VPS`);
                 }
 
-                // ⚠️ KRITISCH: Wenn weniger als 95% gescrapt, keine Changes verarbeiten!
-                const MIN_SCRAPE_QUOTA = 0.95;
+                // ⚠️ KRITISCH: Wenn weniger als 70% gescrapt, keine Changes verarbeiten!
+                // 95% war zu hoch wegen Instagram Lazy-Loading Limits
+                const MIN_SCRAPE_QUOTA = 0.70;
                 if (currentFollowing.length < currentCount * MIN_SCRAPE_QUOTA) {
                     console.log(`   🚫 ABBRUCH: Nur ${currentFollowing.length}/${currentCount} gescrapt (${scrapeQuote}%)`);
-                    console.log(`      Benötigt: mindestens ${Math.ceil(currentCount * 0.95)} (95%)`);
+                    console.log(`      Benötigt: mindestens ${Math.ceil(currentCount * 0.70)} (70%)`);
                     console.log(`      ➡️ Keine Changes werden verarbeitet um falsche Unfollows zu vermeiden!`);
                     console.log(`      ➡️ Count wird NICHT aktualisiert - nächster Lauf wird erneut Änderung erkennen!`);
                     console.log(`      ➡️ DB bleibt bei: ${lastCount} (Live: ${currentCount})\n`);
