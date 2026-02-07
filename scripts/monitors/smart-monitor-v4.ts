@@ -404,23 +404,51 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         console.log(`   ⏳ Warte auf Laden der Following-Liste...`);
         let dataLoaded = false;
         for (let waitAttempt = 0; waitAttempt < 15; waitAttempt++) {
-            const hasRealData = await page.evaluate(() => {
-                const dialog = document.querySelector('[role="dialog"]');
-                if (!dialog) return false;
+            const checkResult = await page.evaluate(() => {
+                // Versuche Dialog zu finden
+                let container = document.querySelector('[role="dialog"]');
+                let containerType = 'dialog';
+
+                // Fallback: Suche das Haupt-Container-Element
+                if (!container) {
+                    container = document.body;
+                    containerType = 'body';
+                }
 
                 // Suche nach echten User-Links (nicht Skeleton)
-                const links = dialog.querySelectorAll('a[href]');
+                const links = container.querySelectorAll('a[href]');
                 let realUserCount = 0;
+                const foundUsers: string[] = [];
+
                 links.forEach(a => {
                     const href = a.getAttribute('href');
-                    if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/) && !href.includes('/following') && !href.includes('/followers')) {
-                        realUserCount++;
+                    if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/) &&
+                        !href.includes('/following') &&
+                        !href.includes('/followers') &&
+                        !href.includes('/explore') &&
+                        !href.includes('/reels')) {
+                        const username = href.replace(/\//g, '');
+                        if (username.length >= 2 && username.length <= 30) {
+                            realUserCount++;
+                            if (foundUsers.length < 5) foundUsers.push(username);
+                        }
                     }
                 });
-                return realUserCount >= 3; // Mindestens 3 echte User-Links = geladen
+
+                return {
+                    containerType,
+                    realUserCount,
+                    foundUsers,
+                    hasDialog: !!document.querySelector('[role="dialog"]')
+                };
             });
 
-            if (hasRealData) {
+            console.log(`   🔍 Check ${waitAttempt + 1}: container=${checkResult.containerType}, users=${checkResult.realUserCount}, hasDialog=${checkResult.hasDialog}`);
+            if (checkResult.foundUsers.length > 0) {
+                console.log(`   📋 Gefunden: ${checkResult.foundUsers.join(', ')}...`);
+            }
+
+            if (checkResult.realUserCount >= 3) {
                 console.log(`   ✅ Following-Liste geladen (Versuch ${waitAttempt + 1})`);
                 dataLoaded = true;
                 break;
