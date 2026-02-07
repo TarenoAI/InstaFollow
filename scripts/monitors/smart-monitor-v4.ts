@@ -522,8 +522,11 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                     'suchen', 'suchensuchen', 'folgen', 'gefolgt', 'nachricht', 'nachrichten',
                     'senden', 'startseite', 'entdecken', 'beiträge', 'beitrage', 'erstellen',
                     'profil', 'einstellungen', 'mehr', 'abonniert', 'abonnieren',
-                    // Instagram spezifisch (aber NICHT meta.ai - das ist ein echter Account!)
-                    'instagram', 'threads', 'facebook', 'whatsapp'
+                    'verifiziert', 'verified', // Badge-Text
+                    // Instagram spezifisch
+                    'instagram', 'threads', 'facebook', 'whatsapp',
+                    // Eingelogter Scraper-Account (nicht als Following zählen!)
+                    'aidragontech'
                 ];
 
                 // Strategie 1: Alle Links mit href die wie Usernames aussehen
