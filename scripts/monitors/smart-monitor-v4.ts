@@ -1380,6 +1380,21 @@ async function main() {
 
                         console.log(`   ✅ Baseline erstellt (${currentFollowing.length} Einträge) - KEINE Changes gemeldet`);
                         console.log(`   ℹ️ Ab jetzt werden Änderungen erkannt!\n`);
+
+                        // 📊 Log: SUCCESS (Baseline)
+                        await saveMonitoringLog(db, {
+                            profileId,
+                            profileUsername: username,
+                            status: 'SUCCESS',
+                            followingCountLive: currentCount,
+                            followingCountDb: lastCount,
+                            scrapedCount: currentFollowing.length,
+                            scrapeQuote: parseFloat(scrapeQuote),
+                            newFollowsCount: addedUsernames.length,
+                            unfollowsCount: removedUsernames.length,
+                            errorMessage: 'Initial Baseline erstellt'
+                        });
+
                         await humanDelay(10000, 15000);
                         continue; // Zum nächsten Profil!
                     }
