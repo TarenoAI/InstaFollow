@@ -308,7 +308,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         await page.screenshot({ path: `debug-before-following-click-${username}.png` });
 
         // DEBUG: Was ist auf der Seite?
-        const pageDebug = await page.evaluate(() => {
+        const pageDebug = await page.evaluate(function () {
             const allLinks = Array.from(document.querySelectorAll('a')).map(a => ({
                 href: a.href,
                 text: a.innerText.substring(0, 50)
@@ -368,7 +368,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         if (!clickedFollowing) {
             // Letzter Versuch: Via JavaScript klicken
             console.log('   ⚠️ Versuche JavaScript-Klick auf Following...');
-            clickedFollowing = await page.evaluate((uname) => {
+            clickedFollowing = await page.evaluate(function (uname) {
                 const links = document.querySelectorAll('a');
                 for (const link of links) {
                     if (link.href.includes('following') || link.href.includes('/following')) {
@@ -424,7 +424,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         console.log(`   ⏳ Warte auf Laden der Following-Liste...`);
         let dataLoaded = false;
         for (let waitAttempt = 0; waitAttempt < 15; waitAttempt++) {
-            const checkResult = await page.evaluate(() => {
+            const checkResult = await page.evaluate(function () {
                 // Versuche Dialog zu finden
                 let container = document.querySelector('[role="dialog"]');
                 let containerType = 'dialog';
@@ -506,8 +506,8 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         console.log(`   📦 Scroll-Container gefunden: ${!!scrollContainer}`);
 
         for (let scroll = 0; scroll < maxScrolls && noNewCount < maxNoNewCount; scroll++) {
-            // Sammle alle sichtbaren Usernames - ALS STRING ÜBERGEBEN GEGEN __name FEHLER
-            const users = await page.evaluate(`() => {
+            // Sammle alle sichtbaren Usernames - ALS FUNKTION GEGEN __name FEHLER
+            const users = await page.evaluate(function () {
                 const found = new Set();
                 const container = document.querySelector('[role="dialog"]') || document.body;
                 const excludeList = [
@@ -521,7 +521,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                     'aidragontech'
                 ];
 
-                const cleanUsername = function(text) {
+                const cleanUsername = function (text) {
                     const suffixes = ['verifiziert', 'verified', 'gefolgt', 'folgen', 'personality',
                         'following', 'follower', 'abonniert', 'abonnieren'];
                     let cleaned = text;
@@ -538,8 +538,8 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 const links = container.querySelectorAll('a[href]');
                 for (let i = 0; i < links.length; i++) {
                     const href = links[i].getAttribute('href');
-                    if (href && href.match(/^\\/[a-zA-Z0-9._]+\\/?$/)) {
-                        const username = href.replace(/\\//g, '');
+                    if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/)) {
+                        const username = href.replace(/\//g, '');
                         if (!excludeList.includes(username.toLowerCase()) && username.length >= 2) {
                             found.add(username);
                         }
@@ -584,11 +584,11 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                     }
                 }
                 return Array.from(found);
-            }`);
+            });
 
             const prevSize = domFollowing.size;
             if (Array.isArray(users)) {
-                users.forEach(u => u && domFollowing.add(u));
+                users.forEach((u: string) => u && domFollowing.add(u));
             }
 
             if (domFollowing.size === prevSize) noNewCount++;
@@ -608,7 +608,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
             // ROBUSTES SCROLLING: Mehrere Strategien
             try {
                 // Strategie 1: Finde das scrollbare Element und scrolle es
-                const scrolled = await page.evaluate(() => {
+                const scrolled = await page.evaluate(function () {
                     const dialog = document.querySelector('[role="dialog"]');
                     if (!dialog) return false;
 
@@ -696,6 +696,8 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         return Array.from(combined);
     } catch (err: any) {
         console.log(`   ❌ Scrape-Fehler: ${err.message}`);
+        await page.screenshot({ path: `debug-scrape-critical-error-${username}.png` });
+        console.log(`   📸 Screenshot vom Fehler gespeichert: debug-scrape-critical-error-${username}.png`);
         return [];
     }
 }
@@ -886,7 +888,7 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
         }
 
         // Methode 5: Suche im ganzen Seitentext nach "X Gefolgt" oder "X Following"
-        const pageText = await page.evaluate(() => document.body?.innerText || '');
+        const pageText = await page.evaluate(function () { return document.body?.innerText || ''; });
         // Pattern: "78 Gefolgt" oder "78 Following" oder "123 abonniert"
         const textMatches = pageText.match(/(\d+[\d,.]*)\s*(Gefolgt|Following|abonniert)/gi);
         if (textMatches && textMatches.length > 0) {
