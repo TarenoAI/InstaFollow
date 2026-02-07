@@ -393,12 +393,46 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
             return [];
         }
 
-        await page.waitForTimeout(4000);
+        await page.waitForTimeout(3000);
         // NICHT dismissPopups aufrufen, da dies das Following-Fenster schließt!
 
         // DEBUG: Screenshot nach Dialog-Öffnung
         await page.screenshot({ path: `debug-dialog-${username}.png` });
         console.log(`   📸 Debug Screenshot: debug-dialog-${username}.png`);
+
+        // ⏳ WARTE BIS DIE DATEN WIRKLICH GELADEN SIND (keine Skeleton mehr)
+        console.log(`   ⏳ Warte auf Laden der Following-Liste...`);
+        let dataLoaded = false;
+        for (let waitAttempt = 0; waitAttempt < 15; waitAttempt++) {
+            const hasRealData = await page.evaluate(() => {
+                const dialog = document.querySelector('[role="dialog"]');
+                if (!dialog) return false;
+
+                // Suche nach echten User-Links (nicht Skeleton)
+                const links = dialog.querySelectorAll('a[href]');
+                let realUserCount = 0;
+                links.forEach(a => {
+                    const href = a.getAttribute('href');
+                    if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/) && !href.includes('/following') && !href.includes('/followers')) {
+                        realUserCount++;
+                    }
+                });
+                return realUserCount >= 3; // Mindestens 3 echte User-Links = geladen
+            });
+
+            if (hasRealData) {
+                console.log(`   ✅ Following-Liste geladen (Versuch ${waitAttempt + 1})`);
+                dataLoaded = true;
+                break;
+            }
+            await page.waitForTimeout(1000);
+            console.log(`   ⏳ Warte auf Daten... (${waitAttempt + 1}/15)`);
+        }
+
+        if (!dataLoaded) {
+            console.log(`   ⚠️ Following-Liste lädt sehr langsam - versuche trotzdem...`);
+            await page.screenshot({ path: `debug-slow-load-${username}.png` });
+        }
 
         // DOM-basierte Sammlung als Backup
         const domFollowing = new Set<string>();
@@ -410,9 +444,6 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         const maxNoNewCount = 25; // Mehr Versuche bevor wir aufgeben
 
         console.log(`   📜 Max Scrolls: ${maxScrolls} (für ${expectedCount} Following)`);
-
-        // Warte auf Dialog und finde das scrollbare Element
-        await page.waitForTimeout(2000);
 
         // Versuche verschiedene Selektoren für den scrollbaren Container
         let scrollContainer = await page.$('div[role="dialog"] div[style*="overflow"]');
