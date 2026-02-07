@@ -489,13 +489,12 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
             // Sammle alle sichtbaren Usernames - ALLE STRATEGIEN PARALLEL
             const users = await page.evaluate(() => {
                 const found = new Set<string>();
-                const dialog = document.querySelector('[role="dialog"]');
-                if (!dialog) return [];
-
+                // MOBILE: Kein Dialog, sondern Vollbild-Seite
+                const container = document.querySelector('[role="dialog"]') || document.body;
                 const excludeList = ['explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search', 'following', 'followers', 'suchen', 'folgen', 'gefolgt', 'nachricht', 'senden'];
 
                 // Strategie 1: Alle Links mit href die wie Usernames aussehen
-                dialog.querySelectorAll('a[href]').forEach(a => {
+                container.querySelectorAll('a[href]').forEach((a: Element) => {
                     const href = a.getAttribute('href');
                     if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/)) {
                         const username = href.replace(/\//g, '');
@@ -506,7 +505,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 });
 
                 // Strategie 2: IMMER span/div-Elemente mit Username-Pattern durchsuchen
-                dialog.querySelectorAll('span, div').forEach(el => {
+                container.querySelectorAll('span, div').forEach((el: Element) => {
                     const text = el.textContent?.trim();
                     if (text && text.match(/^[a-zA-Z0-9._]{2,30}$/) && !text.includes(' ')) {
                         const lower = text.toLowerCase();
@@ -525,10 +524,10 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 });
 
                 // Strategie 3: IMMER Profilbilder durchsuchen
-                dialog.querySelectorAll('img').forEach(img => {
-                    let container = img.parentElement;
-                    for (let i = 0; i < 4 && container; i++) {
-                        container.querySelectorAll('span').forEach(span => {
+                container.querySelectorAll('img').forEach((img: Element) => {
+                    let imgContainer = img.parentElement;
+                    for (let i = 0; i < 4 && imgContainer; i++) {
+                        imgContainer.querySelectorAll('span').forEach((span: Element) => {
                             const text = span.textContent?.trim();
                             if (text && text.match(/^[a-z0-9._]{2,30}$/i) && !text.includes(' ')) {
                                 const lower = text.toLowerCase();
@@ -537,7 +536,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                                 }
                             }
                         });
-                        container = container.parentElement;
+                        imgContainer = imgContainer.parentElement;
                     }
                 });
 
