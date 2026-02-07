@@ -8,7 +8,7 @@
 
 import 'dotenv/config';
 import { createClient } from '@libsql/client';
-import { chromium, devices, Page, BrowserContext, Browser } from 'playwright';
+import { chromium, firefox, devices, Page, BrowserContext, Browser } from 'playwright';
 import path from 'path';
 import fs from 'fs';
 import axios from 'axios';
@@ -857,25 +857,18 @@ async function postToTwitter(
         return null;
     }
 
-    console.log('\n   🐦 Poste auf Twitter...');
+    console.log('\n   🐦 Poste auf Twitter (Firefox)...');
 
-    // Nutze PERSISTENT CONTEXT für Twitter (wie bei Instagram)
-    const TWITTER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/twitter');
+    // Nutze FIREFOX + PERSISTENT CONTEXT für Twitter (bessere Kompatibilität)
+    const TWITTER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/twitter-firefox');
     if (!fs.existsSync(TWITTER_PROFILE_DIR)) {
         fs.mkdirSync(TWITTER_PROFILE_DIR, { recursive: true });
     }
 
-    // Starte Browser mit persistentem Profil
-    const twitterContext = await chromium.launchPersistentContext(TWITTER_PROFILE_DIR, {
+    // Starte Firefox mit persistentem Profil
+    const twitterContext = await firefox.launchPersistentContext(TWITTER_PROFILE_DIR, {
         headless: false, // WICHTIG: false um Twitter-Popups zu vermeiden
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-blink-features=AutomationControlled',
-            '--disable-infobars',
-            '--window-size=1280,800'
-        ],
+        args: [],
         viewport: { width: 1280, height: 800 },
         locale: 'de-DE',
         timezoneId: 'Europe/Berlin'

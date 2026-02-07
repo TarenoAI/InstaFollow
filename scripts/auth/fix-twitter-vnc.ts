@@ -1,43 +1,39 @@
 /**
- * 🔧 TWITTER VNC FIX (Persistent Profile)
+ * 🔧 TWITTER VNC FIX (Persistent Profile - Firefox)
  * 
- * Öffnet Chromium mit persistentem Browser-Profil, damit du
- * dich bei Twitter einloggen kannst. Die Session bleibt
- * dauerhaft im Profil-Ordner gespeichert.
+ * Öffnet Firefox mit persistentem Browser-Profil, damit du
+ * dich bei Twitter einloggen kannst. Firefox funktioniert
+ * besser als Chromium bei Twitter!
  * 
  * Verwendung in VNC:
  * cd ~/InstaFollow && npx tsx scripts/auth/fix-twitter-vnc.ts
  */
 
-import { chromium } from 'playwright';
+import { firefox } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
 
 async function main() {
     console.log('═'.repeat(50));
-    console.log('🔧 TWITTER VNC SESSION FIX (Persistent Profile)');
+    console.log('🔧 TWITTER VNC SESSION FIX (Firefox)');
     console.log('═'.repeat(50));
     console.log('');
 
     // Stelle sicher, dass der Browser-Profil-Ordner existiert
-    const BROWSER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/twitter');
+    const BROWSER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/twitter-firefox');
     if (!fs.existsSync(BROWSER_PROFILE_DIR)) {
         fs.mkdirSync(BROWSER_PROFILE_DIR, { recursive: true });
     }
 
-    console.log('🚀 Starte Chromium mit persistentem Profil...');
+    console.log('🦊 Starte Firefox mit persistentem Profil...');
     console.log(`   Profil-Ordner: ${BROWSER_PROFILE_DIR}`);
     console.log('');
 
     // Nutze PERSISTENT CONTEXT für langlebige Sessions
-    const context = await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, {
+    const context = await firefox.launchPersistentContext(BROWSER_PROFILE_DIR, {
         headless: false,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-blink-features=AutomationControlled'
-        ],
+        args: [],
         viewport: { width: 1280, height: 800 },
         locale: 'de-DE',
         timezoneId: 'Europe/Berlin'
