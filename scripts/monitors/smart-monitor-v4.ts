@@ -522,8 +522,8 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                     'suchen', 'suchensuchen', 'folgen', 'gefolgt', 'nachricht', 'nachrichten',
                     'senden', 'startseite', 'entdecken', 'beiträge', 'beitrage', 'erstellen',
                     'profil', 'einstellungen', 'mehr', 'abonniert', 'abonnieren',
-                    // Meta/Instagram spezifisch
-                    'instagram', 'meta.ai', 'threads', 'facebook', 'whatsapp'
+                    // Instagram spezifisch (aber NICHT meta.ai - das ist ein echter Account!)
+                    'instagram', 'threads', 'facebook', 'whatsapp'
                 ];
 
                 // Strategie 1: Alle Links mit href die wie Usernames aussehen
