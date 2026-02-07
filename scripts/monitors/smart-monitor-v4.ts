@@ -486,8 +486,6 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
             await page.screenshot({ path: `debug-slow-load-${username}.png` });
         }
 
-        // DOM-basierte Sammlung als Backup
-        const domFollowing = new Set<string>();
         let noNewCount = 0;
 
         // Dynamische Scroll-Anzahl: ~10 Accounts pro Scroll sichtbar
@@ -502,167 +500,78 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         if (!scrollContainer) {
             scrollContainer = await page.$('[role="dialog"] div[class*="x1n2onr6"]');
         }
-        if (!scrollContainer) {
-            // Fallback: Finde das div das die Following-Liste enthält
-            scrollContainer = await page.$('[role="dialog"] div > div > div');
-        }
 
         console.log(`   📦 Scroll-Container gefunden: ${!!scrollContainer}`);
 
+        // NUR API INTERCEPTION - DOM SCRAPING ENTFERNT (war unzuverlässig)
         for (let scroll = 0; scroll < maxScrolls && noNewCount < maxNoNewCount; scroll++) {
-            // NUR LINKS VERWENDEN - Kein Text-Scraping mehr!
-            // Das verhindert Duplikate wie "souza_5VerifiziertSouza"
-            const users: any = await page.evaluate(`(function() {
-                const found = [];
-                const seen = new Set();
-                const container = document.querySelector('[role="dialog"]') || document.body;
-                
-                // Nur Navigation-Links ausschließen
-                const navExcludes = ['explore', 'reels', 'direct', 'accounts', 'stories', 'search', 'following', 'followers', 'p'];
-                
-                // NUR Links mit korrektem href-Pattern
-                const links = container.querySelectorAll('a[href^="/"]');
-                for (let i = 0; i < links.length; i++) {
-                    const a = links[i];
-                    const href = a.getAttribute('href');
-                    
-                    // Strenge Validierung: Nur /username/ Pattern (keine Unterseiten)
-                    if (!href || !href.match(/^\\/[a-zA-Z0-9._]{1,30}\\/$/)) continue;
-                    
-                    const uname = href.replace(/\\//g, '');
-                    
-                    // Ausschlüsse
-                    if (navExcludes.includes(uname.toLowerCase())) continue;
-                    if (uname.length < 2 || uname.length > 30) continue;
-                    if (seen.has(uname)) continue;
-                    
-                    // Finde Profilbild im selben Listen-Item
-                    let picUrl = null;
-                    let parent = a.closest('[style*="height"]') || a.parentElement;
-                    if (parent) {
-                        const img = parent.querySelector('img[src*="cdninstagram"]');
-                        if (img) picUrl = img.src;
-                    }
-                    
-                    seen.add(uname);
-                    found.push({ username: uname, picUrl: picUrl });
-                }
-                return found;
-            })()`);
 
-            const prevSize = domFollowing.size;
-            if (Array.isArray(users)) {
-                users.forEach((u: any) => {
-                    if (u && u.username) {
-                        domFollowing.add(u.username);
-                        if (u.picUrl) userPicMap.set(u.username, u.picUrl);
-                    }
-                });
-            }
+            const prevSize = apiFollowing.size;
 
-            if (domFollowing.size === prevSize) noNewCount++;
-            else noNewCount = 0;
-
-            // Logge Status
+            // Logge Status alle 5 Scrolls
             if (scroll % 5 === 0) {
-                console.log(`   Scroll ${scroll + 1}/${maxScrolls}: DOM=${domFollowing.size} | API=${apiFollowing.size}`);
+                console.log(`   Scroll ${scroll + 1}/${maxScrolls}: API=${apiFollowing.size}`);
             }
 
             // Debug: Screenshot alle 20 Scrolls
             if (scroll % 20 === 0) {
-                const scrollTs = Date.now();
-                await page.screenshot({ path: `debug-scroll-${username}-${scroll}-${scrollTs}.png` });
-                console.log(`   📸 Scroll-Debug Screenshot: debug-scroll-${username}-${scroll}-${scrollTs}.png`);
+                await page.screenshot({ path: `debug-scroll-${username}-${scroll}.png` });
             }
 
-            // ROBUSTES SCROLLING: Mehrere Strategien
+            // SCROLLING
             try {
-                // Strategie 1: Finde das scrollbare Element und scrolle es
-                const scrolled = await page.evaluate(`(function() {
+                // Strategie 1: JS-Scroll im Dialog
+                await page.evaluate(`(function() {
                     const dialog = document.querySelector('[role="dialog"]');
-                    if (!dialog) return false;
-
-                    const allDivs = dialog.querySelectorAll('div');
-                    for (let i = 0; i < allDivs.length; i++) {
-                        const el = allDivs[i];
+                    if (!dialog) return;
+                    const divs = dialog.querySelectorAll('div');
+                    for (let i = 0; i < divs.length; i++) {
+                        const el = divs[i];
                         if (el.scrollHeight > el.clientHeight + 10) {
-                            const oldTop = el.scrollTop;
                             el.scrollTop += 600;
-                            if (el.scrollTop !== oldTop) {
-                                return true;
-                            }
+                            return;
                         }
                     }
-                    return false;
                 })()`);
-
-                // Log scroll success nur einmal
-                if (scroll === 0) {
-                    console.log(`   📜 JS-Scroll funktioniert: ${scrolled}`);
-                }
 
                 await page.waitForTimeout(300);
 
-                // Strategie 2: Mouse wheel direkt im Dialog-Bereich
+                // Strategie 2: Mouse wheel
                 const dialogBox = await page.$('[role="dialog"]');
                 if (dialogBox) {
                     const box = await dialogBox.boundingBox();
                     if (box) {
-                        // Scroll im Zentrum des Dialogs
                         await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
                         await page.mouse.wheel(0, 400);
                     }
                 }
 
-                await page.waitForTimeout(200);
-
-                // Strategie 3: Keyboard scrolling
+                // Strategie 3: Keyboard
                 await page.keyboard.press('PageDown');
-                await page.waitForTimeout(100);
-                await page.keyboard.press('ArrowDown');
-                await page.keyboard.press('ArrowDown');
 
             } catch (scrollErr: any) {
-                // Fallback: Mouse wheel
-                if (scroll === 0) console.log(`   ⚠️ Scroll-Fehler: ${scrollErr.message}`);
-                await page.mouse.move(200, 400);
                 await page.mouse.wheel(0, 600);
             }
 
-            // WICHTIG: Nach jedem Scroll auf Rate-Limit Popups prüfen
             await dismissPopups(page);
+            await humanDelay(2500, 4000);
 
-            // Warte auf neue API-Responses (längere Pause um Rate-Limits zu vermeiden)
-            await humanDelay(3000, 5000);
-
-            // Alle 3 Scrolls: Extra warten für Lazy Loading und Rate-Limit Vermeidung
-            if (scroll % 3 === 2) {
-                await page.waitForTimeout(2000);
-                await dismissPopups(page);
-            }
+            // Check ob neue API-Daten kamen
+            if (apiFollowing.size === prevSize) noNewCount++;
+            else noNewCount = 0;
         }
 
         // Response Handler entfernen
         page.off('response', responseHandler);
 
-        // Kombiniere beide Quellen
-        const combined = new Set([...domFollowing, ...apiFollowing]);
-        combined.delete(username);
-
-        console.log(`   ✅ Scraping beendet: DOM=${domFollowing.size} | API=${apiFollowing.size} | KOMBINIERT=${combined.size}`);
-
-        // Wenn API mehr gefunden hat, logge das
-        if (apiFollowing.size > domFollowing.size) {
-            const additional = apiFollowing.size - domFollowing.size;
-            console.log(`   📡 API-Interception fand ${additional} zusätzliche Accounts!`);
-        }
+        console.log(`   ✅ Scraping beendet: API=${apiFollowing.size} Accounts`);
 
         // Dialog schließen
         await page.keyboard.press('Escape');
         await page.waitForTimeout(500);
 
         return {
-            following: Array.from(combined),
+            following: Array.from(apiFollowing),
             picMap: userPicMap
         };
     } catch (err: any) {
