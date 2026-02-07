@@ -226,8 +226,8 @@ async function getProfileInfo(page: Page, username: string, takeScreenshot: bool
         try {
             isVerified = await page.$('[aria-label*="Verified"], svg[aria-label*="Verifiziert"]') !== null;
 
-            const stats = await page.$$eval('a[href*="followers"], a[href*="following"]', (links: any[]) => {
-                return links.map(l => ({ href: l.href, text: l.innerText.trim() }));
+            const stats = await page.$$eval('a[href*="followers"], a[href*="following"]', function (links) {
+                return links.map(function (l: any) { return { href: l.href, text: l.innerText.trim() }; });
             });
 
             for (const stat of stats) {
@@ -256,23 +256,25 @@ async function getProfileInfo(page: Page, username: string, takeScreenshot: bool
  * Fängt Instagram's API-Responses ab während gescrollt wird
  * @param expectedCount - Die erwartete Anzahl an Following für dynamische Scroll-Berechnung
  */
-async function getFollowingList(page: Page, username: string, expectedCount: number = 200): Promise<string[]> {
+async function getFollowingList(page: Page, username: string, expectedCount: number = 200): Promise<{ following: string[], picMap: Map<string, string> }> {
     try {
         // API-Response Sammler
         const apiFollowing = new Set<string>();
+        const userPicMap = new Map<string, string>();
 
         // Intercepte Instagram API-Responses
         const responseHandler = async (response: any) => {
             const url = response.url();
 
             // Instagram Following API
-            if (url.includes('/api/v1/friendships/') && url.includes('/following/')) {
+            if (url.includes('/api/v1/friendships/') || (url.includes('/api/') && url.includes('/following/'))) {
                 try {
                     const json = await response.json();
                     if (json.users) {
                         for (const user of json.users) {
                             if (user.username) {
                                 apiFollowing.add(user.username);
+                                if (user.profile_pic_url) userPicMap.set(user.username, user.profile_pic_url);
                             }
                         }
                     }
@@ -395,7 +397,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         if (!clickedFollowing) {
             console.log('   ❌ Following-Link nicht gefunden');
             await page.screenshot({ path: `debug-no-following-link-${username}.png` });
-            return [];
+            return { following: [], picMap: new Map() };
         }
 
         await page.waitForTimeout(3000);
@@ -509,95 +511,51 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 
         for (let scroll = 0; scroll < maxScrolls && noNewCount < maxNoNewCount; scroll++) {
             // Sammle alle sichtbaren Usernames - ALS FUNKTION GEGEN __name FEHLER
-            // Sammle alle sichtbaren Usernames - AS STRING TO BYPASS TSX/ESBUILD __name INJECTION
-            const users = await page.evaluate(`(function() {
-                const found = new Set();
+            // Sammle alle sichtbaren Usernames + Profilbilder
+            const users: any = await page.evaluate(`(function() {
+                const found = [];
+                const seen = new Set();
                 const container = document.querySelector('[role="dialog"]') || document.body;
-                const excludeList = [
-                    'explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search',
-                    'following', 'followers', 'home', 'messages', 'notifications', 'create',
-                    'profile', 'settings', 'more', 'threads', 'meta', 'about', 'help',
-                    'suchen', 'suchensuchen', 'folgen', 'gefolgt', 'nachricht', 'nachrichten',
-                    'senden', 'startseite', 'entdecken', 'beiträge', 'beitrage', 'erstellen',
-                    'profil', 'einstellungen', 'mehr', 'abonniert', 'abonnieren',
-                    'verifiziert', 'verified', 'instagram', 'threads', 'facebook', 'whatsapp',
-                    'aidragontech'
-                ];
+                
+                const excludeList = ['explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search', 'following', 'followers', 'home', 'messages', 'notifications', 'create', 'profile', 'settings', 'more', 'threads', 'meta', 'about', 'help', 'suchen', 'suchensuchen', 'folgen', 'gefolgt', 'nachricht', 'nachrichten', 'senden', 'startseite', 'entdecken', 'beiträge', 'beitrage', 'erstellen', 'profil', 'einstellungen', 'mehr', 'abonniert', 'abonnieren', 'verifiziert', 'verified', 'instagram', 'facebook', 'whatsapp', 'aidragontech'];
 
-                const clean = function(text) {
-                    if (!text) return '';
-                    const suffixes = ['verifiziert', 'verified', 'gefolgt', 'folgen', 'personality',
-                        'following', 'follower', 'abonniert', 'abonnieren'];
-                    let cl = text.trim();
-                    for (let i = 0; i < suffixes.length; i++) {
-                        const s = suffixes[i];
-                        if (cl.toLowerCase().endsWith(s) && cl.length > s.length) {
-                            cl = cl.slice(0, -s.length);
-                        }
-                    }
-                    return cl;
-                };
-
-                // Strategie 1: Links (RegEx für Usernames wie /username/)
+                // Finde alle Zeilen in der Liste (funktioniert meistens)
                 const links = container.querySelectorAll('a[href]');
                 for (let i = 0; i < links.length; i++) {
-                    const href = links[i].getAttribute('href');
+                    const a = links[i];
+                    const href = a.getAttribute('href');
                     if (href && href.match(/^\\/[a-zA-Z0-9._]+\\/?$/)) {
                         const uname = href.replace(/\\//g, '');
-                        if (!excludeList.includes(uname.toLowerCase()) && uname.length >= 2) {
-                            found.add(uname);
-                        }
-                    }
-                }
-
-                // Strategie 2: Text-Elemente (Sinnvolle Username-Längen)
-                const els = container.querySelectorAll('span, div');
-                for (let i = 0; i < els.length; i++) {
-                    const el = els[i];
-                    const text = el.textContent ? el.textContent.trim() : '';
-                    if (text && text.match(/^[a-zA-Z0-9._]{2,30}$/) && !text.includes(' ')) {
-                        const lower = text.toLowerCase();
-                        if (!excludeList.includes(lower) && !lower.includes('follower') && !lower.includes('beitr') && !lower.includes('abonniert')) {
-                             const parent = el.closest('a') || el.parentElement;
-                             if (parent && (parent.querySelector('img') || parent.tagName === 'A')) {
-                                 const cleaned = clean(text);
-                                 if (cleaned.length >= 2 && !excludeList.includes(cleaned.toLowerCase())) {
-                                     found.add(cleaned);
-                                 }
-                             }
-                        }
-                    }
-                }
-
-                // Strategie 3: Alt-Texte von Profilbildern
-                const images = container.querySelectorAll('img');
-                for (let j = 0; j < images.length; j++) {
-                    const alt = images[j].getAttribute('alt');
-                    if (alt && alt.includes('Profilbild')) {
-                        const uname = alt.split(' ')[0].replace(/[^a-zA-Z0-9._]/g, '');
-                        if (uname && uname.length >= 2 && !excludeList.includes(uname.toLowerCase())) {
-                            found.add(uname);
-                        }
-                    }
-                    // Falls kein Alt-Text, schaue in der Nähe
-                    let p = images[j].parentElement;
-                    for (let k = 0; k < 3 && p; k++) {
-                        const s = p.querySelector('span');
-                        if (s) {
-                            const ct = clean(s.textContent);
-                            if (ct.length >= 2 && !excludeList.includes(ct.toLowerCase())) {
-                                found.add(ct);
+                        if (!excludeList.includes(uname.toLowerCase()) && uname.length >= 2 && !seen.has(uname)) {
+                            // Suche das Profilbild in der Nähe (im selben Listenelement)
+                            let picUrl = null;
+                            let parent = a.parentElement;
+                            for (let k = 0; k < 5 && parent; k++) {
+                                const img = parent.querySelector('img');
+                                if (img && img.src && !img.src.includes('base64')) {
+                                    picUrl = img.src;
+                                    break;
+                                }
+                                parent = parent.parentElement;
                             }
+                            
+                            seen.add(uname);
+                            found.push({ username: uname, picUrl: picUrl });
                         }
-                        p = p.parentElement;
                     }
                 }
-                return Array.from(found);
+                return found;
             })()`);
 
             const prevSize = domFollowing.size;
             if (Array.isArray(users)) {
-                users.forEach((u: string) => u && domFollowing.add(u));
+                users.forEach((u: any) => {
+                    if (u && u.username) {
+                        domFollowing.add(u.username);
+                        // Speichere Pic-URL in einem Map für die spätere DB-Speicherung
+                        if (u.picUrl) userPicMap.set(u.username, u.picUrl);
+                    }
+                });
             }
 
             if (domFollowing.size === prevSize) noNewCount++;
@@ -701,12 +659,15 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         await page.keyboard.press('Escape');
         await page.waitForTimeout(500);
 
-        return Array.from(combined);
+        return {
+            following: Array.from(combined),
+            picMap: userPicMap
+        };
     } catch (err: any) {
         console.log(`   ❌ Scrape-Fehler: ${err.message}`);
         await page.screenshot({ path: `debug-scrape-critical-error-${username}.png` });
         console.log(`   📸 Screenshot vom Fehler gespeichert: debug-scrape-critical-error-${username}.png`);
-        return [];
+        return { following: [], picMap: new Map() };
     }
 }
 
@@ -1261,17 +1222,25 @@ async function main() {
                 continue;
             }
 
-            // Variable für Screenshot-URL bei Änderungen
+            // Variablen initialisieren
             let changeScreenshotUrl: string | null = null;
+            let currentFollowing: string[] = [];
+            let userPicMap = new Map<string, string>();
+            let scrapeQuote = '0';
+            let addedUsernames: string[] = [];
+            let removedUsernames: string[] = [];
 
-            if (currentCount !== lastCount) {
-                console.log(`   🚨 ÄNDERUNG: ${lastCount} → ${currentCount}`);
+            // Scrape nur wenn Änderung erkannt ODER Baseline fehlt
+            if (currentCount !== lastCount || !isBaselineComplete) {
+                if (currentCount !== lastCount) {
+                    console.log(`   🚨 ÄNDERUNG ERKANNT: ${lastCount} → ${currentCount}`);
+                } else {
+                    console.log(`   ℹ️ Erstelle initiale Baseline...`);
+                }
 
-                // 📸 Screenshot NUR bei Änderung machen!
-                console.log(`   📸 Screenshot wegen Änderung...`);
+                // 📸 Screenshot machen
                 changeScreenshotUrl = await captureProfileScreenshot(page, username);
                 if (changeScreenshotUrl) {
-                    // Aktualisiere auch das Haupt-Screenshot im Profil
                     await db.execute({
                         sql: `UPDATE MonitoredProfile SET screenshotUrl = ? WHERE id = ?`,
                         args: [changeScreenshotUrl, profileId]
@@ -1279,32 +1248,19 @@ async function main() {
                 }
 
                 // Full Scrape
-                const currentFollowing = await getFollowingList(page, username, currentCount);
+                const scrapeResult = await getFollowingList(page, username, currentCount);
+                currentFollowing = scrapeResult.following;
+                userPicMap = scrapeResult.picMap;
+
                 console.log(`   📋 ${currentFollowing.length} Following gescrapt`);
 
-                // Diagnose-Logs für Scraping-Quote
-                const scrapeQuote = currentCount > 0 ? ((currentFollowing.length / currentCount) * 100).toFixed(1) : '100';
+                scrapeQuote = currentCount > 0 ? ((currentFollowing.length / currentCount) * 100).toFixed(1) : '100';
                 console.log(`   📈 Scraping-Quote: ${currentFollowing.length}/${currentCount} (${scrapeQuote}%)`);
 
-                if (currentFollowing.length < currentCount * 0.8) {
-                    console.log(`   ⚠️ DIAGNOSE: Weniger als 80% gescrapt!`);
-                    console.log(`      Mögliche Ursachen:`);
-                    console.log(`      1. Instagram Lazy-Loading Limits`);
-                    console.log(`      2. Gelöschte/Deaktivierte Accounts in der Zählung`);
-                    console.log(`      3. Netzwerk-Latenz auf VPS`);
-                }
-
                 // ⚠️ KRITISCH: Wenn weniger als 95% gescrapt, keine Changes verarbeiten!
-                // Bei zu wenig gescrapten Daten → keine Aussage über Unfollows möglich
                 const MIN_SCRAPE_QUOTA = 0.95;
                 if (currentFollowing.length < currentCount * MIN_SCRAPE_QUOTA) {
-                    console.log(`   🚫 ABBRUCH: Nur ${currentFollowing.length}/${currentCount} gescrapt (${scrapeQuote}%)`);
-                    console.log(`      Benötigt: mindestens ${Math.ceil(currentCount * 0.95)} (95%)`);
-                    console.log(`      ➡️ Keine Changes werden verarbeitet um falsche Unfollows zu vermeiden!`);
-                    console.log(`      ➡️ Count wird NICHT aktualisiert - nächster Lauf wird erneut Änderung erkennen!`);
-                    console.log(`      ➡️ DB bleibt bei: ${lastCount} (Live: ${currentCount})\n`);
-
-                    // 📊 Log: PARTIAL Scrape
+                    console.log(`   🚫 ABBRUCH: Nur ${scrapeQuote}% gescrapt (benötigt 95%)`);
                     await saveMonitoringLog(db, {
                         profileId,
                         profileUsername: username,
@@ -1315,17 +1271,15 @@ async function main() {
                         scrapeQuote: parseFloat(scrapeQuote),
                         errorMessage: `Nur ${scrapeQuote}% gescrapt, benötigt 95%`
                     });
-
-                    // ❌ KEIN COUNT-UPDATE! Nur lastCheckedAt aktualisieren
-                    // So wird beim nächsten Lauf die Änderung erneut erkannt
                     await db.execute({
                         sql: `UPDATE MonitoredProfile SET lastCheckedAt = datetime('now') WHERE id = ?`,
                         args: [profileId]
                     });
-
                     await humanDelay(10000, 15000);
-                    continue; // Zum nächsten Profil
+                    continue;
                 }
+
+
 
                 if (currentFollowing.length > 0) {
                     const oldRows = await db.execute({
@@ -1334,8 +1288,8 @@ async function main() {
                     });
                     const oldFollowing = new Set(oldRows.rows.map(r => r.username as string));
 
-                    const addedUsernames = currentFollowing.filter(u => !oldFollowing.has(u));
-                    const removedUsernames = Array.from(oldFollowing).filter(u => !currentFollowing.includes(u));
+                    addedUsernames = currentFollowing.filter(u => !oldFollowing.has(u));
+                    removedUsernames = Array.from(oldFollowing).filter(u => !currentFollowing.includes(u));
 
                     console.log(`   ➕ Neu: ${addedUsernames.length} | ➖ Entfolgt: ${removedUsernames.length}`);
 
@@ -1358,10 +1312,12 @@ async function main() {
                             const end = Math.min(start + batchSize, currentFollowing.length);
 
                             for (let i = start; i < end; i++) {
+                                const uname = currentFollowing[i];
+                                const pPic = userPicMap.get(uname) || null;
                                 await db.execute({
-                                    sql: `INSERT INTO FollowingEntry (id, username, position, profileId, addedAt, lastSeenAt, missedScans) 
-                                          VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
-                                    args: [`v4_${Date.now()}_${i}`, currentFollowing[i], i, profileId]
+                                    sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
+                                          VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
+                                    args: [`v4_${Date.now()}_${i}`, uname, i, profileId, pPic]
                                 });
                             }
                             console.log(`      💾 Batch ${batch + 1}: ${end}/${currentFollowing.length} gespeichert`);
@@ -1500,10 +1456,12 @@ async function main() {
                         await db.execute({ sql: "DELETE FROM FollowingEntry WHERE profileId = ?", args: [profileId] });
 
                         for (let i = 0; i < currentFollowing.length; i++) {
+                            const uname = currentFollowing[i];
+                            const pPic = userPicMap.get(uname) || null;
                             await db.execute({
-                                sql: `INSERT INTO FollowingEntry (id, username, position, profileId, addedAt, lastSeenAt, missedScans) 
-                                      VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
-                                args: [`v4_${Date.now()}_${i}`, currentFollowing[i], i, profileId]
+                                sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
+                                      VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
+                                args: [`v4_${Date.now()}_${i}`, uname, i, profileId, pPic]
                             });
                         }
 

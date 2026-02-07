@@ -8,17 +8,25 @@ export async function GET(request: NextRequest) {
     }
 
     try {
+        console.log(`🖼️ [ImageProxy] Request for: ${url?.substring(0, 50)}...`);
+
         const response = await fetch(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Referer': 'https://www.instagram.com/',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
+                'Sec-Fetch-Dest': 'image',
+                'Sec-Fetch-Mode': 'no-cors',
+                'Sec-Fetch-Site': 'cross-site',
             },
+            next: { revalidate: 3600 } // Cache auf Vercel Ebene für 1 Std
         });
 
         if (!response.ok) {
-            return NextResponse.json({ error: 'Failed to fetch image' }, { status: response.status });
+            console.error(`❌ [ImageProxy] Failed: ${response.status} ${response.statusText}`);
+            return NextResponse.json({ error: `Instagram returned ${response.status}` }, { status: response.status });
         }
 
         const contentType = response.headers.get('content-type') || 'image/jpeg';
@@ -27,11 +35,12 @@ export async function GET(request: NextRequest) {
         return new NextResponse(buffer, {
             headers: {
                 'Content-Type': contentType,
-                'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
+                'Cache-Control': 'public, max-age=31536000, immutable', // Aggressives Caching
+                'Access-Control-Allow-Origin': '*',
             },
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Image proxy error:', error);
-        return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });
+        return NextResponse.json({ error: error.message || 'Failed to proxy image' }, { status: 500 });
     }
 }
