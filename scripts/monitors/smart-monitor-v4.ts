@@ -1179,9 +1179,28 @@ async function main() {
 
                     console.log(`   ➕ Neu: ${addedUsernames.length} | ➖ Entfolgt: ${removedUsernames.length}`);
 
+                    // 🛡️ SANITY CHECK: Wenn DB viel weniger hat als gescrapt → Baseline ist korrupt
+                    // Beispiel: DB hat 80, gescrapt 176 → 96 "neue" wäre falsch!
+                    // Regel: Wenn DB < 80% von gescrapt UND "neue" > erwartete Änderung × 3 → Baseline neu
+                    const expectedChange = Math.abs(currentCount - lastCount);
+                    const dbCoveragePercent = (oldFollowing.size / currentFollowing.length) * 100;
+                    const isSuspiciouslyManyNew = addedUsernames.length > Math.max(expectedChange * 3, 20);
+
+                    if (isBaselineComplete && dbCoveragePercent < 80 && isSuspiciouslyManyNew) {
+                        console.log(`\n   ⚠️ BASELINE KORRUPT ERKANNT!`);
+                        console.log(`      DB: ${oldFollowing.size} | Gescrapt: ${currentFollowing.length} (${dbCoveragePercent.toFixed(1)}% Abdeckung)`);
+                        console.log(`      "Neue": ${addedUsernames.length} aber erwartete Änderung nur ${expectedChange}`);
+                        console.log(`      → Behandle als neue Baseline, keine Changes melden!`);
+                        // Setze Flag um Baseline-Logik zu triggern
+                        // (Der Code unten prüft !isBaselineComplete, daher lokale Variable überschreiben)
+                    }
+
+                    // Korrigiere lokale Variable wenn Baseline korrupt
+                    const needsBaselineRebuild = !isBaselineComplete || (dbCoveragePercent < 80 && isSuspiciouslyManyNew);
+
                     // === BASELINE NICHT KOMPLETT: Erst Baseline erstellen ===
-                    if (!isBaselineComplete) {
-                        console.log(`\n   🆕 BASELINE NICHT KOMPLETT - Erstelle/Aktualisiere Baseline...`);
+                    if (needsBaselineRebuild) {
+                        console.log(`\n   🆕 BASELINE WIRD NEU ERSTELLT...`);
                         console.log(`      Bisherige Einträge in DB: ${oldFollowing.size}`);
                         console.log(`      Gescrapt: ${currentFollowing.length}`);
 
