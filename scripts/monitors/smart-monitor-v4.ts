@@ -506,31 +506,22 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         console.log(`   📦 Scroll-Container gefunden: ${!!scrollContainer}`);
 
         for (let scroll = 0; scroll < maxScrolls && noNewCount < maxNoNewCount; scroll++) {
-            // Sammle alle sichtbaren Usernames - ALLE STRATEGIEN PARALLEL
-            const users = await page.evaluate(function () {
-                const found = new Set<string>();
-                // MOBILE: Kein Dialog, sondern Vollbild-Seite
+            // Sammle alle sichtbaren Usernames - ALS STRING ÜBERGEBEN GEGEN __name FEHLER
+            const users = await page.evaluate(`() => {
+                const found = new Set();
                 const container = document.querySelector('[role="dialog"]') || document.body;
-
-                // Erweiterte Exclude-Liste: UI-Elemente, Navigation, deutsche Begriffe
                 const excludeList = [
-                    // Englische UI
                     'explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search',
                     'following', 'followers', 'home', 'messages', 'notifications', 'create',
                     'profile', 'settings', 'more', 'threads', 'meta', 'about', 'help',
-                    // Deutsche UI
                     'suchen', 'suchensuchen', 'folgen', 'gefolgt', 'nachricht', 'nachrichten',
                     'senden', 'startseite', 'entdecken', 'beiträge', 'beitrage', 'erstellen',
                     'profil', 'einstellungen', 'mehr', 'abonniert', 'abonnieren',
-                    'verifiziert', 'verified', // Badge-Text
-                    // Instagram spezifisch
-                    'instagram', 'threads', 'facebook', 'whatsapp',
-                    // Eingelogter Scraper-Account (nicht als Following zählen!)
+                    'verifiziert', 'verified', 'instagram', 'threads', 'facebook', 'whatsapp',
                     'aidragontech'
                 ];
 
-                // Hilfsfunktion: Entferne bekannte Suffixe die durch textContent angeklebt werden
-                var cleanUsername = function (text: string): string {
+                const cleanUsername = function(text) {
                     const suffixes = ['verifiziert', 'verified', 'gefolgt', 'folgen', 'personality',
                         'following', 'follower', 'abonniert', 'abonnieren'];
                     let cleaned = text;
@@ -543,32 +534,26 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                     return cleaned;
                 };
 
-
-                // Strategie 1: Alle Links mit href die wie Usernames aussehen
+                // Strategie 1: Links
                 const links = container.querySelectorAll('a[href]');
                 for (let i = 0; i < links.length; i++) {
-                    const a = links[i];
-                    const href = a.getAttribute('href');
-                    if (href && href.match(/^\/[a-zA-Z0-9._]+\/?$/)) {
-                        const username = href.replace(/\//g, '');
+                    const href = links[i].getAttribute('href');
+                    if (href && href.match(/^\\/[a-zA-Z0-9._]+\\/?$/)) {
+                        const username = href.replace(/\\//g, '');
                         if (!excludeList.includes(username.toLowerCase()) && username.length >= 2) {
                             found.add(username);
                         }
                     }
                 }
 
-                // Strategie 2: IMMER span/div-Elemente mit Username-Pattern durchsuchen
+                // Strategie 2: Text-Elemente
                 const textElements = container.querySelectorAll('span, div');
                 for (let i = 0; i < textElements.length; i++) {
                     const el = textElements[i];
-                    const text = el.textContent?.trim();
+                    const text = el.textContent ? el.textContent.trim() : '';
                     if (text && text.match(/^[a-zA-Z0-9._]{2,30}$/) && !text.includes(' ')) {
                         const lower = text.toLowerCase();
-                        // Filter bekannte Nicht-Usernames
-                        if (!excludeList.includes(lower) &&
-                            !lower.includes('follower') &&
-                            !lower.includes('beitr') &&
-                            !lower.includes('abonniert')) {
+                        if (!excludeList.includes(lower) && !lower.includes('follower') && !lower.includes('beitr') && !lower.includes('abonniert')) {
                             const parent = el.closest('a') || el.parentElement;
                             if (parent && (parent.querySelector('img') || parent.tagName === 'A')) {
                                 const cleaned = cleanUsername(text);
@@ -580,20 +565,17 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                     }
                 }
 
-                // Strategie 3: IMMER Profilbilder durchsuchen
+                // Strategie 3: Bilder
                 const images = container.querySelectorAll('img');
                 for (let j = 0; j < images.length; j++) {
-                    const img = images[j];
-                    let imgContainer = img.parentElement;
+                    let imgContainer = images[j].parentElement;
                     for (let i = 0; i < 4 && imgContainer; i++) {
                         const spans = imgContainer.querySelectorAll('span');
                         for (let k = 0; k < spans.length; k++) {
-                            const span = spans[k];
-                            const text = span.textContent?.trim();
+                            const text = spans[k].textContent ? spans[k].textContent.trim() : '';
                             if (text && text.match(/^[a-z0-9._]{2,30}$/i) && !text.includes(' ')) {
                                 const cleaned = cleanUsername(text);
-                                const lower = cleaned.toLowerCase();
-                                if (!excludeList.includes(lower) && cleaned.length >= 3) {
+                                if (!excludeList.includes(cleaned.toLowerCase()) && cleaned.length >= 3) {
                                     found.add(cleaned);
                                 }
                             }
@@ -601,12 +583,13 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                         imgContainer = imgContainer.parentElement;
                     }
                 }
-
                 return Array.from(found);
-            });
+            }`);
 
             const prevSize = domFollowing.size;
-            users.forEach(u => u && domFollowing.add(u));
+            if (Array.isArray(users)) {
+                users.forEach(u => u && domFollowing.add(u));
+            }
 
             if (domFollowing.size === prevSize) noNewCount++;
             else noNewCount = 0;
