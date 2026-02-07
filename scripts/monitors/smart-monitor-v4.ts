@@ -395,6 +395,25 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         }
 
         await page.waitForTimeout(3000);
+
+        // 🔍 Prüfe ob Dialog geöffnet oder zur Following-Seite navigiert
+        const currentUrl = page.url();
+        const hasDialog = await page.$('[role="dialog"]');
+
+        console.log(`   📍 URL nach Klick: ${currentUrl}`);
+        console.log(`   💬 Dialog gefunden: ${!!hasDialog}`);
+
+        // Falls kein Dialog und nicht auf Following-Seite → Direkt navigieren
+        if (!hasDialog && !currentUrl.includes('/following')) {
+            console.log('   ⚠️ Weder Dialog noch Following-Seite - navigiere direkt...');
+            await page.goto(`https://www.instagram.com/${username}/following/`, {
+                waitUntil: 'domcontentloaded',
+                timeout: 15000
+            });
+            await page.waitForTimeout(3000);
+            console.log(`   📍 Neue URL: ${page.url()}`);
+        }
+
         // NICHT dismissPopups aufrufen, da dies das Following-Fenster schließt!
 
         // DEBUG: Screenshot nach Dialog-Öffnung
