@@ -510,39 +510,42 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         console.log(`   📦 Scroll-Container gefunden: ${!!scrollContainer}`);
 
         for (let scroll = 0; scroll < maxScrolls && noNewCount < maxNoNewCount; scroll++) {
-            // Sammle alle sichtbaren Usernames - ALS FUNKTION GEGEN __name FEHLER
-            // Sammle alle sichtbaren Usernames + Profilbilder
+            // NUR LINKS VERWENDEN - Kein Text-Scraping mehr!
+            // Das verhindert Duplikate wie "souza_5VerifiziertSouza"
             const users: any = await page.evaluate(`(function() {
                 const found = [];
                 const seen = new Set();
                 const container = document.querySelector('[role="dialog"]') || document.body;
                 
-                const excludeList = ['explore', 'reels', 'p', 'direct', 'accounts', 'stories', 'search', 'following', 'followers', 'home', 'messages', 'notifications', 'create', 'profile', 'settings', 'more', 'threads', 'meta', 'about', 'help', 'suchen', 'suchensuchen', 'folgen', 'gefolgt', 'nachricht', 'nachrichten', 'senden', 'startseite', 'entdecken', 'beiträge', 'beitrage', 'erstellen', 'profil', 'einstellungen', 'mehr', 'abonniert', 'abonnieren', 'verifiziert', 'verified', 'instagram', 'facebook', 'whatsapp', 'aidragontech'];
-
-                // Finde alle Zeilen in der Liste (funktioniert meistens)
-                const links = container.querySelectorAll('a[href]');
+                // Nur Navigation-Links ausschließen
+                const navExcludes = ['explore', 'reels', 'direct', 'accounts', 'stories', 'search', 'following', 'followers', 'p'];
+                
+                // NUR Links mit korrektem href-Pattern
+                const links = container.querySelectorAll('a[href^="/"]');
                 for (let i = 0; i < links.length; i++) {
                     const a = links[i];
                     const href = a.getAttribute('href');
-                    if (href && href.match(/^\\/[a-zA-Z0-9._]+\\/?$/)) {
-                        const uname = href.replace(/\\//g, '');
-                        if (!excludeList.includes(uname.toLowerCase()) && uname.length >= 2 && !seen.has(uname)) {
-                            // Suche das Profilbild in der Nähe (im selben Listenelement)
-                            let picUrl = null;
-                            let parent = a.parentElement;
-                            for (let k = 0; k < 5 && parent; k++) {
-                                const img = parent.querySelector('img');
-                                if (img && img.src && !img.src.includes('base64')) {
-                                    picUrl = img.src;
-                                    break;
-                                }
-                                parent = parent.parentElement;
-                            }
-                            
-                            seen.add(uname);
-                            found.push({ username: uname, picUrl: picUrl });
-                        }
+                    
+                    // Strenge Validierung: Nur /username/ Pattern (keine Unterseiten)
+                    if (!href || !href.match(/^\\/[a-zA-Z0-9._]{1,30}\\/$/)) continue;
+                    
+                    const uname = href.replace(/\\//g, '');
+                    
+                    // Ausschlüsse
+                    if (navExcludes.includes(uname.toLowerCase())) continue;
+                    if (uname.length < 2 || uname.length > 30) continue;
+                    if (seen.has(uname)) continue;
+                    
+                    // Finde Profilbild im selben Listen-Item
+                    let picUrl = null;
+                    let parent = a.closest('[style*="height"]') || a.parentElement;
+                    if (parent) {
+                        const img = parent.querySelector('img[src*="cdninstagram"]');
+                        if (img) picUrl = img.src;
                     }
+                    
+                    seen.add(uname);
+                    found.push({ username: uname, picUrl: picUrl });
                 }
                 return found;
             })()`);
@@ -552,7 +555,6 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 users.forEach((u: any) => {
                     if (u && u.username) {
                         domFollowing.add(u.username);
-                        // Speichere Pic-URL in einem Map für die spätere DB-Speicherung
                         if (u.picUrl) userPicMap.set(u.username, u.picUrl);
                     }
                 });
@@ -931,80 +933,56 @@ async function postToTwitter(
         return null;
     }
 
-    console.log('\n   🐦 Poste auf Twitter (Firefox)...');
+    console.log('\n   🐦 Poste auf Twitter...');
 
-    // Nutze FIREFOX + PERSISTENT CONTEXT für Twitter (bessere Kompatibilität)
-    const TWITTER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/twitter-firefox');
-    if (!fs.existsSync(TWITTER_PROFILE_DIR)) {
-        fs.mkdirSync(TWITTER_PROFILE_DIR, { recursive: true });
+    // Session-Datei für Twitter (manuell via VNC erstellt)
+    const TWITTER_SESSION_PATH = path.join(process.cwd(), 'data/sessions/twitter-session.json');
+
+    // Prüfe ob Session existiert
+    if (!fs.existsSync(TWITTER_SESSION_PATH)) {
+        console.log('   ⚠️ Twitter Session fehlt!');
+        console.log('   ➡️ Bitte führe /fix-twitter-session Workflow aus');
+        return null;
     }
 
-    // Starte Firefox mit persistentem Profil
-    const twitterContext = await firefox.launchPersistentContext(TWITTER_PROFILE_DIR, {
-        headless: false, // WICHTIG: false um Twitter-Popups zu vermeiden
-        args: [],
-        viewport: { width: 1280, height: 800 },
-        locale: 'de-DE',
-        timezoneId: 'Europe/Berlin'
+    // Nutze Chromium mit gespeicherter Session
+    const browser = await chromium.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
-    const page = await twitterContext.newPage();
+
+    let context;
+    try {
+        // Lade Session aus Datei
+        context = await browser.newContext({
+            storageState: TWITTER_SESSION_PATH,
+            viewport: { width: 1280, height: 800 },
+            locale: 'de-DE',
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        });
+    } catch (e) {
+        console.log('   ❌ Twitter Session ungültig - führe /fix-twitter-session aus');
+        await browser.close();
+        return null;
+    }
+
+    const page = await context.newPage();
 
     try {
         // Prüfe ob eingeloggt
-        await page.goto('https://twitter.com/home', { waitUntil: 'domcontentloaded' });
+        await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded', timeout: 30000 });
         await page.waitForTimeout(3000);
 
-        // Login wenn nötig
-        if (page.url().includes('login') || await page.$('input[autocomplete="username"]')) {
-            console.log('   🔐 Twitter Login...');
-
-            if (!page.url().includes('login')) {
-                await page.goto('https://twitter.com/login');
-                await page.waitForTimeout(2000);
-            }
-
-            await page.fill('input[autocomplete="username"]', TWITTER_USERNAME);
-
-            // Klicke "Weiter" / "Next" Button - mehrere Sprachen unterstützen
-            const nextButton = await page.$('text=Weiter') ||
-                await page.$('text=Next') ||
-                await page.$('[role="button"]:has-text("Next")') ||
-                await page.$('[role="button"]:has-text("Weiter")');
-            if (nextButton) {
-                await nextButton.click();
-            } else {
-                // Fallback: Drücke Enter
-                await page.keyboard.press('Enter');
-            }
-            await page.waitForTimeout(2000);
-
-            await page.fill('input[type="password"]', TWITTER_PASSWORD, { timeout: 10000 }).catch(async () => {
-                // Password-Feld nicht gefunden - Screenshot machen
-                await page.screenshot({ path: 'debug-twitter-login.png' });
-                console.log('   ⚠️ Password-Feld nicht gefunden - siehe debug-twitter-login.png');
-                throw new Error('Twitter Login-Seite hat kein Password-Feld - evtl. Captcha oder Verification');
-            });
-
-            // Klicke "Anmelden" / "Log in" Button
-            const loginButton = await page.$('text=Anmelden') ||
-                await page.$('text=Log in') ||
-                await page.$('[data-testid="LoginForm_Login_Button"]');
-            if (loginButton) {
-                await loginButton.click();
-            } else {
-                await page.keyboard.press('Enter');
-            }
-            await page.waitForTimeout(5000);
-
-            // Prüfe ob Login erfolgreich
-            if (page.url().includes('login')) {
-                await page.screenshot({ path: 'debug-twitter-login-failed.png' });
-                console.log('   ❌ Twitter Login fehlgeschlagen - siehe debug-twitter-login-failed.png');
-                throw new Error('Twitter Login fehlgeschlagen');
-            }
-
-            // Session automatisch im persistenten Profil gespeichert
+        // Check: Sind wir auf der Login-Seite gelandet?
+        if (page.url().includes('login') || page.url().includes('flow')) {
+            console.log('   ❌ Twitter Session abgelaufen!');
+            console.log('   ➡️ Führe /fix-twitter-session Workflow aus');
+            await page.screenshot({ path: 'debug-twitter-session-expired.png' });
+            await browser.close();
+            return null;
         }
+
+        console.log('   ✅ Twitter Session gültig');
 
         console.log('   ✅ Twitter eingeloggt');
 
@@ -1045,13 +1023,12 @@ async function postToTwitter(
 
         console.log(`   ✅ Tweet gepostet! ${tweetUrl}`);
 
-        // Session automatisch im persistenten Profil gespeichert
-        await twitterContext.close();
+        await browser.close();
 
         return tweetUrl;
     } catch (err: any) {
         console.log(`   ❌ Twitter Fehler: ${err.message}`);
-        await twitterContext.close().catch(() => { });
+        await browser.close().catch(() => { });
         return null;
     }
 }
