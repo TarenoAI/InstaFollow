@@ -34,7 +34,7 @@ async function main() {
     const context = await firefox.launchPersistentContext(BROWSER_PROFILE_DIR, {
         headless: false,
         args: [],
-        viewport: { width: 1280, height: 800 },
+        viewport: { width: 800, height: 600 },  // Kleiner für VNC
         locale: 'de-DE',
         timezoneId: 'Europe/Berlin'
     });
