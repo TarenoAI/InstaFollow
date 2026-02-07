@@ -126,3 +126,39 @@ model AppConfig {
   delayBetweenProfilesMs Int @default(45000) // 45 seconds between profiles
   updatedAt       DateTime @updatedAt
 }
+
+// Monitoring Log - Bericht pro Cron-Job-Durchlauf
+model MonitoringLog {
+  id              String   @id @default(cuid())
+  
+  // Profil-Referenz
+  profileId       String
+  profileUsername String
+  
+  // Status
+  status          String   // "SUCCESS", "PARTIAL", "FAILED", "NO_CHANGE", "SKIPPED"
+  
+  // Scraping-Details
+  followingCountLive    Int?       // Aktuelle Zahl auf Instagram
+  followingCountDb      Int?       // Zahl in der DB vor dem Run
+  scrapedCount          Int?       // Anzahl gescrapte Following
+  scrapeQuote           Float?     // Prozent gescrapt (z.B. 95.5)
+  
+  // Änderungen
+  newFollowsCount       Int        @default(0)
+  unfollowsCount        Int        @default(0)
+  newFollows            String?    // JSON Array der neuen Follows
+  unfollows             String?    // JSON Array der Unfollows
+  
+  // Fehler-Details
+  errorMessage          String?
+  
+  // Timing
+  durationMs            Int?       // Wie lange der Scrape dauerte
+  createdAt             DateTime   @default(now())
+  
+  // Index für schnelle Abfragen
+  @@index([profileId])
+  @@index([createdAt])
+  @@index([status])
+}

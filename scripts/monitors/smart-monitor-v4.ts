@@ -12,6 +12,7 @@ import { chromium, firefox, devices, Page, BrowserContext, Browser } from 'playw
 import path from 'path';
 import fs from 'fs';
 import axios from 'axios';
+import { saveMonitoringLog, ensureMonitoringLogTable, LogStatus } from '../lib/monitoring-log';
 
 // === KONFIGURATION ===
 const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
@@ -1079,6 +1080,9 @@ async function main() {
         authToken: process.env.TURSO_AUTH_TOKEN!
     });
 
+    // Stelle sicher dass MonitoringLog-Tabelle existiert
+    await ensureMonitoringLogTable(db);
+
     // Nutze PERSISTENT CONTEXT für langlebige Sessions
     // Speichert alles: Cookies, LocalStorage, IndexedDB, Cache, etc.
     const BROWSER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/instagram');
@@ -1225,12 +1229,12 @@ async function main() {
                     console.log(`      3. Netzwerk-Latenz auf VPS`);
                 }
 
-                // ⚠️ KRITISCH: Wenn weniger als 70% gescrapt, keine Changes verarbeiten!
-                // 95% war zu hoch wegen Instagram Lazy-Loading Limits
-                const MIN_SCRAPE_QUOTA = 0.70;
+                // ⚠️ KRITISCH: Wenn weniger als 95% gescrapt, keine Changes verarbeiten!
+                // Bei zu wenig gescrapten Daten → keine Aussage über Unfollows möglich
+                const MIN_SCRAPE_QUOTA = 0.95;
                 if (currentFollowing.length < currentCount * MIN_SCRAPE_QUOTA) {
                     console.log(`   🚫 ABBRUCH: Nur ${currentFollowing.length}/${currentCount} gescrapt (${scrapeQuote}%)`);
-                    console.log(`      Benötigt: mindestens ${Math.ceil(currentCount * 0.70)} (70%)`);
+                    console.log(`      Benötigt: mindestens ${Math.ceil(currentCount * 0.95)} (95%)`);
                     console.log(`      ➡️ Keine Changes werden verarbeitet um falsche Unfollows zu vermeiden!`);
                     console.log(`      ➡️ Count wird NICHT aktualisiert - nächster Lauf wird erneut Änderung erkennen!`);
                     console.log(`      ➡️ DB bleibt bei: ${lastCount} (Live: ${currentCount})\n`);
