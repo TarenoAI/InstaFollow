@@ -1081,7 +1081,23 @@ async function main() {
             const existingScreenshot = row.screenshotUrl as string | null;
 
             console.log('─'.repeat(60));
-            console.log(`🔍 @${username} (DB: ${lastCount})`);
+            console.log(`🔍 @${username}`);
+
+            // 📊 DB-GESUNDHEITSCHECK: Zeige wie aktuell die DB ist
+            const dbEntries = await db.execute({
+                sql: 'SELECT COUNT(*) as cnt FROM FollowingEntry WHERE profileId = ?',
+                args: [profileId]
+            });
+            const actualDbCount = (dbEntries.rows[0]?.cnt as number) || 0;
+            const dbCoverage = lastCount > 0 ? ((actualDbCount / lastCount) * 100).toFixed(1) : '0';
+
+            console.log(`   📊 DB-Status: ${actualDbCount} Einträge | Soll: ${lastCount} | Abdeckung: ${dbCoverage}%`);
+            console.log(`   📋 Baseline: ${isBaselineComplete ? '✅ Komplett' : '⚠️ Nicht komplett'}`);
+
+            // Warnung wenn DB-Abdeckung schlecht ist
+            if (isBaselineComplete && actualDbCount < lastCount * 0.9) {
+                console.log(`   ⚠️ WARNUNG: DB hat nur ${dbCoverage}% der erwarteten Einträge!`);
+            }
 
             const currentCount = await getFollowingCount(page, username);
 
@@ -1090,7 +1106,7 @@ async function main() {
                 continue;
             }
 
-            console.log(`   Aktuell: ${currentCount}`);
+            console.log(`   📡 Live: ${currentCount} Following`);
 
             // ⚠️ Skip Profile mit zu vielen Followings (nicht zuverlässig scrapbar)
             const MAX_FOLLOWING = 1000;
