@@ -1,8 +1,8 @@
 /**
  * 📸 FETCH PROFILE PICTURES
  * 
- * Holt nur die Profilbilder für alle Profile eines Sets.
- * Keine Following-Liste, nur schneller Profilbild-Update.
+ * Holt Profilbilder und speichert sie LOKAL (nicht nur URLs).
+ * Die lokalen Bilder werden in public/profile-pics/ gespeichert.
  */
 
 import 'dotenv/config';
@@ -10,9 +10,17 @@ import { createClient } from '@libsql/client';
 import { chromium, devices, Page } from 'playwright';
 import path from 'path';
 import fs from 'fs';
+import https from 'https';
+import http from 'http';
 
 const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
+const PROFILE_PICS_DIR = path.join(process.cwd(), 'public/profile-pics');
 const iPhone = devices['iPhone 13 Pro'];
+
+// Erstelle Ordner
+if (!fs.existsSync(PROFILE_PICS_DIR)) {
+    fs.mkdirSync(PROFILE_PICS_DIR, { recursive: true });
+}
 
 // DB Connection
 const db = createClient({
@@ -22,6 +30,46 @@ const db = createClient({
 
 async function delay(ms: number) {
     return new Promise(r => setTimeout(r, ms));
+}
+
+// Download Bild und speichere lokal
+async function downloadImage(url: string, filename: string): Promise<string | null> {
+    return new Promise((resolve) => {
+        const filepath = path.join(PROFILE_PICS_DIR, filename);
+        const file = fs.createWriteStream(filepath);
+
+        const protocol = url.startsWith('https') ? https : http;
+
+        const request = protocol.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15',
+                'Accept': 'image/*',
+            }
+        }, (response) => {
+            if (response.statusCode === 200) {
+                response.pipe(file);
+                file.on('finish', () => {
+                    file.close();
+                    resolve(`/profile-pics/${filename}`);
+                });
+            } else {
+                file.close();
+                fs.unlink(filepath, () => { });
+                resolve(null);
+            }
+        });
+
+        request.on('error', () => {
+            file.close();
+            fs.unlink(filepath, () => { });
+            resolve(null);
+        });
+
+        request.setTimeout(10000, () => {
+            request.destroy();
+            resolve(null);
+        });
+    });
 }
 
 async function getProfileInfo(page: Page, username: string): Promise<{
@@ -77,11 +125,13 @@ async function getProfileInfo(page: Page, username: string): Promise<{
 
 async function main() {
     const setName = process.argv[2] || 'Bundesliga 300K+';
+    const forceRefresh = process.argv.includes('--force');
 
     console.log(`\n════════════════════════════════════════════════════════════`);
-    console.log(`📸 PROFILBILDER AKTUALISIEREN`);
+    console.log(`📸 PROFILBILDER AKTUALISIEREN (LOKAL SPEICHERN)`);
     console.log(`════════════════════════════════════════════════════════════\n`);
     console.log(`📋 Set: ${setName}`);
+    console.log(`🔄 Force Refresh: ${forceRefresh ? 'Ja' : 'Nein'}`);
 
     // Get profiles from set
     const setResult = await db.execute({
@@ -112,12 +162,15 @@ async function main() {
     const profiles = profilesResult.rows;
     console.log(`📊 ${profiles.length} Profile im Set\n`);
 
-    // Filter profiles without pics
-    const needPics = profiles.filter(p => !p.profilePicUrl);
-    console.log(`📸 Davon ohne Profilbild: ${needPics.length}\n`);
+    // Filter profiles - nur die ohne lokales Bild oder bei --force alle
+    const needPics = forceRefresh
+        ? profiles
+        : profiles.filter(p => !p.profilePicUrl || !(p.profilePicUrl as string).startsWith('/profile-pics/'));
+
+    console.log(`📸 Zu aktualisieren: ${needPics.length}\n`);
 
     if (needPics.length === 0) {
-        console.log(`✅ Alle Profile haben bereits Bilder!`);
+        console.log(`✅ Alle Profile haben lokale Bilder!`);
         process.exit(0);
     }
 
@@ -144,25 +197,34 @@ async function main() {
         const info = await getProfileInfo(page, username);
 
         if (info?.profilePicUrl) {
-            await db.execute({
-                sql: `UPDATE MonitoredProfile SET 
-                      profilePicUrl = ?,
-                      fullName = ?,
-                      isVerified = ?,
-                      followerCount = ?,
-                      followingCount = ?
-                      WHERE id = ?`,
-                args: [
-                    info.profilePicUrl,
-                    info.fullName,
-                    info.isVerified ? 1 : 0,
-                    parseInt(info.followerCount.replace(/[.,]/g, '') || '0'),
-                    info.followingCount,
-                    profile.id
-                ]
-            });
-            console.log(`   ✅ Bild gespeichert: ${info.fullName}`);
-            updated++;
+            // Download und lokal speichern
+            const filename = `${username}.jpg`;
+            const localPath = await downloadImage(info.profilePicUrl, filename);
+
+            if (localPath) {
+                await db.execute({
+                    sql: `UPDATE MonitoredProfile SET 
+                          profilePicUrl = ?,
+                          fullName = ?,
+                          isVerified = ?,
+                          followerCount = ?,
+                          followingCount = ?
+                          WHERE id = ?`,
+                    args: [
+                        localPath,  // Lokaler Pfad statt Instagram URL!
+                        info.fullName,
+                        info.isVerified ? 1 : 0,
+                        parseInt(info.followerCount.replace(/[.,]/g, '') || '0'),
+                        info.followingCount,
+                        profile.id
+                    ]
+                });
+                console.log(`   ✅ Lokal gespeichert: ${localPath}`);
+                updated++;
+            } else {
+                console.log(`   ⚠️ Download fehlgeschlagen`);
+                failed++;
+            }
         } else {
             console.log(`   ⚠️ Kein Bild gefunden`);
             failed++;
@@ -175,8 +237,16 @@ async function main() {
     await context.storageState({ path: SESSION_PATH });
     await browser.close();
 
+    // Git Push der Bilder
+    const { exec } = await import('child_process');
+    exec(`cd ${process.cwd()} && git add public/profile-pics/ && git commit -m "auto: profile pics" && git push origin main`,
+        (err) => {
+            if (!err) console.log('📤 Bilder zu Git gepusht');
+        });
+
     console.log(`\n════════════════════════════════════════════════════════════`);
-    console.log(`✅ Fertig: ${updated} aktualisiert, ${failed} fehlgeschlagen`);
+    console.log(`✅ Fertig: ${updated} lokal gespeichert, ${failed} fehlgeschlagen`);
+    console.log(`📁 Bilder in: ${PROFILE_PICS_DIR}`);
     console.log(`════════════════════════════════════════════════════════════\n`);
 }
 

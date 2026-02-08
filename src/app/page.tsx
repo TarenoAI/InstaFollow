@@ -1320,7 +1320,12 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
                             {profile.isBaselineComplete ? (
                               <p className="text-xs text-[var(--accent)] flex items-center gap-1 mt-0.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"></span>
-                                Baseline: {profile.baselineFollowingCount || profile.followingCount} ({profile.baselineCreatedAt ? new Date(profile.baselineCreatedAt).toLocaleDateString('de-DE') : '—'})
+                                Baseline: {profile.baselineFollowingCount || profile.followingCount} Following
+                                {profile.baselineCreatedAt && (
+                                  <span className="text-[var(--text-muted)]">
+                                    • {new Date(profile.baselineCreatedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                                  </span>
+                                )}
                               </p>
                             ) : (
                               <p className="text-xs text-[var(--warning)] flex items-center gap-1 mt-0.5">
