@@ -638,30 +638,29 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
     try {
         console.log(`      🔍 Suche @${username}...`);
 
-        // Stelle sicher dass wir auf Instagram sind
-        let currentUrl = page.url();
-        if (!currentUrl.includes('instagram.com') || currentUrl.includes('login')) {
-            console.log(`      ⚠️ Nicht eingeloggt oder auf falscher Seite - navigiere zu Instagram...`);
-            await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-            await page.waitForTimeout(2000);
+        // 📱 MOBILE LOGIN-CHECK (iPhone 13)
+        // Prüfe URL und UI-Elemente
+        const isLoginPage = page.url().includes('login') || page.url().includes('accounts/login');
+        const hasLoginButton = (await page.$('a[href*="/accounts/login/"]')) !== null || (await page.$('button:has-text("Log In")')) !== null;
 
-            if (page.url().includes('login')) {
-                // Strategie 1: Cookies
-                if (process.env.INSTAGRAM_SESSION_ID) {
-                    console.log('      🔄 Versuche Auto-Login via .env Cookies...');
-                    await page.context().addCookies([
-                        { name: 'sessionid', value: process.env.INSTAGRAM_SESSION_ID, domain: '.instagram.com', path: '/', secure: true, httpOnly: true }
-                    ]);
-                    await page.goto('https://www.instagram.com/', { waitUntil: 'networkidle' });
-                    await dismissPopups(page);
-                }
+        if (isLoginPage || hasLoginButton) {
+            console.log(`      ⚠️ Nicht eingeloggt (Mobile UI) - Starte aggressiven Login-Fix...`);
 
-                // Strategie 2: Echter Login (wenn Cookies nicht reichen)
-                if (page.url().includes('login')) {
-                    console.log('      ⚠️ Cookies reichen nicht. Versuche Auto-Login mit Passwort...');
-                    const loginOk = await performLogin(page);
-                    if (!loginOk) return null; // Abbruch wenn Login fehlschlägt
-                }
+            // Erst Cookies probieren
+            if (process.env.INSTAGRAM_SESSION_ID) {
+                console.log('      🔄 Versuche Auto-Login via .env Cookies...');
+                await page.context().addCookies([
+                    { name: 'sessionid', value: process.env.INSTAGRAM_SESSION_ID, domain: '.instagram.com', path: '/', secure: true, httpOnly: true }
+                ]);
+                await page.goto('https://www.instagram.com/', { waitUntil: 'networkidle' });
+                await dismissPopups(page);
+            }
+
+            // Dann Auto-Login mit User/Pass wenn immer noch Login-Seite
+            if (page.url().includes('login') || (await page.$('input[name="username"]'))) {
+                console.log('      ⚠️ Cookies reichen nicht. Versuche Auto-Login mit Passwort...');
+                const loginOk = await performLogin(page);
+                if (!loginOk) return null; // Abbruch
             }
             await dismissPopups(page);
         }
