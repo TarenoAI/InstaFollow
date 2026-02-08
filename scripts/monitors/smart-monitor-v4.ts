@@ -836,45 +836,24 @@ async function postToTwitter(
     text: string,
     imagePath?: string
 ): Promise<string | null> {
-    if (!TWITTER_USERNAME || !TWITTER_PASSWORD) {
-        console.log('   ⚠️ TWITTER_USERNAME oder TWITTER_PASSWORD fehlt');
+    if (!TWITTER_USERNAME) {
+        console.log('   ⚠️ TWITTER_USERNAME fehlt');
         return null;
     }
 
-    console.log('\n   🐦 Poste auf Twitter...');
+    console.log('\n   🐦 Poste auf Twitter (via Firefox Persistent Profile)...');
 
-    // Session-Datei für Twitter (manuell via VNC erstellt)
-    const TWITTER_SESSION_PATH = path.join(process.cwd(), 'data/sessions/twitter-session.json');
+    const TWITTER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/twitter-firefox');
 
-    // Prüfe ob Session existiert
-    if (!fs.existsSync(TWITTER_SESSION_PATH)) {
-        console.log('   ⚠️ Twitter Session fehlt!');
-        console.log('   ➡️ Bitte führe /fix-twitter-session Workflow aus');
-        return null;
-    }
-
-    // Nutze Chromium mit gespeicherter Session
-    const browser = await chromium.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    // Launch Firefox mit persistentem Profil
+    const context = await firefox.launchPersistentContext(TWITTER_PROFILE_DIR, {
+        headless: true, // Für echten Betrieb headless: true
+        viewport: { width: 1024, height: 600 },
+        locale: 'de-DE',
+        timezoneId: 'Europe/Berlin'
     });
 
-    let context;
-    try {
-        // Lade Session aus Datei
-        context = await browser.newContext({
-            storageState: TWITTER_SESSION_PATH,
-            viewport: { width: 1280, height: 800 },
-            locale: 'de-DE',
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        });
-    } catch (e) {
-        console.log('   ❌ Twitter Session ungültig - führe /fix-twitter-session aus');
-        await browser.close();
-        return null;
-    }
-
-    const page = await context.newPage();
+    const page = context.pages()[0] || await context.newPage();
 
     try {
         // Prüfe ob eingeloggt
@@ -883,60 +862,61 @@ async function postToTwitter(
 
         // Check: Sind wir auf der Login-Seite gelandet?
         if (page.url().includes('login') || page.url().includes('flow')) {
-            console.log('   ❌ Twitter Session abgelaufen!');
-            console.log('   ➡️ Führe /fix-twitter-session Workflow aus');
+            console.log('   ❌ Twitter Session abgelaufen oder nicht eingeloggt!');
+            console.log('   ➡️ Führe aus: DISPLAY=:1 npx tsx scripts/auth/twitter-vnc-login.ts');
             await page.screenshot({ path: `${DEBUG_DIR}/twitter-session-expired.png` });
-            await browser.close();
+            await context.close();
             return null;
         }
-
-        console.log('   ✅ Twitter Session gültig');
 
         console.log('   ✅ Twitter eingeloggt');
 
         // Zum Compose-Bereich
-        await page.goto('https://twitter.com/compose/tweet', { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(2000);
+        await page.goto('https://x.com/compose/post', { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(3000);
 
-        // Text eingeben
-        const textArea = await page.$('[data-testid="tweetTextarea_0"]');
-        if (textArea) {
-            await textArea.fill(text);
-            await page.waitForTimeout(1000);
-        }
+        // Text eingeben - Twitter nutzt contenteditable, daher click + type
+        const tweetBox = page.locator('[data-testid="tweetTextarea_0"]').first();
+        await tweetBox.waitFor({ timeout: 10000 });
+        await tweetBox.click();
+        await page.waitForTimeout(500);
+        await page.keyboard.type(text, { delay: 30 });
+        await page.waitForTimeout(1000);
 
         // Bild hochladen wenn vorhanden
         if (imagePath && fs.existsSync(imagePath)) {
-            const fileInput = await page.$('input[type="file"]');
-            if (fileInput) {
-                await fileInput.setInputFiles(imagePath);
-                await page.waitForTimeout(3000);
-            }
+            console.log('   📂 Lade Bild hoch...');
+            const fileInput = page.locator('input[type="file"]').first();
+            await fileInput.setInputFiles(imagePath);
+            await page.waitForTimeout(5000); // Mehr Zeit für Upload
         }
 
-        // Tweet absenden
-        await page.click('[data-testid="tweetButton"]');
-        await page.waitForTimeout(5000);
+        // Tweet absenden via Shortcut (zuverlässiger)
+        console.log('   📤 Sende Tweet (Shortcut)...');
+        await page.keyboard.press('Control+Enter');
+        await page.waitForTimeout(6000);
 
         // Tweet-URL extrahieren (von der Timeline)
-        await page.goto(`https://twitter.com/${TWITTER_USERNAME}`, { waitUntil: 'domcontentloaded' });
+        console.log('   🔍 Suche Tweet-URL...');
+        await page.goto(`https://x.com/${TWITTER_USERNAME}`, { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(3000);
 
-        const tweetLink = await page.$('article a[href*="/status/"]');
+        const tweetLink = page.locator('article a[href*="/status/"]').first();
         let tweetUrl = '';
-        if (tweetLink) {
-            tweetUrl = await tweetLink.getAttribute('href') || '';
-            if (tweetUrl) tweetUrl = `https://twitter.com${tweetUrl}`;
+        try {
+            const href = await tweetLink.getAttribute('href');
+            if (href) tweetUrl = `https://x.com${href}`;
+        } catch (e) {
+            console.log('   ⚠️ Konnte Tweet-URL nicht direkt finden');
         }
 
-        console.log(`   ✅ Tweet gepostet! ${tweetUrl}`);
+        console.log(`   ✅ Tweet gepostet! ${tweetUrl || '(URL unbekannt)'}`);
 
-        await browser.close();
-
-        return tweetUrl;
+        await context.close();
+        return tweetUrl || 'https://x.com';
     } catch (err: any) {
         console.log(`   ❌ Twitter Fehler: ${err.message}`);
-        await browser.close().catch(() => { });
+        await context.close().catch(() => { });
         return null;
     }
 }
