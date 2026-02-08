@@ -127,8 +127,52 @@ async function performLogin(page: Page): Promise<boolean> {
         }
 
         if (continueBtnClicked) {
-            await page.waitForTimeout(8000);
+            await page.waitForTimeout(3000);
             await dismissPopups(page);
+
+            // FALL 1b: Nach "Weiter" kommt Passwort-Abfrage (Saved Login mit Passwort-Bestätigung)
+            const passFieldOnly = page.locator('input[name="password"], input[type="password"]');
+            const userFieldCheck = page.locator('input[name="username"]');
+
+            // Prüfe ob nur Passwort-Feld sichtbar (gespeicherter Account)
+            if (await passFieldOnly.isVisible() && !(await userFieldCheck.isVisible())) {
+                console.log('   🔐 Passwort-Abfrage erkannt (gespeicherter Account)...');
+
+                if (INSTAGRAM_PASSWORD) {
+                    await passFieldOnly.fill(INSTAGRAM_PASSWORD);
+                    await page.waitForTimeout(1000);
+
+                    // Klicke "Anmelden" / "Log In"
+                    const loginBtnSelectors = [
+                        'button[type="submit"]',
+                        'button:has-text("Anmelden")',
+                        'button:has-text("Log In")',
+                        'div[role="button"]:has-text("Anmelden")',
+                        'div[role="button"]:has-text("Log In")',
+                    ];
+
+                    for (const sel of loginBtnSelectors) {
+                        try {
+                            const btn = page.locator(sel).first();
+                            if (await btn.isVisible()) {
+                                console.log(`   🖱️ Klicke Anmelden-Button (${sel})...`);
+                                await btn.click({ force: true });
+                                break;
+                            }
+                        } catch { }
+                    }
+
+                    await page.waitForTimeout(8000);
+                    await dismissPopups(page);
+
+                    if (!page.url().includes('login')) {
+                        console.log('   ✅ Login via gespeichertes Konto + Passwort erfolgreich!');
+                        return true;
+                    }
+                } else {
+                    console.log('   ⚠️ INSTAGRAM_PASSWORD nicht in .env gesetzt!');
+                }
+            }
 
             if (!page.url().includes('login')) {
                 console.log('   ✅ Login via gespeichertes Konto erfolgreich!');
