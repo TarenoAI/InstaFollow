@@ -74,8 +74,8 @@ async function postToTwitter(text: string): Promise<string | null> {
         await page.goto('https://x.com/compose/post', { waitUntil: 'domcontentloaded' });
         await humanDelay(2000, 3000);
 
-        // Warte auf Tweet-Box
-        const tweetBox = page.locator('[data-testid="tweetTextarea_0"]');
+        // Warte auf Tweet-Box (nimm die erste falls mehrere existieren)
+        const tweetBox = page.locator('[data-testid="tweetTextarea_0"]').first();
         await tweetBox.waitFor({ timeout: 10000 });
 
         // Text eingeben
@@ -87,7 +87,7 @@ async function postToTwitter(text: string): Promise<string | null> {
 
         // Tweet absenden
         console.log('📤 Sende Tweet...');
-        const postButton = page.locator('[data-testid="tweetButton"], [data-testid="tweetButtonInline"]');
+        const postButton = page.locator('[data-testid="tweetButton"], [data-testid="tweetButtonInline"]').first();
         await postButton.click();
         await humanDelay(3000, 5000);
 
