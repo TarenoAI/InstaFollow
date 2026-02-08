@@ -1,72 +1,82 @@
 ---
-ID: 20260208-login-twitter
+ID: 20260208-process-twitter
 Date: 2026-02-08
 Status: Active
-Topic: X/Twitter Login & Posting Process
+Topic: X/Twitter Complete Process (Login, Posting)
 ---
 
-# 🐦 X (Twitter) Login & Posting Protokoll
+# 🐦 X (Twitter) Prozess-Dokumentation (Single Source of Truth)
 
-Dieses Dokument ist die **Single Source of Truth** für den X/Twitter-Automatisierungsprozess.
-Es beschreibt exakt, wie der Browser gesteuert werden muss, welche Selektoren verwendet werden und wie auf verschiedene Szenarien reagiert wird.
-
-**WICHTIG:** Wenn sich das Verhalten von X/Twitter ändert (z.B. neue Buttons, andere Texte), MUSS dieses Dokument aktualisiert werden!
+Dieses Dokument ist die zentrale Referenz für den X/Twitter-Automatisierungsprozess.
 
 ---
 
-## 1. Login-Prüfung & Session-Check
+## 1. Login-Prüfung
 
-1. **Start:** Öffne `https://x.com/home` (Firefox Persistent Profile).
-2. **Warnung/Ablauf:**
-   - URL enthält: `/flow` oder `/i/flow/login`?
-   - Selektor-Check: `[data-testid="loginButton"]` gefunden?
-   - **FEHLERSZENARIO:** Screenshot erstellen `twitter-session-expired-*.png`.
-   - **Lösung:** Manuell via VNC einloggen (`scripts/auth/twitter-vnc-login.ts`).
-3. **Erfolg:** URL ist `https://x.com/home` oder Timeline wird geladen.
+### A. Start
+- URL: `https://x.com/home`
+- Browser: Firefox Persistent Profile
+- Warten: 3 Sekunden
 
-## 2. Navigieren zum "Posten" (Compose)
-
-1. **Option 1 (Direkt):**
-   - Gehe zu `https://x.com/compose/post`.
-   - **Vorteil:** Direkt im Eingabefeld.
-   - **Warte:** Auf `[data-testid="tweetTextarea_0"]`.
-2. **Option 2 (Home):**
-   - Suche Button "Posten", "Tweet", "+".
-   - Selektor: `a[href="/compose/tweet"]`, `div[role="button"][aria-label="Post"]`.
-
-## 3. Post erstellen
-
-1. **Text eingeben:**
-   - Klicke in `[data-testid="tweetTextarea_0"]`.
-   - Tippe Text (Keyboard-Input ist zuverlässiger als `fill()`).
-2. **Medien (Optional):**
-   - Suche Input: `input[type="file"][accept*="image"]`.
-   - Datei hochladen (`setInputFiles`).
-   - Warte auf Upload (mind. 5s für Bilder).
-
-## 4. Post absenden
-
-1. **Senden:**
-   - **Shortcut:** Drücke `Control+Enter` (Cmd+Enter).
-   - **Alternativ:** Suche Button "Posten", "Tweet".
-   - Selektor: `div[data-testid="tweetButton"]`.
-2. **Verifikation:**
-   - Warte auf Verschwinden des Composer-Overlays.
-   - Warte auf Toast-Benachrichtigung ("Your post was sent").
+### B. Session-Check
+- **Fehlerfall:** Login-Seite oder `i/flow/login` erkannt.
+    - Selektor: `[data-testid="loginButton"]`
+    - Aktion: Warnung generieren + Screenshot. **Manuell via VNC einloggen** (`scripts/auth/twitter-vnc-login.ts`).
+- **Erfolgsfall:** Timeline oder Navigation sichtbar.
 
 ---
 
-## 🔧 Fehlerbehandlung & Updates
+## 2. Navigieren zum "Posten"
 
-**Wenn ein Schritt fehlschlägt:**
-1. **Screenshot erstellen:** `public/debug/` prüfen.
-2. **Analyse:**
-   - Hat sich der Text des Buttons geändert? (z.B. "Posten" -> "Veröffentlichen")
-   - Hat sich die ID/Klasse geändert?
-   - Ist ein Captcha erschienen?
-3. **DOKUMENT UPDATE:**
-   - Trage die Änderung HIER in dieses Dokument ein.
-   - Aktualisiere den Code (`smart-monitor-v4.ts`) entsprechend der neuen Doku.
+### A. Aufruf
+1.  **Direkt-Link:** `https://x.com/compose/post` (bevorzugt).
+2.  **Home-Button:**
+    - Selektor: `a[href="/compose/tweet"]` oder `div[role="button"][aria-label="Post"]`
+    - Oft in der Seitenleiste links oder als "+" Bubble (Mobile).
+
+---
+
+## 3. Post-Erstellung (Schreiben)
+
+### A. Textfeld
+1.  **Selektor:** `div[data-testid="tweetTextarea_0"]`
+2.  **Aktion:**
+    - Klicken (Focus).
+    - Text eintippen (Keyboard-Send).
+
+### B. Medien (Bilder)
+1.  **Input:** `input[type="file"][accept*="image"]` (versteckt, aber steuerbar).
+2.  **Aktion:** `setInputFiles(pfad)`
+3.  **Warten:** 5 Sekunden auf Upload-Preview (`[data-testid="attachments"]`).
+
+---
+
+## 4. Post-Absenden (Kritischer Schritt)
+
+### A. Senden (Primary Method)
+1.  **Shortcut:** `Control + Enter` (Cmd + Enter auf Mac).
+    - Zuverlässiger als Button, da dieser manchmal deaktiviert scheint (obwohl er es nicht ist).
+
+### B. Senden (Secondary Method - Button)
+1.  **Suche:** Button "Posten", "Tweet".
+    - Selektor: `div[data-testid="tweetButton"]`
+    - Position (Desktop): Unten rechts im Dialog / Textfeld.
+    - Position (Mobile): Oben rechts.
+2.  **Status-Check:**
+    - Prüfen ob deaktiviert (`aria-disabled="true"`). Wenn ja -> Textfeld noch leer oder zu lang?
+
+---
+
+## 5. Verifikation
+
+### A. Erfolgs-Meldung
+1.  **Toast:** Unten mittig erscheint "Your post was sent" / "Dein Tweet wurde gesendet".
+2.  **Weiterleitung:** Zurück zur Timeline oder Profil?
+
+### B. Link extrahieren
+1.  **Profil:** Gehe zu `https://x.com/[DEIN_USERNAME]`.
+2.  **Suche:** Erster Tweet in der Liste `article`.
+    - Selektor: `article a[href*="/status/"]`
 
 ---
 *Letztes Update: 2026-02-08*
