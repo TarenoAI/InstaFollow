@@ -433,6 +433,14 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
             }
         }
 
+        if (page.url().includes('login') || (await page.$('input[name="username"]'))) {
+            console.log(`   ⚠️ Login-Seite erkannt vor JS-Klick! Starte Login...`);
+            await performLogin(page);
+            // Nach Login: Navigiere erneut zum Profil
+            await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded' });
+            await page.waitForTimeout(4000);
+        }
+
         if (!clickedFollowing) {
             // Letzter Versuch: Via JavaScript klicken
             console.log('   ⚠️ Versuche JavaScript-Klick auf Following...');
@@ -440,6 +448,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 const links = document.querySelectorAll('a');
                 for (let i = 0; i < links.length; i++) {
                     const l = links[i];
+                    if (l.href.includes('login')) return 'LOGIN_REQUIRED'; // Erkennung im Browser-Kontext
                     if (l.href.includes('following') || l.href.includes('/following')) {
                         l.click();
                         return true;
