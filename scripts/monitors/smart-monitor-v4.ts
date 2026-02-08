@@ -1371,7 +1371,7 @@ async function main() {
                                   lastSuccessfulScrapeAt = datetime('now')
                                   WHERE id = ?`,
                             args: [
-                                currentCount,
+                                currentFollowing.length, // FIX: Nehme IMMER die echte Anzahl, nicht den Instagram-Header!
                                 parseInt(baselineProfileInfo?.followerCount.replace(/[.,KMB]/g, '') || '0'),
                                 currentFollowing.length,
                                 baselineProfileInfo?.profilePicUrl || null,
