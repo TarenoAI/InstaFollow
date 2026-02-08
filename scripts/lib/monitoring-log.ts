@@ -16,6 +16,7 @@ export interface MonitoringLogEntry {
     status: LogStatus;
     followingCountLive?: number;
     followingCountDb?: number;
+    followerCountLive?: number;
     scrapedCount?: number;
     scrapeQuote?: number;
     newFollowsCount?: number;
@@ -39,10 +40,10 @@ export async function saveMonitoringLog(
         await db.execute({
             sql: `INSERT INTO MonitoringLog (
                 id, profileId, profileUsername, status,
-                followingCountLive, followingCountDb, scrapedCount, scrapeQuote,
+                followingCountLive, followingCountDb, followerCountLive, scrapedCount, scrapeQuote,
                 newFollowsCount, unfollowsCount, newFollows, unfollows,
                 errorMessage, durationMs, createdAt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
             args: [
                 id,
                 entry.profileId,
@@ -50,6 +51,7 @@ export async function saveMonitoringLog(
                 entry.status,
                 entry.followingCountLive ?? null,
                 entry.followingCountDb ?? null,
+                entry.followerCountLive ?? null,
                 entry.scrapedCount ?? null,
                 entry.scrapeQuote ?? null,
                 entry.newFollowsCount ?? 0,
@@ -112,6 +114,7 @@ export async function ensureMonitoringLogTable(
             status TEXT NOT NULL,
             followingCountLive INTEGER,
             followingCountDb INTEGER,
+            followerCountLive INTEGER,
             scrapedCount INTEGER,
             scrapeQuote REAL,
             newFollowsCount INTEGER DEFAULT 0,

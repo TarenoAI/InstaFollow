@@ -130,33 +130,47 @@ async function getProfileInfo(page: Page, username: string): Promise<{
         let following = 0;
 
         try {
+            // Hilfsfunktion zum Parsen von Zahlen wie "1.2M" oder "300K"
+            const parseCount = (str: string): string => {
+                const clean = str.replace(/[.,]/g, '').trim().toUpperCase();
+                const match = str.match(/([\d,.]+)\s*([KM])?$/i);
+                if (!match) return "0";
+
+                let num = parseFloat(match[1].replace(/,/g, ''));
+                const unit = match[2]?.toUpperCase();
+
+                if (unit === 'K') num *= 1000;
+                else if (unit === 'M') num *= 1000000;
+
+                return Math.floor(num).toString();
+            };
+
             // Methode A: Meta Description (meist am zuverlässigsten)
             const metaDesc = await page.$eval('meta[name="description"]', (el: any) => el.content).catch(() => '');
             if (metaDesc) {
-                const followMatch = metaDesc.match(/([\d,\.]+)\s*(Follower|Abonnent)/i);
-                const followingMatch = metaDesc.match(/([\d,\.]+)\s*(Following|Gefolgt|abonniert)/i);
+                // Pattern: "123 Follower", "1.2M Follower", "300K Follower"
+                const followMatch = metaDesc.match(/([\d,\.]+[KM]?)\s*(Follower|Abonnent)/i);
+                const followingMatch = metaDesc.match(/([\d,\.]+[KM]?)\s*(Following|Gefolgt|abonniert)/i);
 
-                if (followMatch) followers = followMatch[1].replace(/[.,]/g, '');
-                if (followingMatch) following = parseInt(followingMatch[1].replace(/[.,]/g, ''));
+                if (followMatch) followers = parseCount(followMatch[1]);
+                if (followingMatch) following = parseInt(parseCount(followingMatch[1]));
             }
 
-            // Methode B: Falls Meta fehlt, direkt im UI suchen
+            // Methode B: Falls Meta fehlt oder 0, direkt im UI suchen
             if (followers === '0' || following === 0) {
                 const followLink = page.locator('a[href*="/followers/"]').first();
                 const followingLink = page.locator('a[href*="/following/"]').first();
 
                 if (await followLink.isVisible()) {
                     const text = await followLink.innerText();
-                    const m = text.match(/[\d,.]+/);
-                    if (m) followers = m[0].replace(/[.,]/g, '');
+                    followers = parseCount(text);
                 }
                 if (await followingLink.isVisible()) {
                     const text = await followingLink.innerText();
-                    const m = text.match(/[\d,.]+/);
-                    if (m) following = parseInt(m[0].replace(/[.,]/g, ''));
+                    following = parseInt(parseCount(text));
                 }
             }
-        } catch (e) {
+        } catch (e: any) {
             console.log(`   ⚠️ Fehler beim Auslesen der Stats: ${e.message}`);
         }
 

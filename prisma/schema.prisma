@@ -143,6 +143,7 @@ model MonitoringLog {
   // Scraping-Details
   followingCountLive    Int?       // Aktuelle Zahl auf Instagram
   followingCountDb      Int?       // Zahl in der DB vor dem Run
+  followerCountLive     Int?       // Aktuelle Follower-Zahl
   scrapedCount          Int?       // Anzahl gescrapte Following
   scrapeQuote           Float?     // Prozent gescrapt (z.B. 95.5)
   

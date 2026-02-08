@@ -1291,8 +1291,11 @@ async function main() {
                     if (addedUsernames.length > 0 || removedUsernames.length > 0) {
                         console.log('\n   📊 Lade Profilinfos mit Screenshots...');
 
+                        let followerNum: number | undefined = undefined;
                         const monitoredProfileInfo = await getProfileInfo(page, username, true);
                         if (!monitoredProfileInfo) continue;
+
+                        followerNum = parseInt(monitoredProfileInfo.followerCount.replace(/[,.KMB]/g, '') || '0');
 
                         // Verarbeite FOLLOWS (max 10 um Zeit zu sparen)
                         if (addedUsernames.length > 0) {
@@ -1398,7 +1401,6 @@ async function main() {
                         }
 
                         // Aktualisiere auch Profilinfos
-                        const followerNum = parseInt(monitoredProfileInfo.followerCount.replace(/[,.KMB]/g, '') || '0');
                         await db.execute({
                             sql: `UPDATE MonitoredProfile SET 
                                   followingCount = ?, 
@@ -1437,6 +1439,7 @@ async function main() {
                         status: 'SUCCESS',
                         followingCountLive: currentCount,
                         followingCountDb: lastCount,
+                        followerCountLive: followerNum,
                         scrapedCount: currentFollowing.length,
                         scrapeQuote: parseFloat(scrapeQuote),
                         newFollowsCount: addedUsernames.length,
