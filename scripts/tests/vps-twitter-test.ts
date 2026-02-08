@@ -87,11 +87,10 @@ async function postToTwitter(text: string): Promise<string | null> {
 
         await saveDebugScreenshot(page, 'debug-twitter-before-submit');
 
-        // Tweet absenden - force: true um Overlays zu ignorieren
-        console.log('📤 Sende Tweet...');
-        const postButton = page.locator('[data-testid="tweetButton"], [data-testid="tweetButtonInline"]').first();
-        await postButton.click({ force: true });
-        await humanDelay(3000, 5000);
+        // Tweet absenden - Ctrl+Enter ist der Shortcut zum Posten
+        console.log('📤 Sende Tweet (Ctrl+Enter)...');
+        await page.keyboard.press('Control+Enter');
+        await humanDelay(4000, 6000);
 
         await saveDebugScreenshot(page, 'debug-twitter-after-submit');
 
