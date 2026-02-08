@@ -1266,9 +1266,11 @@ async function main() {
                                   followingCount = ?, 
                                   lastCheckedAt = datetime('now'),
                                   isBaselineComplete = 1,
+                                  baselineCreatedAt = datetime('now'),
+                                  baselineFollowingCount = ?,
                                   lastSuccessfulScrapeAt = datetime('now')
                                   WHERE id = ?`,
-                            args: [currentCount, profileId]
+                            args: [currentCount, currentFollowing.length, profileId]
                         });
 
                         console.log(`   ✅ Baseline erstellt (${currentFollowing.length} Einträge) - KEINE Changes gemeldet`);

@@ -19,6 +19,9 @@ export interface ProfileInfo {
     followingCount: number | null;
     lastCheckedAt: Date | null;
     screenshotUrl: string | null;
+    isBaselineComplete: boolean;
+    baselineCreatedAt: Date | null;
+    baselineFollowingCount: number | null;
 }
 
 export interface TwitterAccountInfo {
@@ -64,6 +67,9 @@ export async function getSets(): Promise<SetInfo[]> {
             followingCount: p.followingCount,
             lastCheckedAt: p.lastCheckedAt,
             screenshotUrl: p.screenshotUrl,
+            isBaselineComplete: p.isBaselineComplete || false,
+            baselineCreatedAt: p.baselineCreatedAt,
+            baselineFollowingCount: p.baselineFollowingCount,
         })),
         twitterAccount: set.twitterAccount ? {
             id: set.twitterAccount.id,
@@ -213,6 +219,9 @@ export async function addProfileToSet(setId: string, username: string): Promise<
                 followingCount: profile.followingCount,
                 lastCheckedAt: profile.lastCheckedAt,
                 screenshotUrl: (profile as any).screenshotUrl || null,
+                isBaselineComplete: (profile as any).isBaselineComplete || false,
+                baselineCreatedAt: (profile as any).baselineCreatedAt || null,
+                baselineFollowingCount: (profile as any).baselineFollowingCount || null,
             },
         };
     } catch (error: unknown) {

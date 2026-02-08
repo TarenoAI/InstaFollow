@@ -1315,6 +1315,17 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
                                 })}
                               </p>
                             )}
+                            {profile.isBaselineComplete ? (
+                              <p className="text-xs text-[var(--accent)] flex items-center gap-1 mt-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"></span>
+                                Baseline: {profile.baselineFollowingCount || profile.followingCount} ({profile.baselineCreatedAt ? new Date(profile.baselineCreatedAt).toLocaleDateString('de-DE') : '—'})
+                              </p>
+                            ) : (
+                              <p className="text-xs text-[var(--warning)] flex items-center gap-1 mt-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--warning)]"></span>
+                                Baseline: Nicht erstellt
+                              </p>
+                            )}
                           </>
                         )}
                       </div>
