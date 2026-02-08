@@ -94,7 +94,7 @@ async function performLogin(page: Page): Promise<boolean> {
     try {
         console.log('🏁 Starte Auto-Login Prozess...');
         await page.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'networkidle' });
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(5000);
         await dismissPopups(page);
 
         // Username eingeben
@@ -109,14 +109,36 @@ async function performLogin(page: Page): Promise<boolean> {
             await passField.fill(INSTAGRAM_PASSWORD || '');
             await page.waitForTimeout(1000);
 
-            // Login Button klicken
-            const loginBtn = page.locator('button[type="submit"]');
-            await loginBtn.click();
-            console.log('   🖱️ Login-Button geklickt.');
+            // Login Button klicken (verschiedene Strategien)
+            const loginSelectors = [
+                'button[type="submit"]',
+                'button:has-text("Log In")',
+                'button:has-text("Anmelden")',
+                'div[role="button"]:has-text("Log In")',
+                'div[role="button"]:has-text("Anmelden")'
+            ];
+
+            let clicked = false;
+            for (const sel of loginSelectors) {
+                try {
+                    const btn = page.locator(sel).first();
+                    if (await btn.isVisible()) {
+                        console.log(`   🖱️ Klicke Login-Button (${sel})...`);
+                        await btn.click({ force: true, timeout: 5000 });
+                        clicked = true;
+                        break;
+                    }
+                } catch { }
+            }
+
+            if (!clicked) {
+                console.log('   ⌨️ Kein Button gefunden, drücke Enter...');
+                await page.keyboard.press('Enter');
+            }
 
             // Warte auf Navigation nach Login
             await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => { });
-            await page.waitForTimeout(5000);
+            await page.waitForTimeout(8000); // Instagram braucht manchmal ewig
             await dismissPopups(page);
 
             // Prüfen ob wir drin sind (kein login im URL mehr)
@@ -126,10 +148,15 @@ async function performLogin(page: Page): Promise<boolean> {
             }
         }
 
-        console.log('   ❌ Login-Felder nicht gefunden oder Login fehlgeschlagen.');
+        console.log('   ❌ Login fehlgeschlagen oder Felder nicht gefunden.');
+        const debugPic = path.join(DEBUG_DIR, `login-failed-${Date.now()}.png`);
+        await page.screenshot({ path: debugPic });
+        console.log(`   📸 Screenshot vom Login-Fehler: ${debugPic}`);
         return false;
     } catch (err: any) {
         console.log(`   ❌ Auto-Login Fehler: ${err.message}`);
+        const debugPic = path.join(DEBUG_DIR, `login-error-${Date.now()}.png`);
+        await page.screenshot({ path: debugPic });
         return false;
     }
 }
