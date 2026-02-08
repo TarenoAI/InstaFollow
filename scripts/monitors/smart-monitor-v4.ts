@@ -1123,13 +1123,18 @@ async function main() {
             }
         }
 
-        // Check for single profile argument
-        let query = "SELECT id, username, followingCount, isBaselineComplete, screenshotUrl FROM MonitoredProfile";
+        let query = `
+            SELECT DISTINCT mp.id, mp.username, mp.followingCount, mp.isBaselineComplete, mp.screenshotUrl 
+            FROM MonitoredProfile mp
+            JOIN _MonitoredProfileToProfileSet pts ON mp.id = pts.A
+            JOIN ProfileSet ps ON pts.B = ps.id
+            WHERE ps.isActive = 1
+        `;
         let args: any[] = [];
 
         if (targetUsername) {
             console.log(`🎯 Modus: Einzel-Profil Check (@${targetUsername})`);
-            query += " WHERE username = ?";
+            query += " AND mp.username = ?";
             args.push(targetUsername);
         } else {
             // LOCK-System (nur bei Full Run)
