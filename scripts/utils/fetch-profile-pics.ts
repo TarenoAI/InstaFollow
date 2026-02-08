@@ -82,44 +82,93 @@ async function getProfileInfo(page: Page, username: string): Promise<{
 } | null> {
     try {
         await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await delay(2000);
+        await delay(3000); // Etwas mehr Zeit für Mobile-Layout
 
         // Dismiss popups
         for (const selector of ['button:has-text("Jetzt nicht")', 'button:has-text("Ablehnen")', '[aria-label="Schließen"]']) {
-            const btn = page.locator(selector).first();
-            if (await btn.isVisible({ timeout: 500 }).catch(() => false)) {
-                await btn.click().catch(() => { });
-                await delay(500);
-            }
+            try {
+                const btn = page.locator(selector).first();
+                if (await btn.isVisible({ timeout: 1000 })) {
+                    await btn.click().catch(() => { });
+                    await delay(500);
+                }
+            } catch (e) { }
         }
 
         // Get profile info
         let profilePicUrl = '';
         try {
-            const img = page.locator('header img[alt*="Profilbild"], header img[alt*="profile picture"]').first();
+            const img = page.locator('header img[alt*="Profilbild"], header img[alt*="profile picture"], [role="button"] img[alt*="Profilbild"]').first();
             if (await img.isVisible({ timeout: 2000 })) {
                 profilePicUrl = await img.getAttribute('src') || '';
             }
         } catch { }
 
-        const headerText = await page.locator('header').first().textContent() || '';
-        const fullName = headerText.split('\n').find(l => l.trim() && !l.includes('@')) || username;
-        const isVerified = headerText.includes('Verifiziert') || await page.locator('header [aria-label*="Verifiziert"]').isVisible().catch(() => false);
+        // Robustere Namens-Extraktion
+        let fullName = username;
+        try {
+            // Methode 1: Header h1/h2 die nicht der Username sind
+            const possibleNames = await page.locator('header section span, header h1, header h2').allTextContents();
+            const foundName = possibleNames.find(t =>
+                t.trim() &&
+                !t.includes('@') &&
+                t.trim().toLowerCase() !== username.toLowerCase() &&
+                !t.includes('Follower') &&
+                !t.includes('Gefolgt') &&
+                !t.includes('Following') &&
+                !t.includes('Zurück') &&
+                !t.includes('Back')
+            );
+            if (foundName) fullName = foundName.trim();
+        } catch (e) { }
 
-        // Get counts
-        const statsText = await page.locator('header ul, header section').first().textContent() || '';
-        const followingMatch = statsText.match(/(\d+(?:[.,]\d+)?)\s*(?:Gefolgt|Following|abonniert)/i);
-        const followerMatch = statsText.match(/(\d+(?:[.,]\d+)?)\s*(?:Follower|Abonnent)/i);
+        // Verifiziert Check
+        const isVerified = await page.locator('header [aria-label*="Verifiziert"], header [aria-label*="Verified"]').isVisible().catch(() => false);
+
+        // Get counts (Methoden aus smart-monitor-v4 übernommen)
+        let followers = '0';
+        let following = 0;
+
+        try {
+            // Methode A: Meta Description (meist am zuverlässigsten)
+            const metaDesc = await page.$eval('meta[name="description"]', (el: any) => el.content).catch(() => '');
+            if (metaDesc) {
+                const followMatch = metaDesc.match(/([\d,\.]+)\s*(Follower|Abonnent)/i);
+                const followingMatch = metaDesc.match(/([\d,\.]+)\s*(Following|Gefolgt|abonniert)/i);
+
+                if (followMatch) followers = followMatch[1].replace(/[.,]/g, '');
+                if (followingMatch) following = parseInt(followingMatch[1].replace(/[.,]/g, ''));
+            }
+
+            // Methode B: Falls Meta fehlt, direkt im UI suchen
+            if (followers === '0' || following === 0) {
+                const followLink = page.locator('a[href*="/followers/"]').first();
+                const followingLink = page.locator('a[href*="/following/"]').first();
+
+                if (await followLink.isVisible()) {
+                    const text = await followLink.innerText();
+                    const m = text.match(/[\d,.]+/);
+                    if (m) followers = m[0].replace(/[.,]/g, '');
+                }
+                if (await followingLink.isVisible()) {
+                    const text = await followingLink.innerText();
+                    const m = text.match(/[\d,.]+/);
+                    if (m) following = parseInt(m[0].replace(/[.,]/g, ''));
+                }
+            }
+        } catch (e) {
+            console.log(`   ⚠️ Fehler beim Auslesen der Stats: ${e.message}`);
+        }
 
         return {
             profilePicUrl,
-            fullName: fullName.trim(),
+            fullName,
             isVerified,
-            followerCount: followerMatch?.[1] || '0',
-            followingCount: parseInt(followingMatch?.[1]?.replace(/[.,]/g, '') || '0'),
+            followerCount: followers,
+            followingCount: following,
         };
     } catch (err: any) {
-        console.log(`   ❌ Fehler: ${err.message}`);
+        console.log(`   ❌ Fehler bei @${username}: ${err.message}`);
         return null;
     }
 }
