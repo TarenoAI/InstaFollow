@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
             unfollows: row.unfollows ? JSON.parse(row.unfollows as string) : null,
             errorMessage: row.errorMessage,
             durationMs: row.durationMs,
-            createdAt: row.createdAt
+            createdAt: row.createdAt ? (row.createdAt as string).replace(' ', 'T') + 'Z' : null
         }));
 
         return NextResponse.json({ success: true, logs });
