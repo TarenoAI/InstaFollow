@@ -1135,7 +1135,9 @@ async function postToTwitter(
         if (page.url().includes('login') || page.url().includes('flow')) {
             console.log('   ❌ Twitter Session abgelaufen oder nicht eingeloggt!');
             console.log('   ➡️ Führe aus: DISPLAY=:1 npx tsx scripts/auth/twitter-vnc-login.ts');
-            await page.screenshot({ path: `${DEBUG_DIR}/twitter-session-expired.png` });
+            const twitterLoginPath = `${DEBUG_DIR}/twitter-session-expired-${Date.now()}.png`;
+            await page.screenshot({ path: twitterLoginPath });
+            await pushDebugScreenshot(twitterLoginPath, 'debug: twitter session expired');
             await context.close();
             return null;
         }
@@ -1187,6 +1189,12 @@ async function postToTwitter(
         return tweetUrl || 'https://x.com';
     } catch (err: any) {
         console.log(`   ❌ Twitter Fehler: ${err.message}`);
+        // 📸 Screenshot vom Fehler
+        try {
+            const twitterErrorPath = `${DEBUG_DIR}/twitter-post-error-${Date.now()}.png`;
+            await page.screenshot({ path: twitterErrorPath });
+            await pushDebugScreenshot(twitterErrorPath, `debug: twitter post error - ${err.message?.substring(0, 30)}`);
+        } catch { }
         await context.close().catch(() => { });
         return null;
     }
