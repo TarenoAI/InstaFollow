@@ -1444,6 +1444,7 @@ async function main() {
         } else {
             // Im Automatik-Modus: Nur aktive Sets!
             query += " AND ps.isActive = 1";
+            query += " ORDER BY lastCheckedAt ASC"; // Älteste zuerst!
 
             // LOCK-System (nur bei Full Run)
             if (fs.existsSync(LOCK_FILE)) {
