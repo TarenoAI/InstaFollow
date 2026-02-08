@@ -608,6 +608,13 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
             // Check ob neue API-Daten kamen
             if (apiFollowing.size === prevSize) noNewCount++;
             else noNewCount = 0;
+
+            // 🚨 MOBILE LOGIN-CHECK WÄHREND DES SCROLLENS
+            // Falls Session plötzlich abläuft
+            if (page.url().includes('login') && scroll % 5 === 0) {
+                console.log(`   ⚠️ Session verloren während Scraping! Versuche Re-Login...`);
+                await performLogin(page);
+            }
         }
 
         // Response Handler entfernen
