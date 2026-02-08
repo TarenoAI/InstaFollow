@@ -13,6 +13,7 @@ import path from 'path';
 import fs from 'fs';
 import axios from 'axios';
 import { saveMonitoringLog, ensureMonitoringLogTable, LogStatus } from '../lib/monitoring-log';
+import { addToQueue } from '../lib/twitter-queue';
 
 // === KONFIGURATION ===
 const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
@@ -1720,6 +1721,18 @@ async function main() {
                                     screenshotToUse
                                 );
 
+                                // 📤 Falls Twitter-Post fehlgeschlagen -> In Queue speichern
+                                if (!tweetUrl) {
+                                    console.log('   📥 Twitter-Post fehlgeschlagen - speichere in Queue...');
+                                    addToQueue({
+                                        text: tweetText,
+                                        imagePath: screenshotToUse,
+                                        monitoredProfile: monitoredProfileInfo.username,
+                                        changeType: 'FOLLOW',
+                                        targetUsernames: addedUsernames
+                                    });
+                                }
+
                                 await sendWebhook({
                                     event: 'FOLLOW',
                                     monitoredProfile: monitoredProfileInfo,
@@ -1755,12 +1768,25 @@ async function main() {
 
                             if (removedProfiles.length > 0) {
                                 const tweetText = formatTweetText('UNFOLLOW', monitoredProfileInfo, removedProfiles);
+                                const unfollowScreenshot = removedProfiles[0]?.screenshotPath || monitoredProfileInfo.screenshotPath;
 
                                 const tweetUrl = await postToTwitter(
                                     context.browser()!,
                                     tweetText,
-                                    removedProfiles[0]?.screenshotPath || monitoredProfileInfo.screenshotPath
+                                    unfollowScreenshot
                                 );
+
+                                // 📤 Falls Twitter-Post fehlgeschlagen -> In Queue speichern
+                                if (!tweetUrl) {
+                                    console.log('   📥 Twitter-Post fehlgeschlagen - speichere in Queue...');
+                                    addToQueue({
+                                        text: tweetText,
+                                        imagePath: unfollowScreenshot,
+                                        monitoredProfile: monitoredProfileInfo.username,
+                                        changeType: 'UNFOLLOW',
+                                        targetUsernames: removedUsernames
+                                    });
+                                }
 
                                 await sendWebhook({
                                     event: 'UNFOLLOW',
