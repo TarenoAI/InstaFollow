@@ -26,10 +26,10 @@ async function main() {
     console.log(`📂 Browser-Profil: ${TWITTER_PROFILE_DIR}`);
     console.log(`\n🌐 Starte Browser...\n`);
 
-    // Persistenter Browser-Context
+    // Persistenter Browser-Context mit kleinerem Fenster für VNC
     const context = await chromium.launchPersistentContext(TWITTER_PROFILE_DIR, {
         headless: false,  // Sichtbar für VNC!
-        viewport: { width: 1280, height: 800 },
+        viewport: { width: 1024, height: 600 },  // Kleineres Fenster für VNC
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         locale: 'de-DE',
         args: [
@@ -37,6 +37,8 @@ async function main() {
             '--no-first-run',
             '--disable-sync',
             '--no-sandbox',
+            '--window-size=1024,600',
+            '--window-position=0,0',
         ],
     });
 
