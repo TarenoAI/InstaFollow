@@ -58,3 +58,16 @@ data/browser-profiles/
 !public/profile-pics/*.jpg
 !public/profile-pics/*.png
 !public/file.svg
+
+# Auth & Sessions
+data/sessions/
+twitter-session.json
+
+# Temporary Scripts & VPS utilities
+debug-vps.ts
+login-vps.ts
+quick-check.ts
+temp_clone/
+twitter-*.ts
+!twitter-api-monitor.ts # Example of a script you might want to keep (guessing name)
+
