@@ -1493,23 +1493,19 @@ async function main() {
                 }
             }
 
+            // 📤 Nach jedem Profil: Screenshots und Debug-Bilder zu Git pushen
+            const { exec } = await import('child_process');
+            exec(`cd ${process.cwd()} && git add public/screenshots/ public/debug/ .incidents/ && git commit -m "auto: progress update @${username}" && git push origin main`,
+                (err) => {
+                    if (!err) console.log(`   📤 Progress @${username} zu Git gepusht`);
+                });
+
             console.log('');
             await humanDelay(10000, 15000);
         }
 
         await context.storageState({ path: SESSION_PATH });
         console.log('💾 Instagram Session gespeichert');
-
-        // 📤 Screenshots, Debug-Bilder und Incidents zu Git pushen
-        console.log(`📁 Debug-Ordner: ${DEBUG_DIR}`);
-        console.log(`📁 Screenshots-Ordner: ${SCREENSHOTS_DIR}`);
-
-        const { exec } = await import('child_process');
-        exec(`cd ${process.cwd()} && git add public/screenshots/ public/debug/ .incidents/ && git commit -m "auto: screenshots + debug + incidents" && git push origin main`,
-            (err) => {
-                if (!err) console.log('📤 Dateien zu Git gepusht (screenshots, debug, incidents)');
-                else if (!err?.message?.includes('nothing to commit')) console.log('ℹ️ Keine neuen Dateien');
-            });
 
     } catch (err: any) {
         console.error('\n❌ Fehler:', err.message);
