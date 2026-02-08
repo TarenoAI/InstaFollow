@@ -30,10 +30,12 @@ import { checkAppPassword } from './actions/auth';
 import { getProfileScreenshots } from './actions/github';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-// Helper function to proxy Instagram images through our API to avoid CORS issues
+// Instagram Bilder direkt laden (Profile Pictures haben kein CORS-Problem)
+// Proxy nur als Fallback verwenden wenn nötig
 function proxyImageUrl(url: string): string {
   if (!url) return '';
-  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  // Direkt laden - Instagram Profile Pics sind öffentlich zugänglich
+  return url;
 }
 
 // ============ SETTINGS MODAL ============
