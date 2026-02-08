@@ -742,6 +742,16 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
         let pageReady = false;
         let bodyLen = 0;
         for (let i = 0; i < 5; i++) {
+            // Check 0: Login detection
+            if (page.url().includes('login') || (await page.$('input[name="username"]'))) {
+                console.log(`      ⚠️ Login-Seite erkannt während Lade-Wait (${i + 1}/5)!`);
+                const loginOk = await performLogin(page);
+                if (loginOk) {
+                    await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded' });
+                    continue;
+                }
+            }
+
             // Check 1: Body text length
             bodyLen = await page.evaluate("document.body ? document.body.innerText.length : 0");
 
@@ -755,7 +765,7 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
                 break;
             }
 
-            console.log(`      ⏳ Warte auf Content (${i + 1}/5)... [bodyLen=${bodyLen}]`);
+            console.log(`      ⏳ Warte auf Content (${i + 1}/5)... [bodyLen=${bodyLen}] [URL=${page.url().substring(0, 40)}...]`);
             await page.waitForTimeout(2000);
             await dismissPopups(page);
         }
@@ -763,12 +773,21 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
         console.log(`      📄 Body text length: ${bodyLen}, pageReady: ${pageReady}`);
 
         if (!pageReady) {
-            console.log(`      ⚠️ Seite nicht bereit - versuche Reload...`);
+            console.log(`      ⚠️ Seite nicht bereit - mache Debug-Screenshot und versuche Reload...`);
+            const debugPic = path.join(DEBUG_DIR, `not-ready-${username}-${Date.now()}.png`);
+            await page.screenshot({ path: debugPic });
+
             await page.reload({ waitUntil: 'load', timeout: 30000 }).catch(() => { });
             await page.waitForTimeout(5000);
             await dismissPopups(page);
 
             // Nochmal checken
+            if (page.url().includes('login')) {
+                console.log('      ⚠️ Redirect zu Login nach Reload erkannt!');
+                await performLogin(page);
+                await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded' });
+            }
+
             const hasFollowingLink = await page.$('a[href*="following"]').then(el => !!el).catch(() => false);
             bodyLen = await page.evaluate("document.body ? document.body.innerText.length : 0");
             pageReady = bodyLen > 150 || hasFollowingLink;
@@ -1054,6 +1073,20 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
 
 const LOCK_FILE = path.join(process.cwd(), '.monitor.lock');
 
+/**
+ * Pushes all screenshots and debug logs to Git
+ */
+async function pushProgressToGit(username: string) {
+    try {
+        const { execSync } = await import('child_process');
+        console.log(`   📤 Push progress für @${username}...`);
+        execSync(`git add public/screenshots/ public/debug/ .incidents/ && git commit -m "auto: progress update @${username}" && git push origin main`, { stdio: 'ignore' });
+        console.log(`   ✅ Gepusht!`);
+    } catch (err) {
+        // Silently fail if nothing to commit
+    }
+}
+
 // === MAIN ===
 async function main() {
     console.log('\n' + '═'.repeat(60));
@@ -1240,6 +1273,7 @@ async function main() {
                     followingCountDb: lastCount,
                     errorMessage: 'Following-Count konnte nicht gelesen werden'
                 });
+                await pushProgressToGit(username);
                 continue;
             }
 
@@ -1644,11 +1678,7 @@ async function main() {
             }
 
             // 📤 Nach jedem Profil: Screenshots und Debug-Bilder zu Git pushen
-            const { exec } = await import('child_process');
-            exec(`cd ${process.cwd()} && git add public/screenshots/ public/debug/ .incidents/ && git commit -m "auto: progress update @${username}" && git push origin main`,
-                (err) => {
-                    if (!err) console.log(`   📤 Progress @${username} zu Git gepusht`);
-                });
+            await pushProgressToGit(username);
 
             console.log('');
             await humanDelay(10000, 15000);
