@@ -46,3 +46,15 @@ next-env.d.ts
 config.json
 dev.db
 dev.db-journal
+
+# Monitoring Debug & Artifacts
+artifacts/
+.incidents/
+public/debug/
+public/screenshots/
+data/browser-profiles/
+*.png
+*.jpg
+!public/profile-pics/*.jpg
+!public/profile-pics/*.png
+!public/file.svg

@@ -1,0 +1,14 @@
+# Exclude heavy debug files and artifacts from Vercel build
+artifacts/
+data/browser-profiles/
+public/debug/
+public/screenshots/
+*.png
+*.jpg
+!public/profile-pics/*.jpg
+!public/profile-pics/*.png
+.incidents/
+.gemini/
+.agent/
+node_modules/
+.next/
