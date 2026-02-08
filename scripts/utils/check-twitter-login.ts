@@ -1,0 +1,76 @@
+
+/**
+ * 🧪 TWITTER LOGIN CHECKER
+ * 
+ * Überprüft ob die X/Twitter Session aktuell gültig ist (Home-Feed sichtbar).
+ * Gibt den Status zurück und speichert optional einen Screenshot.
+ */
+
+import 'dotenv/config';
+import { getTwitterContext, closeTwitterContext, checkTwitterSession } from '../lib/twitter-auto-login';
+import * as path from 'path';
+import { prisma } from '../../src/lib/prisma';
+
+const DEBUG_DIR = path.join(process.cwd(), 'public/debug');
+
+async function checkLogin() {
+    console.log('\n🔍 Prüfe X/Twitter Login-Status...');
+
+    // Wir starten im non-headless Modus falls wir manuell schauen wollen (lokal), 
+    // aber standardmäßig headless für den Cron/Server.
+    const result = await getTwitterContext(true);
+
+    if (!result.success || !result.page || !result.context) {
+        console.log(`❌ NICHT EINGELOGGT: ${result.error || 'Unbekannter Fehler'}`);
+        await updateDbStatus(false);
+        process.exit(1);
+    }
+
+    const { page, context } = result;
+
+    try {
+        // Wir sind schon auf x.com/home nach getTwitterContext
+        const isLoggedIn = await checkTwitterSession(page);
+
+        if (isLoggedIn) {
+            console.log('✅ EINGELOGGT: Home-Feed ist sichtbar.');
+            await page.screenshot({ path: path.join(DEBUG_DIR, 'twitter-status-check.png') });
+            await updateDbStatus(true);
+        } else {
+            console.log('❌ NICHT EINGELOGGT: Login-Seite oder Flow sichtbar.');
+            await updateDbStatus(false);
+        }
+
+        await closeTwitterContext(context);
+    } catch (err: any) {
+        console.log(`❌ FEHLER: ${err.message}`);
+        await closeTwitterContext(context).catch(() => { });
+        process.exit(1);
+    }
+}
+
+async function updateDbStatus(isLoggedIn: boolean) {
+    try {
+        // Finde den Haupt-Account (oder alle)
+        const accounts = await (prisma as any).twitterAccount.findMany();
+
+        for (const acc of accounts) {
+            await (prisma as any).twitterAccount.update({
+                where: { id: acc.id },
+                data: {
+                    lastLoginStatus: isLoggedIn,
+                    lastStatusCheckAt: new Date()
+                }
+            });
+            console.log(`   💾 Datenbank aktualisiert für @${acc.username}`);
+        }
+    } catch (err) {
+        // Falls Tabellen noch nicht existieren (Migration fehlt)
+        console.log('   ⚠️ Datenbank-Update übersprungen (Migration fehlt vermutlich)');
+    }
+}
+
+checkLogin().catch(err => {
+    console.error(err);
+    process.exit(1);
+});

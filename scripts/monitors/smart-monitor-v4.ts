@@ -14,6 +14,7 @@ import fs from 'fs';
 import axios from 'axios';
 import { saveMonitoringLog, ensureMonitoringLogTable, LogStatus } from '../lib/monitoring-log';
 import { addToQueue } from '../lib/twitter-queue';
+import { getTwitterContext, closeTwitterContext, checkTwitterSession } from '../lib/twitter-auto-login';
 
 // === KONFIGURATION ===
 const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
@@ -1293,6 +1294,37 @@ async function pushProgressToGit(username: string) {
 }
 
 // === MAIN ===
+/**
+ * 🐦 Prüft den Twitter Login-Status für alle Accounts in der DB
+ */
+async function updateTwitterStatusInDb(db: any) {
+    console.log('\n🐦 Prüfe X/Twitter Login-Status für Datenbank...');
+
+    // Hole alle Twitter Accounts
+    const accounts = await db.execute("SELECT id, username FROM TwitterAccount");
+
+    if (accounts.rows.length === 0) return;
+
+    // Wir brauchen nur EINE Session um zu prüfen ob die globale Session (Firefox Profile) noch geht
+    const result = await getTwitterContext(true);
+
+    let isLoggedIn = false;
+    if (result.success && result.page) {
+        isLoggedIn = await checkTwitterSession(result.page);
+        await closeTwitterContext(result.context!);
+    }
+
+    console.log(`   📊 Status: ${isLoggedIn ? '✅ Eingeloggt' : '❌ Login erforderlich'}`);
+
+    for (const row of accounts.rows) {
+        await db.execute({
+            sql: "UPDATE TwitterAccount SET lastLoginStatus = ?, lastStatusCheckAt = datetime('now') WHERE id = ?",
+            args: [isLoggedIn ? 1 : 0, row.id]
+        });
+        console.log(`   💾 DB aktualisiert für @${row.username}`);
+    }
+}
+
 async function main() {
     console.log('\n' + '═'.repeat(60));
     console.log(`🕵️ SMART MONITORING v4 - ${new Date().toLocaleString()}`);
@@ -1934,6 +1966,13 @@ async function main() {
 
         await context.storageState({ path: SESSION_PATH });
         console.log('💾 Instagram Session gespeichert');
+
+        // 🐦 Twitter Status Check am Ende des Cron-Runs
+        try {
+            await updateTwitterStatusInDb(db);
+        } catch (e) {
+            console.log('   ⚠️ Twitter Status Check fehlgeschlagen:', e);
+        }
 
     } catch (err: any) {
         console.error('\n❌ Fehler:', err.message);

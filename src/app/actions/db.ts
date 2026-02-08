@@ -29,6 +29,8 @@ export interface TwitterAccountInfo {
     username: string;
     displayName: string | null;
     isActive: boolean;
+    lastLoginStatus?: boolean | null;
+    lastStatusCheckAt?: Date | null;
 }
 
 export interface SetInfo {
@@ -367,6 +369,8 @@ export async function getTwitterAccounts(): Promise<TwitterAccountInfo[]> {
             username: a.username,
             displayName: a.displayName,
             isActive: a.isActive,
+            lastLoginStatus: a.lastLoginStatus,
+            lastStatusCheckAt: a.lastStatusCheckAt,
         }));
     } catch (error: any) {
         // Table doesn't exist yet or other error
