@@ -645,12 +645,23 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
             await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
             await page.waitForTimeout(2000);
 
-            if (page.url().includes('login') && process.env.INSTAGRAM_SESSION_ID) {
-                console.log('      🔄 Versuche Auto-Login via .env Cookies...');
-                await page.context().addCookies([
-                    { name: 'sessionid', value: process.env.INSTAGRAM_SESSION_ID, domain: '.instagram.com', path: '/', secure: true, httpOnly: true }
-                ]);
-                await page.goto('https://www.instagram.com/', { waitUntil: 'networkidle' });
+            if (page.url().includes('login')) {
+                // Strategie 1: Cookies
+                if (process.env.INSTAGRAM_SESSION_ID) {
+                    console.log('      🔄 Versuche Auto-Login via .env Cookies...');
+                    await page.context().addCookies([
+                        { name: 'sessionid', value: process.env.INSTAGRAM_SESSION_ID, domain: '.instagram.com', path: '/', secure: true, httpOnly: true }
+                    ]);
+                    await page.goto('https://www.instagram.com/', { waitUntil: 'networkidle' });
+                    await dismissPopups(page);
+                }
+
+                // Strategie 2: Echter Login (wenn Cookies nicht reichen)
+                if (page.url().includes('login')) {
+                    console.log('      ⚠️ Cookies reichen nicht. Versuche Auto-Login mit Passwort...');
+                    const loginOk = await performLogin(page);
+                    if (!loginOk) return null; // Abbruch wenn Login fehlschlägt
+                }
             }
             await dismissPopups(page);
         }
