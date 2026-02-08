@@ -54,6 +54,8 @@ model MonitoredProfile {
   
   // Baseline tracking - nur wenn true, können Changes erkannt werden
   isBaselineComplete    Boolean  @default(false)
+  baselineCreatedAt     DateTime?  // Wann wurde die Baseline erstellt
+  baselineFollowingCount Int?       // Following-Anzahl bei Baseline-Erstellung
   lastSuccessfulScrapeAt DateTime?
   
   // Screenshot of the profile (latest)
