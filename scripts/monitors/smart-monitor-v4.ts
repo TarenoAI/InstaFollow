@@ -1462,10 +1462,29 @@ async function main() {
                     followingCountDb: lastCount
                 });
 
-                await db.execute({
-                    sql: "UPDATE MonitoredProfile SET lastCheckedAt = datetime('now') WHERE id = ?",
-                    args: [profileId]
-                });
+                // Trotzdem Profilinfos aktualisieren (Bild, Name, etc.)
+                const profileInfo = await getProfileInfo(page, username, false);
+                if (profileInfo?.profilePicUrl) {
+                    await db.execute({
+                        sql: `UPDATE MonitoredProfile SET 
+                              profilePicUrl = ?,
+                              fullName = ?,
+                              isVerified = ?,
+                              lastCheckedAt = datetime('now')
+                              WHERE id = ?`,
+                        args: [
+                            profileInfo.profilePicUrl,
+                            profileInfo.fullName || username,
+                            profileInfo.isVerified ? 1 : 0,
+                            profileId
+                        ]
+                    });
+                } else {
+                    await db.execute({
+                        sql: "UPDATE MonitoredProfile SET lastCheckedAt = datetime('now') WHERE id = ?",
+                        args: [profileId]
+                    });
+                }
             }
 
             console.log('');
