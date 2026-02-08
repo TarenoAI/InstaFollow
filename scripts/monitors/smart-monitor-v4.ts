@@ -98,7 +98,14 @@ async function performLogin(page: Page): Promise<boolean> {
         await dismissPopups(page);
 
         // Username eingeben
+        console.log('   ⏳ Warte auf Login-Felder...');
         const userField = page.locator('input[name="username"]');
+        try {
+            await userField.waitFor({ state: 'visible', timeout: 15000 });
+        } catch (e) {
+            console.log('   ⚠️ Login-Feld nicht erschienen (Timeout).');
+        }
+
         if (await userField.isVisible()) {
             console.log(`   ⌨️ Tippe Username ${INSTAGRAM_USERNAME}...`);
             await userField.fill(INSTAGRAM_USERNAME || '');
@@ -158,10 +165,11 @@ async function performLogin(page: Page): Promise<boolean> {
             }
         }
 
-        console.log('   ❌ Login fehlgeschlagen oder Felder nicht gefunden.');
+        const title = await page.title();
+        const bodyContent = await page.evaluate("document.body ? document.body.innerText.substring(0, 200) : 'Kein Body'");
+        console.log(`   ❌ Login fehlgeschlagen. Seite: "${title}" | Body: "${bodyContent}"`);
         const debugPic = path.join(DEBUG_DIR, `login-failed-${Date.now()}.png`);
         await page.screenshot({ path: debugPic });
-        console.log(`   📸 Screenshot vom Login-Fehler: ${debugPic}`);
         return false;
     } catch (err: any) {
         console.log(`   ❌ Auto-Login Fehler: ${err.message}`);
@@ -1117,9 +1125,24 @@ async function pushProgressToGit(username: string) {
     try {
         const { execSync } = await import('child_process');
         console.log(`   📤 Push progress für @${username}...`);
-        // Verwende rebase um Konflikte mit meinen Commits zu vermeiden
+
+        // 1. Config setzen
         execSync(`git config user.email "bot@tareno.ai" && git config user.name "InstaBot"`, { stdio: 'ignore' });
-        execSync(`git add public/screenshots/ public/debug/ .incidents/ && git commit -m "auto: progress update @${username}" && git pull --rebase origin main && git push origin main`, { stdio: 'ignore' });
+
+        // 2. Änderungen hinzufügen
+        execSync(`git add public/screenshots/ public/debug/ .incidents/`, { stdio: 'ignore' });
+
+        // 3. Nur committen wenn Änderungen vorhanden sind
+        try {
+            execSync(`git diff-index --quiet HEAD || git commit -m "auto: progress update @${username}"`, { stdio: 'ignore' });
+        } catch (e) {
+            // Commit fehlgeschlagen (meist weil nichts zu committen)
+        }
+
+        // 4. Pull & Push
+        console.log(`   🔄 Git Pull & Push...`);
+        execSync(`git pull --rebase origin main && git push origin main`, { stdio: 'ignore' });
+
         console.log(`   ✅ Gepusht!`);
     } catch (err: any) {
         console.log(`   ⚠️ Git-Push fehlgeschlagen: ${err.message}`);
