@@ -1135,7 +1135,13 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
                 </div>
               </div>
             </div>
-            <p className="text-[var(--text-muted)] text-sm">{set.profiles.length} Profile</p>
+            <div className="flex items-center gap-3 text-sm">
+              <span className="text-[var(--text-muted)]">{set.profiles.length} Profile</span>
+              <span className="w-1 h-1 rounded-full bg-[var(--border)]"></span>
+              <span className={`${set.profiles.filter(p => p.isBaselineComplete).length === set.profiles.length ? 'text-[var(--success)]' : 'text-[var(--accent)]'} font-medium`}>
+                {set.profiles.filter(p => p.isBaselineComplete).length} von {set.profiles.length} Baseline bereit
+              </span>
+            </div>
           </div>
 
           {/* Tracking Toggle */}
