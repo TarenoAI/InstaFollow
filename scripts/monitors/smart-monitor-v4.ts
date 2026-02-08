@@ -1145,6 +1145,12 @@ async function main() {
                     });
                 }
 
+                let followerNum = 0;
+                try {
+                    const info = await getProfileInfo(page, username, false);
+                    if (info) followerNum = parseInt(info.followerCount.replace(/[.,KMB]/g, '') || '0');
+                } catch { }
+
                 // Full Scrape
                 const scrapeResult = await getFollowingList(page, username, currentCount);
                 currentFollowing = scrapeResult.following;
@@ -1247,6 +1253,7 @@ async function main() {
                         await db.execute({
                             sql: `UPDATE MonitoredProfile SET 
                                   followingCount = ?, 
+                                  followerCount = ?,
                                   lastCheckedAt = datetime('now'),
                                   isBaselineComplete = 1,
                                   baselineCreatedAt = datetime('now'),
@@ -1258,6 +1265,7 @@ async function main() {
                                   WHERE id = ?`,
                             args: [
                                 currentCount,
+                                parseInt(baselineProfileInfo?.followerCount.replace(/[.,KMB]/g, '') || '0'),
                                 currentFollowing.length,
                                 baselineProfileInfo?.profilePicUrl || null,
                                 baselineProfileInfo?.fullName || username,
@@ -1276,6 +1284,7 @@ async function main() {
                             status: 'SUCCESS',
                             followingCountLive: currentCount,
                             followingCountDb: lastCount,
+                            followerCountLive: followerNum,
                             scrapedCount: currentFollowing.length,
                             scrapeQuote: parseFloat(scrapeQuote),
                             newFollowsCount: addedUsernames.length,
@@ -1291,7 +1300,6 @@ async function main() {
                     if (addedUsernames.length > 0 || removedUsernames.length > 0) {
                         console.log('\n   📊 Lade Profilinfos mit Screenshots...');
 
-                        let followerNum: number | undefined = undefined;
                         const monitoredProfileInfo = await getProfileInfo(page, username, true);
                         if (!monitoredProfileInfo) continue;
 
