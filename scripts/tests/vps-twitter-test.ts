@@ -87,10 +87,10 @@ async function postToTwitter(text: string): Promise<string | null> {
 
         await saveDebugScreenshot(page, 'debug-twitter-before-submit');
 
-        // Tweet absenden
+        // Tweet absenden - force: true um Overlays zu ignorieren
         console.log('📤 Sende Tweet...');
         const postButton = page.locator('[data-testid="tweetButton"], [data-testid="tweetButtonInline"]').first();
-        await postButton.click();
+        await postButton.click({ force: true });
         await humanDelay(3000, 5000);
 
         await saveDebugScreenshot(page, 'debug-twitter-after-submit');
