@@ -8,7 +8,7 @@
 import { createClient } from '@libsql/client';
 
 // Status-Typen
-export type LogStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'NO_CHANGE' | 'SKIPPED';
+export type LogStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'NO_CHANGE' | 'SKIPPED' | 'ERROR';
 
 export interface MonitoringLogEntry {
     profileId: string;

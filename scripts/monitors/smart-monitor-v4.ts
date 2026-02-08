@@ -1102,6 +1102,14 @@ async function main() {
 
             if (currentCount === null) {
                 console.log('   ⚠️ Konnte Zahl nicht lesen\n');
+                await saveMonitoringLog(db, {
+                    profileId,
+                    profileUsername: username,
+                    status: 'ERROR',
+                    followingCountLive: 0,
+                    followingCountDb: lastCount,
+                    errorMessage: 'Following-Count konnte nicht gelesen werden'
+                });
                 continue;
             }
 
@@ -1117,6 +1125,15 @@ async function main() {
                 await db.execute({
                     sql: `UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now') WHERE id = ?`,
                     args: [currentCount, profileId]
+                });
+
+                await saveMonitoringLog(db, {
+                    profileId,
+                    profileUsername: username,
+                    status: 'SKIPPED',
+                    followingCountLive: currentCount,
+                    followingCountDb: lastCount,
+                    errorMessage: `Übersprungen: ${currentCount} > ${MAX_FOLLOWING} Following`
                 });
 
                 await humanDelay(8000, 12000);
