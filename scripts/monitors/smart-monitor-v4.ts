@@ -19,18 +19,16 @@ const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.
 const TWITTER_SESSION_PATH = path.join(process.cwd(), 'data/sessions/twitter-session.json');
 const SCREENSHOTS_DIR = path.join(process.cwd(), 'public/screenshots');
 const DEBUG_DIR = path.join(process.cwd(), 'public/debug');
+const INCIDENTS_DIR = path.join(process.cwd(), '.incidents');
 const iPhone = devices['iPhone 13 Pro'];
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 const TWITTER_USERNAME = process.env.TWITTER_USERNAME;
 const TWITTER_PASSWORD = process.env.TWITTER_PASSWORD;
 
 // Erstelle Ordner
-if (!fs.existsSync(SCREENSHOTS_DIR)) {
-    fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
-}
-if (!fs.existsSync(DEBUG_DIR)) {
-    fs.mkdirSync(DEBUG_DIR, { recursive: true });
-}
+if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+if (!fs.existsSync(DEBUG_DIR)) fs.mkdirSync(DEBUG_DIR, { recursive: true });
+if (!fs.existsSync(INCIDENTS_DIR)) fs.mkdirSync(INCIDENTS_DIR, { recursive: true });
 
 // === TYPEN ===
 interface ProfileInfo {
@@ -97,7 +95,21 @@ async function performLogin(page: Page): Promise<boolean> {
         await page.waitForTimeout(5000);
         await dismissPopups(page);
 
-        // Username eingeben
+        // FALL 1: Gespeichertes Konto ("Weiter" / "Continue as")
+        const continueBtn = page.locator('button:has-text("Weiter"), button:has-text("Continue"), button:has-text("Log in as")');
+        if (await continueBtn.count() > 0 && await continueBtn.first().isVisible()) {
+            console.log('   🖱️ Klicke "Weiter" Button (Gespeichertes Konto)...');
+            await continueBtn.first().click();
+            await page.waitForTimeout(8000);
+            await dismissPopups(page);
+
+            if (!page.url().includes('login')) {
+                console.log('   ✅ Login via gespeichertes Konto erfolgreich!');
+                return true;
+            }
+        }
+
+        // FALL 2: Standard Login-Felder
         console.log('   ⏳ Warte auf Login-Felder...');
         const userField = page.locator('input[name="username"]');
         try {
@@ -1129,21 +1141,24 @@ async function pushProgressToGit(username: string) {
         // 1. Config setzen
         execSync(`git config user.email "bot@tareno.ai" && git config user.name "InstaBot"`, { stdio: 'ignore' });
 
-        // 2. Änderungen hinzufügen
-        execSync(`git add public/screenshots/ public/debug/ .incidents/`, { stdio: 'ignore' });
-
-        // 3. Nur committen wenn Änderungen vorhanden sind
-        try {
-            execSync(`git diff-index --quiet HEAD || git commit -m "auto: progress update @${username}"`, { stdio: 'ignore' });
-        } catch (e) {
-            // Commit fehlgeschlagen (meist weil nichts zu committen)
+        // 2. Einzelne Verzeichnisse hinzufügen (nur wenn sie existieren)
+        const dirs = ['public/screenshots', 'public/debug', '.incidents'];
+        for (const dir of dirs) {
+            if (fs.existsSync(path.join(process.cwd(), dir))) {
+                execSync(`git add ${dir}/`, { stdio: 'ignore' });
+            }
         }
 
-        // 4. Pull & Push
-        console.log(`   🔄 Git Pull & Push...`);
-        execSync(`git pull --rebase origin main && git push origin main`, { stdio: 'ignore' });
-
-        console.log(`   ✅ Gepusht!`);
+        // 3. Nur committen wenn Änderungen vorhanden sind
+        const status = execSync('git status --porcelain').toString();
+        if (status.trim().length > 0) {
+            execSync(`git commit -m "auto: progress update @${username}"`, { stdio: 'ignore' });
+            console.log(`   🔄 Git Pull & Push...`);
+            execSync(`git pull --rebase origin main && git push origin main`, { stdio: 'ignore' });
+            console.log(`   ✅ Gepusht!`);
+        } else {
+            console.log(`   ℹ️ Keine neuen Bilder zum Pushen.`);
+        }
     } catch (err: any) {
         console.log(`   ⚠️ Git-Push fehlgeschlagen: ${err.message}`);
     }
