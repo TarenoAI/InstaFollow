@@ -616,7 +616,9 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 
         if (!clickedFollowing) {
             console.log('   ❌ Following-Link nicht gefunden');
-            await page.screenshot({ path: `${DEBUG_DIR}/no-following-link-${username}.png` });
+            const screenshotPath = `${DEBUG_DIR}/no-following-link-${username}.png`;
+            await page.screenshot({ path: screenshotPath });
+            await pushDebugScreenshot(screenshotPath, `debug: no following link - @${username}`);
             return { following: [], picMap: new Map() };
         }
 
@@ -703,7 +705,9 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 
         if (!dataLoaded) {
             console.log(`   ⚠️ Following-Liste lädt sehr langsam - versuche trotzdem...`);
-            await page.screenshot({ path: `${DEBUG_DIR}/slow-load-${username}.png` });
+            const slowLoadPath = `${DEBUG_DIR}/slow-load-${username}.png`;
+            await page.screenshot({ path: slowLoadPath });
+            await pushDebugScreenshot(slowLoadPath, `debug: slow loading - @${username}`);
         }
 
         let noNewCount = 0;
@@ -1535,6 +1539,12 @@ async function main() {
                 const MIN_SCRAPE_QUOTA = 0.95;
                 if (currentFollowing.length < currentCount * MIN_SCRAPE_QUOTA) {
                     console.log(`   🚫 ABBRUCH: Nur ${scrapeQuote}% gescrapt (benötigt 95%)`);
+
+                    // 📸 Screenshot vom Abbruch-Zustand
+                    const abortPath = `${DEBUG_DIR}/scrape-abort-${username}-${Date.now()}.png`;
+                    await page.screenshot({ path: abortPath });
+                    await pushDebugScreenshot(abortPath, `debug: scrape abort ${scrapeQuote}% - @${username}`);
+
                     await saveMonitoringLog(db, {
                         profileId,
                         profileUsername: username,
