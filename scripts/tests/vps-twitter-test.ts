@@ -78,9 +78,11 @@ async function postToTwitter(text: string): Promise<string | null> {
         const tweetBox = page.locator('[data-testid="tweetTextarea_0"]').first();
         await tweetBox.waitFor({ timeout: 10000 });
 
-        // Text eingeben
+        // Text eingeben - Twitter nutzt contenteditable, daher click + type
         console.log('✍️ Schreibe Tweet...');
-        await tweetBox.fill(text);
+        await tweetBox.click();
+        await humanDelay(500, 800);
+        await page.keyboard.type(text, { delay: 30 });  // Langsam tippen wie ein Mensch
         await humanDelay(1000, 2000);
 
         await saveDebugScreenshot(page, 'debug-twitter-before-submit');
