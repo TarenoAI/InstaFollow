@@ -136,19 +136,23 @@ async function performLogin(page: Page): Promise<boolean> {
                 await page.keyboard.press('Enter');
             }
 
-            // Warte auf Navigation nach Login
-            await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => { });
-            await page.waitForTimeout(8000); // Instagram braucht manchmal ewig
+            // Warte auf Navigation oder spezifische Home-Elemente
+            console.log('   ⏳ Warte auf Login-Abschluss...');
+            await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 15000 }).catch(() => { });
+            await page.waitForTimeout(5000);
             await dismissPopups(page);
 
-            // Prüfen ob wir drin sind (kein login im URL mehr)
+            // Prüfen ob wir drin sind
             const currentUrl = page.url();
+            const hasNav = await page.$('nav').then(el => !!el);
+            const hasSearch = await page.$('svg[aria-label="Suchen"], svg[aria-label="Search"]').then(el => !!el);
+
             if (currentUrl.includes('checkpoint') || currentUrl.includes('challenge')) {
-                console.log('   🚨 SICHERHEITS-CHECK ERFORDERLICH! Bitte einmal via VNC einloggen und Code bestätigen.');
+                console.log('   🚨 SICHERHEITS-CHECK ERFORDERLICH! Bitte via VNC einloggen!');
                 return false;
             }
 
-            if (!currentUrl.includes('login')) {
+            if (!currentUrl.includes('login') || hasNav || hasSearch) {
                 console.log('   ✅ Login erfolgreich!');
                 return true;
             }
@@ -1113,10 +1117,12 @@ async function pushProgressToGit(username: string) {
     try {
         const { execSync } = await import('child_process');
         console.log(`   📤 Push progress für @${username}...`);
-        execSync(`git add public/screenshots/ public/debug/ .incidents/ && git commit -m "auto: progress update @${username}" && git push origin main`, { stdio: 'ignore' });
+        // Verwende rebase um Konflikte mit meinen Commits zu vermeiden
+        execSync(`git config user.email "bot@tareno.ai" && git config user.name "InstaBot"`, { stdio: 'ignore' });
+        execSync(`git add public/screenshots/ public/debug/ .incidents/ && git commit -m "auto: progress update @${username}" && git pull --rebase origin main && git push origin main`, { stdio: 'ignore' });
         console.log(`   ✅ Gepusht!`);
-    } catch (err) {
-        // Silently fail if nothing to commit
+    } catch (err: any) {
+        console.log(`   ⚠️ Git-Push fehlgeschlagen: ${err.message}`);
     }
 }
 
