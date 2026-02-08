@@ -711,7 +711,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         // Dynamische Scroll-Anzahl: ~10 Accounts pro Scroll sichtbar
         // Bei 500 Following = 60 Scrolls, bei 1000 Following = 120 Scrolls
         const maxScrolls = Math.max(80, Math.ceil(expectedCount / 8) + 20);
-        const maxNoNewCount = 10; // Nach 10 Scrolls ohne neue Daten aufhören
+        const maxNoNewCount = 15; // Nach 15 Scrolls ohne neue Daten aufhören (erhöht für langsame APIs)
 
         console.log(`   📜 Max Scrolls: ${maxScrolls} (für ${expectedCount} Following)`);
 
@@ -769,11 +769,17 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
             }
 
             await dismissPopups(page);
-            await humanDelay(2500, 4000);
+            await humanDelay(3500, 5500); // Mehr Zeit für API-Response
 
             // Check ob neue API-Daten kamen
-            if (apiFollowing.size === prevSize) noNewCount++;
-            else noNewCount = 0;
+            if (apiFollowing.size === prevSize) {
+                noNewCount++;
+                if (noNewCount >= 3 && scroll % 3 === 0) {
+                    console.log(`   ⏳ Keine neuen Daten seit ${noNewCount} Scrolls (API=${apiFollowing.size})...`);
+                }
+            } else {
+                noNewCount = 0;
+            }
 
             // 🚨 MOBILE LOGIN-CHECK WÄHREND DES SCROLLENS
             // Falls Session plötzlich abläuft
@@ -1525,6 +1531,7 @@ async function main() {
                 console.log(`   📈 Scraping-Quote: ${currentFollowing.length}/${currentCount} (${scrapeQuote}%)`);
 
                 // ⚠️ KRITISCH: Wenn weniger als 95% gescrapt, keine Changes verarbeiten!
+                // Wir brauchen 95% um zuverlässig Änderungen zu identifizieren
                 const MIN_SCRAPE_QUOTA = 0.95;
                 if (currentFollowing.length < currentCount * MIN_SCRAPE_QUOTA) {
                     console.log(`   🚫 ABBRUCH: Nur ${scrapeQuote}% gescrapt (benötigt 95%)`);
