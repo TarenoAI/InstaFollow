@@ -589,10 +589,19 @@ async function getFollowingCount(page: Page, username: string): Promise<number |
         console.log(`      🔍 Suche @${username}...`);
 
         // Stelle sicher dass wir auf Instagram sind
-        const currentUrl = page.url();
+        let currentUrl = page.url();
         if (!currentUrl.includes('instagram.com') || currentUrl.includes('login')) {
+            console.log(`      ⚠️ Nicht eingeloggt oder auf falscher Seite - navigiere zu Instagram...`);
             await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
             await page.waitForTimeout(2000);
+
+            if (page.url().includes('login') && process.env.INSTAGRAM_SESSION_ID) {
+                console.log('      🔄 Versuche Auto-Login via .env Cookies...');
+                await page.context().addCookies([
+                    { name: 'sessionid', value: process.env.INSTAGRAM_SESSION_ID, domain: '.instagram.com', path: '/', secure: true, httpOnly: true }
+                ]);
+                await page.goto('https://www.instagram.com/', { waitUntil: 'networkidle' });
+            }
             await dismissPopups(page);
         }
 
@@ -1011,9 +1020,53 @@ async function main() {
         await dismissPopups(page);
 
         if (page.url().includes('login')) {
-            console.log('❌ Nicht eingeloggt! Bitte Session erneuern.');
-            await context.close();
-            return;
+            console.log('⚠️ Nicht eingeloggt! Versuche Session aus .env wiederherzustellen...');
+
+            const cookies = [];
+            if (process.env.INSTAGRAM_SESSION_ID) {
+                cookies.push({
+                    name: 'sessionid',
+                    value: process.env.INSTAGRAM_SESSION_ID,
+                    domain: '.instagram.com',
+                    path: '/',
+                    secure: true,
+                    httpOnly: true
+                });
+            }
+            if (process.env.INSTAGRAM_CSRF_TOKEN) {
+                cookies.push({
+                    name: 'csrftoken',
+                    value: process.env.INSTAGRAM_CSRF_TOKEN,
+                    domain: '.instagram.com',
+                    path: '/',
+                    secure: true
+                });
+            }
+            if (process.env.INSTAGRAM_DS_USER_ID) {
+                cookies.push({
+                    name: 'ds_user_id',
+                    value: process.env.INSTAGRAM_DS_USER_ID,
+                    domain: '.instagram.com',
+                    path: '/',
+                    secure: true
+                });
+            }
+
+            if (cookies.length > 0) {
+                await context.addCookies(cookies);
+                console.log(`   🍪 ${cookies.length} Cookies injiziert. Lade neu...`);
+                await page.goto('https://www.instagram.com/', { waitUntil: 'networkidle' });
+                await page.waitForTimeout(3000);
+                await dismissPopups(page);
+            }
+
+            if (page.url().includes('login')) {
+                console.log('❌ Login fehlgeschlagen trotz Cookies! Bitte Session via VNC erneuern.');
+                await context.close();
+                return;
+            } else {
+                console.log('✅ Session erfolgreich via .env wiederhergestellt!');
+            }
         }
 
         // Check for single profile argument
