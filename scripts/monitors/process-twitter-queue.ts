@@ -22,34 +22,27 @@ async function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+import { getTwitterContext, closeTwitterContext, performTwitterLogin } from '../lib/twitter-auto-login';
+
 async function postToTwitter(text: string, imagePath?: string): Promise<string | null> {
     if (!TWITTER_USERNAME) {
         console.log('   ⚠️ TWITTER_USERNAME fehlt');
         return null;
     }
 
-    console.log('\n   🐦 Poste auf Twitter...');
+    console.log('\n   🐦 Poste auf Twitter (mit Auto-Login Fallback)...');
 
-    const context = await firefox.launchPersistentContext(TWITTER_PROFILE_DIR, {
-        headless: true,
-        viewport: { width: 1024, height: 600 },
-        locale: 'de-DE',
-        timezoneId: 'Europe/Berlin'
-    });
+    // Nutze den neuen Twitter-Context mit Auto-Login
+    const sessionResult = await getTwitterContext(true); // headless: true für Produktion
 
-    const page = context.pages()[0] || await context.newPage();
+    if (!sessionResult.success || !sessionResult.page || !sessionResult.context) {
+        console.log(`   ❌ Twitter Session Fehler: ${sessionResult.error}`);
+        return null;
+    }
+
+    const { page, context } = sessionResult;
 
     try {
-        await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForTimeout(3000);
-
-        if (page.url().includes('login') || page.url().includes('flow')) {
-            console.log('   ❌ Twitter Session abgelaufen!');
-            await page.screenshot({ path: `${DEBUG_DIR}/queue-twitter-session-expired-${Date.now()}.png` });
-            await context.close();
-            return null;
-        }
-
         console.log('   ✅ Twitter eingeloggt');
 
         await page.goto('https://x.com/compose/post', { waitUntil: 'domcontentloaded' });
@@ -63,10 +56,16 @@ async function postToTwitter(text: string, imagePath?: string): Promise<string |
         await page.waitForTimeout(1000);
 
         if (imagePath && fs.existsSync(imagePath)) {
-            console.log('   📂 Lade Bild hoch...');
+            console.log(`   📂 Lade Bild hoch: ${path.basename(imagePath)}`);
             const fileInput = page.locator('input[type="file"]').first();
             await fileInput.setInputFiles(imagePath);
             await page.waitForTimeout(5000);
+
+            // Prüfe ob Bild angezeigt wird
+            const hasMedia = await page.$('[data-testid="attachments"]');
+            if (hasMedia) {
+                console.log('   ✅ Bild hochgeladen');
+            }
         }
 
         console.log('   📤 Sende Tweet...');
@@ -88,12 +87,12 @@ async function postToTwitter(text: string, imagePath?: string): Promise<string |
 
         console.log(`   ✅ Tweet gepostet! ${tweetUrl || '(URL unbekannt)'}`);
 
-        await context.close();
+        await closeTwitterContext(context);
         return tweetUrl || 'https://x.com';
     } catch (err: any) {
         console.log(`   ❌ Twitter Fehler: ${err.message}`);
         await page.screenshot({ path: `${DEBUG_DIR}/queue-twitter-error-${Date.now()}.png` }).catch(() => { });
-        await context.close().catch(() => { });
+        await closeTwitterContext(context).catch(() => { });
         return null;
     }
 }

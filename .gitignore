@@ -69,5 +69,6 @@ login-vps.ts
 quick-check.ts
 temp_clone/
 twitter-*.ts
+!scripts/lib/twitter-auto-login.ts
 !twitter-api-monitor.ts # Example of a script you might want to keep (guessing name)
 

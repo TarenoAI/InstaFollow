@@ -1217,23 +1217,41 @@ async function sendWebhook(payload: WebhookPayload) {
 }
 
 /**
- * Formatiert den Tweet-Text im Stil von @takiprazzi
- * Zeigt ALLE Accounts, nicht nur 3!
+ * Formatiert den Tweet-Text bilingual (DE/EN) mit Emojis
+ * Zeigt max 5 Accounts um Tweet-Länge zu respektieren
  */
 function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, targets: ProfileInfo[]): string {
-    const emoji = event === 'FOLLOW' ? '👉' : '👀';
-    const actionEmoji = event === 'FOLLOW' ? '✅' : '❌';
-    const action = event === 'FOLLOW'
-        ? `folgt jetzt ${targets.length} ${targets.length === 1 ? 'Person' : 'Personen'}`
-        : `folgt nicht mehr ${targets.length} ${targets.length === 1 ? 'Person' : 'Personen'}`;
+    const emoji = event === 'FOLLOW' ? '✅' : '👀';
+    const actionEmoji = event === 'FOLLOW' ? '➕' : '❌';
+    const count = targets.length;
 
-    let text = `${emoji} ${profile.username} (${profile.fullName}) ${action}:\n\n`;
+    // Erste Zeile: Deutsch
+    let text = `${emoji} @${profile.username} (${profile.fullName}) `;
+    text += event === 'FOLLOW'
+        ? `folgt jetzt ${count} ${count === 1 ? 'Person' : 'Personen'}`
+        : `folgt nicht mehr ${count} ${count === 1 ? 'Person' : 'Personen'}`;
 
-    // ALLE Targets anzeigen - Twitter erlaubt bis zu 280 Zeichen, aber Threads sind möglich
-    for (const target of targets) {
-        text += `${actionEmoji} ${target.username} (${target.fullName})\n`;
-        text += `🔗 instagram.com/${target.username}\n\n`;
+    // Zweite Zeile: Englisch
+    text += '\n';
+    text += event === 'FOLLOW'
+        ? `${emoji} @${profile.username} now follows ${count} ${count === 1 ? 'person' : 'people'}`
+        : `${emoji} @${profile.username} unfollowed ${count} ${count === 1 ? 'person' : 'people'}`;
+
+    text += '\n\n';
+
+    // Max 5 Targets anzeigen um Tweet-Länge zu respektieren
+    const displayCount = Math.min(targets.length, 5);
+    for (let i = 0; i < displayCount; i++) {
+        const target = targets[i];
+        text += `${actionEmoji} @${target.username} (${target.fullName})\n`;
+        text += `🔗 instagram.com/${target.username}\n`;
     }
+
+    if (targets.length > 5) {
+        text += `\n... und ${targets.length - 5} weitere / ... and ${targets.length - 5} more`;
+    }
+
+    text += '\n\n#Instagram #FollowerWatch #Bundesliga';
 
     return text.trim();
 }
