@@ -2,17 +2,17 @@
  * 🐦 VPS TWITTER POST TEST
  * 
  * Testet ob wir über die VPS einen Post auf X (Twitter) erstellen können.
- * NUTZT PERSISTENTES BROWSER-PROFIL - einmal einloggen, für immer aktiv!
+ * NUTZT FIREFOX mit persistentem Profil - einmal einloggen, für immer aktiv!
  */
 
 import 'dotenv/config';
-import { chromium, BrowserContext, Page } from 'playwright';
+import { firefox, BrowserContext, Page } from 'playwright';  // Firefox!
 import path from 'path';
 import fs from 'fs';
 import { exec } from 'child_process';
 
-// Persistentes Profil für Twitter (wie bei Instagram)
-const TWITTER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/twitter');
+// Firefox Profil (mit kopierten System-Cookies)
+const TWITTER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/twitter-firefox');
 const TWITTER_INCIDENTS_DIR = path.join(process.cwd(), '.twitter-incidents');
 const DEBUG_DIR = path.join(process.cwd(), 'public/debug');
 
@@ -41,16 +41,9 @@ async function postToTwitter(text: string): Promise<string | null> {
     console.log(`📝 Text: "${text}"\n`);
     console.log(`📂 Browser-Profil: ${TWITTER_PROFILE_DIR}`);
 
-    const context = await chromium.launchPersistentContext(TWITTER_PROFILE_DIR, {
+    const context = await firefox.launchPersistentContext(TWITTER_PROFILE_DIR, {
         headless: false, // WICHTIG: false für VNC Sichtbarkeit
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-blink-features=AutomationControlled',
-            '--window-size=1280,800'
-        ],
-        viewport: { width: 1280, height: 800 },
+        viewport: { width: 1024, height: 600 },
         locale: 'de-DE',
         timezoneId: 'Europe/Berlin'
     });
