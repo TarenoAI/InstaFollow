@@ -1126,17 +1126,20 @@ async function main() {
         let query = `
             SELECT DISTINCT mp.id, mp.username, mp.followingCount, mp.isBaselineComplete, mp.screenshotUrl 
             FROM MonitoredProfile mp
-            JOIN _MonitoredProfileToProfileSet pts ON mp.id = pts.A
-            JOIN ProfileSet ps ON pts.B = ps.id
-            WHERE ps.isActive = 1
+            LEFT JOIN _MonitoredProfileToProfileSet pts ON mp.id = pts.A
+            LEFT JOIN ProfileSet ps ON pts.B = ps.id
+            WHERE 1=1
         `;
         let args: any[] = [];
 
         if (targetUsername) {
-            console.log(`🎯 Modus: Einzel-Profil Check (@${targetUsername})`);
+            console.log(`🎯 Modus: Einzel-Profil Check (@${targetUsername}) - Ignoriere Set-Status`);
             query += " AND mp.username = ?";
             args.push(targetUsername);
         } else {
+            // Im Automatik-Modus: Nur aktive Sets!
+            query += " AND ps.isActive = 1";
+
             // LOCK-System (nur bei Full Run)
             if (fs.existsSync(LOCK_FILE)) {
                 const stats = fs.statSync(LOCK_FILE);
