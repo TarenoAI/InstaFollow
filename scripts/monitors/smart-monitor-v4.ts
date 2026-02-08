@@ -242,6 +242,15 @@ async function getProfileInfo(page: Page, username: string, takeScreenshot: bool
             timeout: 20000
         });
         await page.waitForTimeout(4000);
+        if (page.url().includes('login') || (await page.$('input[name="username"]'))) {
+            console.log(`      ⚠️ Nicht eingeloggt (in getProfileInfo)! Starte Login...`);
+            const loginOk = await performLogin(page);
+            if (!loginOk) return null;
+
+            // Nach Login: Navigiere erneut zum Profil
+            await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded' });
+            await page.waitForTimeout(4000);
+        }
         await dismissPopups(page);
 
         // Screenshot wenn gewünscht
