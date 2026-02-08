@@ -142,7 +142,13 @@ async function performLogin(page: Page): Promise<boolean> {
             await dismissPopups(page);
 
             // Prüfen ob wir drin sind (kein login im URL mehr)
-            if (!page.url().includes('login')) {
+            const currentUrl = page.url();
+            if (currentUrl.includes('checkpoint') || currentUrl.includes('challenge')) {
+                console.log('   🚨 SICHERHEITS-CHECK ERFORDERLICH! Bitte einmal via VNC einloggen und Code bestätigen.');
+                return false;
+            }
+
+            if (!currentUrl.includes('login')) {
                 console.log('   ✅ Login erfolgreich!');
                 return true;
             }
