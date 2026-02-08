@@ -6,14 +6,14 @@
  */
 
 import 'dotenv/config';
-import { firefox } from 'playwright';  // Firefox statt Chromium - weniger Detection!
+import { firefox } from 'playwright';
 import path from 'path';
 import fs from 'fs';
 
-// Persistentes Profil für Twitter
+// System-Firefox Profil (wo du manuell eingeloggt bist!)
+const SYSTEM_FIREFOX_PROFILE = '/root/snap/firefox/common/.mozilla/firefox/n0ef3nry.default';
+// Fallback zu unserem eigenen Profil
 const TWITTER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/twitter-firefox');
-
-// Erstelle Profil-Ordner
 if (!fs.existsSync(TWITTER_PROFILE_DIR)) {
     fs.mkdirSync(TWITTER_PROFILE_DIR, { recursive: true });
 }
