@@ -84,6 +84,56 @@ async function captureProfileScreenshot(page: Page, username: string): Promise<s
     }
 }
 
+const INSTAGRAM_USERNAME = process.env.INSTAGRAM_USERNAME;
+const INSTAGRAM_PASSWORD = process.env.INSTAGRAM_PASSWORD;
+
+/**
+ * Führt einen automatischen Login bei Instagram durch
+ */
+async function performLogin(page: Page): Promise<boolean> {
+    try {
+        console.log('🏁 Starte Auto-Login Prozess...');
+        await page.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'networkidle' });
+        await page.waitForTimeout(3000);
+        await dismissPopups(page);
+
+        // Username eingeben
+        const userField = page.locator('input[name="username"]');
+        if (await userField.isVisible()) {
+            console.log(`   ⌨️ Tippe Username ${INSTAGRAM_USERNAME}...`);
+            await userField.fill(INSTAGRAM_USERNAME || '');
+            await page.waitForTimeout(1000);
+
+            // Passwort eingeben
+            const passField = page.locator('input[name="password"]');
+            await passField.fill(INSTAGRAM_PASSWORD || '');
+            await page.waitForTimeout(1000);
+
+            // Login Button klicken
+            const loginBtn = page.locator('button[type="submit"]');
+            await loginBtn.click();
+            console.log('   🖱️ Login-Button geklickt.');
+
+            // Warte auf Navigation nach Login
+            await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => { });
+            await page.waitForTimeout(5000);
+            await dismissPopups(page);
+
+            // Prüfen ob wir drin sind (kein login im URL mehr)
+            if (!page.url().includes('login')) {
+                console.log('   ✅ Login erfolgreich!');
+                return true;
+            }
+        }
+
+        console.log('   ❌ Login-Felder nicht gefunden oder Login fehlgeschlagen.');
+        return false;
+    } catch (err: any) {
+        console.log(`   ❌ Auto-Login Fehler: ${err.message}`);
+        return false;
+    }
+}
+
 async function dismissPopups(page: Page) {
     const selectors = [
         // Cookie consent
@@ -1061,9 +1111,13 @@ async function main() {
             }
 
             if (page.url().includes('login')) {
-                console.log('❌ Login fehlgeschlagen trotz Cookies! Bitte Session via VNC erneuern.');
-                await context.close();
-                return;
+                console.log('⚠️ Cookies allein reichen nicht. Starte Auto-Login mit User/Pass...');
+                const loginSuccess = await performLogin(page);
+                if (!loginSuccess) {
+                    console.log('❌ Auto-Login fehlgeschlagen! Bitte Session via VNC erneuern.');
+                    await context.close();
+                    return;
+                }
             } else {
                 console.log('✅ Session erfolgreich via .env wiederhergestellt!');
             }
