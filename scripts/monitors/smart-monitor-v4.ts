@@ -96,10 +96,37 @@ async function performLogin(page: Page): Promise<boolean> {
         await dismissPopups(page);
 
         // FALL 1: Gespeichertes Konto ("Weiter" / "Continue as")
-        const continueBtn = page.locator('button:has-text("Weiter"), button:has-text("Continue"), button:has-text("Log in as")');
-        if (await continueBtn.count() > 0 && await continueBtn.first().isVisible()) {
-            console.log('   🖱️ Klicke "Weiter" Button (Gespeichertes Konto)...');
-            await continueBtn.first().click();
+        // Instagram verwendet nicht immer <button> - manchmal div, span, oder andere Elemente
+        const continueBtnSelectors = [
+            // Deutsche Varianten
+            'button:has-text("Weiter")',
+            'div[role="button"]:has-text("Weiter")',
+            'span:has-text("Weiter")',
+            '[role="button"]:has-text("Weiter")',
+            // Englische Varianten
+            'button:has-text("Continue")',
+            'div[role="button"]:has-text("Continue")',
+            'button:has-text("Log in as")',
+            'div[role="button"]:has-text("Log in as")',
+            // Fallback: Blauer Button (typisch für Instagram Continue)
+            'button[style*="background-color: rgb(0, 149, 246)"]',
+            'div[style*="background-color: rgb(0, 149, 246)"]',
+        ];
+
+        let continueBtnClicked = false;
+        for (const selector of continueBtnSelectors) {
+            try {
+                const continueBtn = page.locator(selector).first();
+                if (await continueBtn.count() > 0 && await continueBtn.isVisible()) {
+                    console.log(`   🖱️ Klicke "Weiter" Button (${selector})...`);
+                    await continueBtn.click({ force: true });
+                    continueBtnClicked = true;
+                    break;
+                }
+            } catch { }
+        }
+
+        if (continueBtnClicked) {
             await page.waitForTimeout(8000);
             await dismissPopups(page);
 
@@ -107,6 +134,7 @@ async function performLogin(page: Page): Promise<boolean> {
                 console.log('   ✅ Login via gespeichertes Konto erfolgreich!');
                 return true;
             }
+            console.log('   ⚠️ Weiter-Klick hat nicht funktioniert, versuche Standard-Login...');
         }
 
         // FALL 2: Standard Login-Felder
