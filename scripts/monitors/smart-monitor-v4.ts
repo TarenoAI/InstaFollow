@@ -1480,10 +1480,21 @@ async function main() {
             let addedUsernames: string[] = [];
             let removedUsernames: string[] = [];
 
-            // Scrape nur wenn Änderung erkannt ODER Baseline fehlt
-            if (currentCount !== lastCount || !isBaselineComplete) {
+            // Scrape nur wenn Änderung erkannt ODER Baseline fehlt ODER DB-Einträge stimmen nicht mit Live überein
+            // KRITISCH: Wenn DB-Einträge ≠ Live-Count, gibt es unidentifizierte Changes!
+            const dbMismatch = actualDbCount !== currentCount;
+            const needsScrape = currentCount !== lastCount || !isBaselineComplete || dbMismatch;
+
+            if (dbMismatch && isBaselineComplete && currentCount === lastCount) {
+                console.log(`   🚨 DB-DISKREPANZ ERKANNT: DB hat ${actualDbCount} Einträge, Live zeigt ${currentCount}`);
+                console.log(`   ℹ️ Es gibt ${currentCount - actualDbCount} unidentifizierte Following - starte Full Scrape!`);
+            }
+
+            if (needsScrape) {
                 if (currentCount !== lastCount) {
                     console.log(`   🚨 ÄNDERUNG ERKANNT: ${lastCount} → ${currentCount}`);
+                } else if (dbMismatch) {
+                    console.log(`   🔄 Starte Full Scrape wegen DB-Diskrepanz...`);
                 } else {
                     console.log(`   ℹ️ Erstelle initiale Baseline...`);
                 }
