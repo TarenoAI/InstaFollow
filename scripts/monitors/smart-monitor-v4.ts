@@ -1260,7 +1260,10 @@ async function main() {
                             console.log(`      💾 Batch ${batch + 1}: ${end}/${currentFollowing.length} gespeichert`);
                         }
 
-                        // Markiere als Baseline-complete + speichere Zeitpunkt
+                        // Profilinfos holen (inkl. Profilbild)
+                        const baselineProfileInfo = await getProfileInfo(page, username, false);
+
+                        // Markiere als Baseline-complete + speichere Zeitpunkt + Profilinfos
                         await db.execute({
                             sql: `UPDATE MonitoredProfile SET 
                                   followingCount = ?, 
@@ -1268,9 +1271,19 @@ async function main() {
                                   isBaselineComplete = 1,
                                   baselineCreatedAt = datetime('now'),
                                   baselineFollowingCount = ?,
+                                  profilePicUrl = ?,
+                                  fullName = ?,
+                                  isVerified = ?,
                                   lastSuccessfulScrapeAt = datetime('now')
                                   WHERE id = ?`,
-                            args: [currentCount, currentFollowing.length, profileId]
+                            args: [
+                                currentCount,
+                                currentFollowing.length,
+                                baselineProfileInfo?.profilePicUrl || null,
+                                baselineProfileInfo?.fullName || username,
+                                baselineProfileInfo?.isVerified ? 1 : 0,
+                                profileId
+                            ]
                         });
 
                         console.log(`   ✅ Baseline erstellt (${currentFollowing.length} Einträge) - KEINE Changes gemeldet`);
