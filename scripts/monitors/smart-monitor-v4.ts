@@ -56,6 +56,23 @@ async function humanDelay(minMs: number, maxMs: number) {
 }
 
 /**
+ * Pusht Debug-Screenshots automatisch zu Git für Remote-Debugging
+ */
+async function pushDebugScreenshot(filepath: string, message: string = 'debug screenshot'): Promise<boolean> {
+    const { execSync } = require('child_process');
+    try {
+        execSync(`git add -f "${filepath}"`, { cwd: process.cwd(), stdio: 'pipe' });
+        execSync(`git commit -m "${message}" --allow-empty`, { cwd: process.cwd(), stdio: 'pipe' });
+        execSync('git push', { cwd: process.cwd(), stdio: 'pipe' });
+        console.log(`   📤 Screenshot gepusht: ${path.basename(filepath)}`);
+        return true;
+    } catch (err: any) {
+        console.log(`   ⚠️ Git-Push für Screenshot fehlgeschlagen: ${err.message?.substring(0, 100)}`);
+        return false;
+    }
+}
+
+/**
  * Macht einen Screenshot vom aktuellen Profil und speichert ihn
  * Gibt die GitHub RAW URL zurück (für Vercel-Zugriff)
  */
@@ -254,11 +271,13 @@ async function performLogin(page: Page): Promise<boolean> {
         console.log(`   ❌ Login fehlgeschlagen. Seite: "${title}" | Body: "${bodyContent}"`);
         const debugPic = path.join(DEBUG_DIR, `login-failed-${Date.now()}.png`);
         await page.screenshot({ path: debugPic });
+        await pushDebugScreenshot(debugPic, `debug: login failed - ${title}`);
         return false;
     } catch (err: any) {
         console.log(`   ❌ Auto-Login Fehler: ${err.message}`);
         const debugPic = path.join(DEBUG_DIR, `login-error-${Date.now()}.png`);
         await page.screenshot({ path: debugPic });
+        await pushDebugScreenshot(debugPic, `debug: login error - ${err.message?.substring(0, 50)}`);
         return false;
     }
 }
