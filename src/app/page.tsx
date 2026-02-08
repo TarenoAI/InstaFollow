@@ -2564,24 +2564,48 @@ export default function Home() {
                 {sets.length > 0 ? (
                   <div className="grid gap-4 md:grid-cols-2">
                     {sets.map((set) => (
-                      <button
-                        key={set.id}
-                        onClick={() => setSelectedSet(set)}
-                        className="glass-card p-6 text-left hover:border-[var(--accent-solid)] transition-all group"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="w-12 h-12 rounded-xl bg-[var(--accent)] flex items-center justify-center text-white text-xl font-bold">
-                            {set.name.charAt(0).toUpperCase()}
+                      <div key={set.id} className="relative group">
+                        <button
+                          onClick={() => setSelectedSet(set)}
+                          className="w-full h-full glass-card p-6 text-left hover:border-[var(--accent-solid)] transition-all"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="w-12 h-12 rounded-xl bg-[var(--accent)] flex items-center justify-center text-white text-xl font-bold">
+                              {set.name.charAt(0).toUpperCase()}
+                            </div>
+                            <svg className="w-5 h-5 text-[var(--text-muted)] group-hover:text-[var(--accent-solid)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
                           </div>
-                          <svg className="w-5 h-5 text-[var(--text-muted)] group-hover:text-[var(--accent-solid)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          <h3 className="text-lg font-semibold mb-1">{set.name}</h3>
+                          <div className="flex items-center gap-2">
+                            <p className="text-[var(--text-muted)] text-sm">
+                              {set.profiles.length} {set.profiles.length === 1 ? 'Profil' : 'Profile'}
+                            </p>
+                            {set.isActive && (
+                              <span className="flex items-center gap-1 text-[10px] font-bold text-[var(--success)] uppercase tracking-wider bg-[var(--success)]/10 px-1.5 py-0.5 rounded border border-[var(--success)]/20">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse"></span>
+                                Aktiv
+                              </span>
+                            )}
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Möchtest du das Set "${set.name}" wirklich löschen?`)) {
+                              deleteSet(set.id).then(() => loadSets());
+                            }
+                          }}
+                          className="absolute bottom-6 right-6 p-2 text-[var(--error)] hover:bg-[var(--error)]/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                          title="Set löschen"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
-                        </div>
-                        <h3 className="text-lg font-semibold mb-1">{set.name}</h3>
-                        <p className="text-[var(--text-muted)] text-sm">
-                          {set.profiles.length} {set.profiles.length === 1 ? 'Profil' : 'Profile'}
-                        </p>
-                      </button>
+                        </button>
+                      </div>
                     ))}
                   </div>
                 ) : (
