@@ -18,14 +18,18 @@ import { saveMonitoringLog, ensureMonitoringLogTable, LogStatus } from '../lib/m
 const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
 const TWITTER_SESSION_PATH = path.join(process.cwd(), 'data/sessions/twitter-session.json');
 const SCREENSHOTS_DIR = path.join(process.cwd(), 'public/screenshots');
+const DEBUG_DIR = path.join(process.cwd(), 'public/debug');
 const iPhone = devices['iPhone 13 Pro'];
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 const TWITTER_USERNAME = process.env.TWITTER_USERNAME;
 const TWITTER_PASSWORD = process.env.TWITTER_PASSWORD;
 
-// Erstelle Screenshots-Ordner
+// Erstelle Ordner
 if (!fs.existsSync(SCREENSHOTS_DIR)) {
     fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+}
+if (!fs.existsSync(DEBUG_DIR)) {
+    fs.mkdirSync(DEBUG_DIR, { recursive: true });
 }
 
 // === TYPEN ===
@@ -307,7 +311,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         await dismissPopups(page);  // Nochmal Popups schließen
 
         // Screenshot vor dem Klick für Debugging
-        await page.screenshot({ path: `debug-before-following-click-${username}.png` });
+        await page.screenshot({ path: `${DEBUG_DIR}/before-following-click-${username}.png` });
 
         // DEBUG: Was ist auf der Seite?
         const pageDebug: any = await page.evaluate(`(function() {
@@ -396,7 +400,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 
         if (!clickedFollowing) {
             console.log('   ❌ Following-Link nicht gefunden');
-            await page.screenshot({ path: `debug-no-following-link-${username}.png` });
+            await page.screenshot({ path: `${DEBUG_DIR}/no-following-link-${username}.png` });
             return { following: [], picMap: new Map() };
         }
 
@@ -423,7 +427,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         // NICHT dismissPopups aufrufen, da dies das Following-Fenster schließt!
 
         // DEBUG: Screenshot nach Dialog-Öffnung
-        await page.screenshot({ path: `debug-dialog-${username}.png` });
+        await page.screenshot({ path: `${DEBUG_DIR}/dialog-${username}.png` });
         console.log(`   📸 Debug Screenshot: debug-dialog-${username}.png`);
 
         // ⏳ WARTE BIS DIE DATEN WIRKLICH GELADEN SIND (keine Skeleton mehr)
@@ -483,7 +487,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
 
         if (!dataLoaded) {
             console.log(`   ⚠️ Following-Liste lädt sehr langsam - versuche trotzdem...`);
-            await page.screenshot({ path: `debug-slow-load-${username}.png` });
+            await page.screenshot({ path: `${DEBUG_DIR}/slow-load-${username}.png` });
         }
 
         let noNewCount = 0;
@@ -511,11 +515,6 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
             // Logge Status alle 5 Scrolls
             if (scroll % 5 === 0) {
                 console.log(`   Scroll ${scroll + 1}/${maxScrolls}: API=${apiFollowing.size}`);
-            }
-
-            // Debug: Screenshot alle 20 Scrolls
-            if (scroll % 20 === 0) {
-                await page.screenshot({ path: `debug-scroll-${username}-${scroll}.png` });
             }
 
             // SCROLLING
@@ -576,7 +575,7 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
         };
     } catch (err: any) {
         console.log(`   ❌ Scrape-Fehler: ${err.message}`);
-        await page.screenshot({ path: `debug-scrape-critical-error-${username}.png` });
+        await page.screenshot({ path: `${DEBUG_DIR}/scrape-critical-error-${username}.png` });
         console.log(`   📸 Screenshot vom Fehler gespeichert: debug-scrape-critical-error-${username}.png`);
         return { following: [], picMap: new Map() };
     }
@@ -886,7 +885,7 @@ async function postToTwitter(
         if (page.url().includes('login') || page.url().includes('flow')) {
             console.log('   ❌ Twitter Session abgelaufen!');
             console.log('   ➡️ Führe /fix-twitter-session Workflow aus');
-            await page.screenshot({ path: 'debug-twitter-session-expired.png' });
+            await page.screenshot({ path: `${DEBUG_DIR}/twitter-session-expired.png` });
             await browser.close();
             return null;
         }
@@ -1459,11 +1458,14 @@ async function main() {
         await context.storageState({ path: SESSION_PATH });
         console.log('💾 Instagram Session gespeichert');
 
-        // 📤 Screenshots UND Incidents zu Git pushen
+        // 📤 Screenshots, Debug-Bilder und Incidents zu Git pushen
+        console.log(`📁 Debug-Ordner: ${DEBUG_DIR}`);
+        console.log(`📁 Screenshots-Ordner: ${SCREENSHOTS_DIR}`);
+
         const { exec } = await import('child_process');
-        exec(`cd ${process.cwd()} && git add public/screenshots/ .incidents/ && git commit -m "auto: screenshots + incidents" && git push origin main`,
+        exec(`cd ${process.cwd()} && git add public/screenshots/ public/debug/ .incidents/ && git commit -m "auto: screenshots + debug + incidents" && git push origin main`,
             (err) => {
-                if (!err) console.log('📤 Screenshots & Incidents zu Git gepusht');
+                if (!err) console.log('📤 Dateien zu Git gepusht (screenshots, debug, incidents)');
                 else if (!err?.message?.includes('nothing to commit')) console.log('ℹ️ Keine neuen Dateien');
             });
 
