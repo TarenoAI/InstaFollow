@@ -7,13 +7,14 @@
 
 import 'dotenv/config';
 import { createClient } from '@libsql/client';
-import { chromium, devices, Page } from 'playwright';
+import { chromium, devices, Page, BrowserContext } from 'playwright';
 import path from 'path';
 import fs from 'fs';
 import https from 'https';
 import http from 'http';
 
-const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
+// MUSS der gleiche Pfad sein wie in smart-monitor-v4.ts!
+const BROWSER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/instagram');
 const PROFILE_PICS_DIR = path.join(process.cwd(), 'public/profile-pics');
 const iPhone = devices['iPhone 13 Pro'];
 
@@ -174,15 +175,28 @@ async function main() {
         process.exit(0);
     }
 
-    // Launch browser
-    console.log(`🌐 Starte Browser...`);
-    const browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({
+    // Launch browser mit persistentem Profil
+    console.log(`🌐 Starte Browser mit persistentem Profil...`);
+    console.log(`📂 Profil: ${BROWSER_PROFILE_DIR}`);
+
+    // Erstelle Profil-Ordner falls nicht vorhanden
+    if (!fs.existsSync(BROWSER_PROFILE_DIR)) {
+        fs.mkdirSync(BROWSER_PROFILE_DIR, { recursive: true });
+    }
+
+    const context = await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, {
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled'
+        ],
         ...iPhone,
-        storageState: fs.existsSync(SESSION_PATH) ? SESSION_PATH : undefined,
         locale: 'de-DE',
+        timezoneId: 'Europe/Berlin'
     });
-    const page = await context.newPage();
+    const page = context.pages()[0] || await context.newPage();
 
     let updated = 0;
     let failed = 0;
@@ -234,8 +248,7 @@ async function main() {
         await delay(3000 + Math.random() * 2000);
     }
 
-    await context.storageState({ path: SESSION_PATH });
-    await browser.close();
+    await context.close();
 
     // Git Push der Bilder
     const { exec } = await import('child_process');
