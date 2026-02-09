@@ -76,22 +76,21 @@ async function checkLogin() {
 
 async function updateDbStatus(isLoggedIn: boolean) {
     try {
-        // Finde den Haupt-Account (oder alle)
-        const accounts = await (prisma as any).twitterAccount.findMany();
+        const { createClient } = await import('@libsql/client');
+        const db = createClient({
+            url: process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL!,
+            authToken: process.env.TURSO_AUTH_TOKEN
+        });
 
-        for (const acc of accounts) {
-            await (prisma as any).twitterAccount.update({
-                where: { id: acc.id },
-                data: {
-                    lastLoginStatus: isLoggedIn,
-                    lastStatusCheckAt: new Date()
-                }
-            });
-            console.log(`   💾 Datenbank aktualisiert für @${acc.username}`);
-        }
-    } catch (err) {
-        // Falls Tabellen noch nicht existieren (Migration fehlt)
-        console.log('   ⚠️ Datenbank-Update übersprungen (Migration fehlt vermutlich)');
+        // Update alle Twitter Accounts
+        await db.execute({
+            sql: `UPDATE TwitterAccount SET lastLoginStatus = ?, lastStatusCheckAt = datetime('now')`,
+            args: [isLoggedIn ? 1 : 0]
+        });
+
+        console.log(`   💾 Datenbank aktualisiert: ${isLoggedIn ? 'Eingeloggt' : 'Ausgeloggt'}`);
+    } catch (err: any) {
+        console.log('   ⚠️ Datenbank-Update fehlgeschlagen:', err.message);
     }
 }
 
