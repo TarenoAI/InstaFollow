@@ -219,6 +219,11 @@ ${actionEmoji} @${event.targetUsername} (${event.targetFullName || ''})
                     args: [event.id]
                 });
                 console.log(`   💾 Event markiert.`);
+
+                // WICHTIG: Browser nach jedem Post neu starten für frische Session
+                console.log('   🔄 Starte Browser neu für nächsten Post...');
+                await closeTwitterContext(context).catch(() => { });
+                await startBrowser();
             } else {
                 console.log(`   ❌ Tweet fehlgeschlagen`);
                 failCount++;
