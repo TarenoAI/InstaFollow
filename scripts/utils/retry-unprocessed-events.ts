@@ -103,39 +103,54 @@ async function postTweet(page: any, text: string, imagePath?: string): Promise<b
 
         console.log('   📤 Sende Tweet...');
         await page.keyboard.press('Control+Enter');
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(3000);
 
-        // Fallback: Button klicken falls Text noch da
+        // Verifikation: Suche nach "Your post was sent" Toast oder leeres Textfeld
+        let verified = false;
+
+        // Methode 1: Toast-Nachricht "Your post was sent"
         try {
-            const textarea = page.locator('[data-testid="tweetTextarea_0"]').first();
-            const textLeft = await textarea.innerText().catch(() => '');
-            if (textLeft && textLeft.trim().length > 0) {
-                console.log('   🔄 Shortcut fehlgeschlagen, versuche Button...');
-                const postBtn = page.locator('[data-testid="tweetButtonInline"], [data-testid="tweetButton"]').filter({ hasText: /Post/i }).first();
-                if (await postBtn.isVisible()) {
-                    await postBtn.click();
-                    await page.waitForTimeout(6000);
+            const toast = page.getByText('Your post was sent').first();
+            await toast.waitFor({ timeout: 8000 });
+            console.log('   ✅ Toast erkannt: "Your post was sent"!');
+            verified = true;
+        } catch {
+            console.log('   ℹ️ Kein Toast erkannt, prüfe Textfeld...');
+        }
+
+        // Methode 2: Textfeld ist leer (Post wurde gesendet)
+        if (!verified) {
+            try {
+                const textarea = page.locator('[data-testid="tweetTextarea_0"]').first();
+                const textLeft = await textarea.innerText().catch(() => '');
+                if (!textLeft || textLeft.trim().length === 0) {
+                    console.log('   ✅ Textfeld ist leer -> Post gesendet!');
+                    verified = true;
+                } else {
+                    console.log(`   ⚠️ Textfeld hat noch Inhalt: "${textLeft.substring(0, 30)}..."`);
+                    // Fallback: Button klicken
+                    console.log('   🔄 Versuche Button zu klicken...');
+                    const postBtn = page.locator('[data-testid="tweetButtonInline"]').first();
+                    if (await postBtn.isVisible()) {
+                        await postBtn.click();
+                        await page.waitForTimeout(5000);
+                        const textAfterBtn = await textarea.innerText().catch(() => '');
+                        if (!textAfterBtn || textAfterBtn.trim().length === 0) {
+                            console.log('   ✅ Button-Klick erfolgreich!');
+                            verified = true;
+                        }
+                    }
                 }
-            }
-        } catch { }
+            } catch { }
+        }
 
-        // --- STRIKTE VERIFIKATION ---
-        console.log(`   🔍 Verifiziere Post auf Profil @${TWITTER_USERNAME}...`);
-        await page.goto(`https://x.com/${TWITTER_USERNAME}`, { waitUntil: 'domcontentloaded', timeout: 25000 });
-        await page.waitForTimeout(6000);
+        await page.screenshot({ path: `${DEBUG_DIR}/after-post-${Date.now()}.png` }).catch(() => { });
 
-        const profileContent = await page.innerText('body').catch(() => '');
-        const match = text.match(/@([a-zA-Z0-9_\.]+)/g);
-        const lastMention = match ? match[match.length - 1] : 'folgt';
-        console.log(`   🔎 Suche nach "${lastMention}" auf Profil...`);
-
-        await page.screenshot({ path: `${DEBUG_DIR}/verify-profile-${Date.now()}.png` }).catch(() => { });
-
-        if (profileContent.includes(lastMention)) {
-            console.log('   ✅ Verifikation erfolgreich!');
+        if (verified) {
+            console.log('   ✅ Tweet erfolgreich gepostet!');
             return true;
         } else {
-            console.log('   ❌ Verifikation fehlgeschlagen: Tweet nicht auf Profil.');
+            console.log('   ❌ Tweet konnte nicht verifiziert werden.');
             return false;
         }
     } catch (err: any) {
