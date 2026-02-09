@@ -28,22 +28,35 @@ async function postTweet(page: any, text: string): Promise<boolean> {
         await page.evaluate(() => true);
 
         // Gehe zur Compose-Seite (per Dokumentation: /compose/post)
-        await page.goto('https://x.com/compose/post', { waitUntil: 'domcontentloaded', timeout: 15000 });
-        await page.waitForTimeout(2000);
+        await page.goto('https://x.com/compose/post', { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page.waitForTimeout(4000); // Längeres Warten für Modal
 
-        // Finde Textfeld (per Dokumentation: div[data-testid="tweetTextarea_0"])
-        const textarea = page.locator('[data-testid="tweetTextarea_0"]');
-        await textarea.waitFor({ timeout: 10000 });
+        // Finde Textfeld - versuche mehrere Selektoren
+        let textarea = page.locator('[data-testid="tweetTextarea_0"]');
+
+        try {
+            await textarea.waitFor({ timeout: 5000 });
+        } catch {
+            // Fallback: Suche nach "What's happening?" Placeholder
+            console.log('   🔄 Versuche alternativen Selektor...');
+            textarea = page.locator('[aria-label="Post text"]').or(
+                page.locator('[placeholder="What\'s happening?"]')
+            ).or(
+                page.locator('.public-DraftEditor-content')
+            );
+            await textarea.waitFor({ timeout: 5000 });
+        }
+
         await textarea.click();
         await page.waitForTimeout(500);
 
         // Text eingeben
         await page.keyboard.type(text, { delay: 30 });
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(1500);
 
         // Post absenden (per Dokumentation: Control+Enter ist primäre Methode)
         await page.keyboard.press('Control+Enter');
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(6000);
 
         // Prüfe ob erfolgreich (URL sollte sich ändern, nicht mehr compose)
         const url = page.url();
