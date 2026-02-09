@@ -1,11 +1,8 @@
 /**
- * 🔄 RETRY UNPROCESSED EVENTS (V3)
+ * 🔄 RETRY UNPROCESSED EVENTS (V4)
  * 
- * Verbesserte Version mit:
- * - Strikter Profil-Verifikation
- * - Support für Usernames mit Punkten
- * - Hashtag-Autocomplete Fix (Escape)
- * - Bild-Pfad Korrektur (GitHub URL -> Local)
+ * Gruppiert Events pro Account + Typ in einen einzigen Tweet.
+ * z.B. 3 Unfollows von @esmuellert → 1 Tweet mit allen 3 Targets.
  */
 
 import { createClient } from '@libsql/client';
@@ -15,17 +12,75 @@ import path from 'path';
 import fs from 'fs';
 
 const DELAY_BETWEEN_POSTS_MS = 15 * 60 * 1000; // 15 Minuten
-const MAX_EVENTS_PER_RUN = 10;
+const MAX_GROUPS_PER_RUN = 10;
 const MAX_CONSECUTIVE_FAILURES = 3;
 const DEBUG_DIR = path.join(process.cwd(), 'public/debug');
+
+interface GroupedEvent {
+    monitoredUsername: string;
+    monitoredFullName: string;
+    type: string;
+    targets: { username: string; fullName: string | null }[];
+    eventIds: string[];
+    screenshotUrl: string | null;
+    profileId: string;
+}
 
 async function sleep(ms: number) {
     console.log(`   ⏰ Warte ${Math.round(ms / 60000)} Minuten...`);
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function postTweet(page: any, text: string, imagePath?: string): Promise<boolean> {
-    const TWITTER_USERNAME = process.env.TWITTER_USERNAME || 'BuliFollows';
+function resolveImagePath(imagePath: string): string | null {
+    let localPath = imagePath;
+    if (localPath.startsWith('http')) {
+        const mainIdx = localPath.indexOf('/main/');
+        if (mainIdx !== -1) {
+            localPath = localPath.substring(mainIdx + 6);
+        }
+    }
+
+    let absolutePath = path.isAbsolute(localPath) ? localPath : path.join(process.cwd(), localPath);
+
+    // Fallback: Suche neuesten Screenshot für diesen User
+    if (!fs.existsSync(absolutePath)) {
+        const screenshotsDir = path.join(process.cwd(), 'public/screenshots');
+        const filename = path.basename(localPath);
+        const usernamePart = filename.split('-')[0];
+        if (usernamePart && fs.existsSync(screenshotsDir)) {
+            const files = fs.readdirSync(screenshotsDir)
+                .filter(f => f.startsWith(usernamePart) && f.endsWith('.png'))
+                .sort().reverse();
+            if (files.length > 0) {
+                absolutePath = path.join(screenshotsDir, files[0]);
+                console.log(`   🖼️ Alternative gefunden: ${files[0]}`);
+            }
+        }
+    }
+
+    return fs.existsSync(absolutePath) ? absolutePath : null;
+}
+
+function formatGroupedTweet(group: GroupedEvent): string {
+    const emoji = group.type === 'FOLLOW' ? '✅' : '👀';
+    const actionDE = group.type === 'FOLLOW' ? 'folgt jetzt' : 'folgt nicht mehr';
+    const actionEN = group.type === 'FOLLOW' ? 'now follows' : 'unfollowed';
+    const actionEmoji = group.type === 'FOLLOW' ? '➕' : '❌';
+
+    const targetLines = group.targets.map(t => {
+        const name = t.fullName ? ` (${t.fullName})` : '';
+        return `${actionEmoji} @${t.username}${name}`;
+    }).join('\n');
+
+    return `${emoji} @${group.monitoredUsername} (${group.monitoredFullName || ''}) ${actionDE}:
+${emoji} @${group.monitoredUsername} ${actionEN}:
+
+${targetLines}
+
+#Instagram #FollowerWatch #Bundesliga`;
+}
+
+async function postTweet(page: any, text: string, imagePath?: string | null): Promise<boolean> {
     try {
         await page.evaluate(() => true);
 
@@ -55,43 +110,12 @@ async function postTweet(page: any, text: string, imagePath?: string): Promise<b
         await page.keyboard.type(text, { delay: 30 });
         await page.waitForTimeout(1500);
 
-        // Bild-Check
+        // Bild hochladen
         if (imagePath) {
-            let localPath = imagePath;
-            if (localPath.startsWith('http')) {
-                const mainIdx = localPath.indexOf('/main/');
-                if (mainIdx !== -1) {
-                    localPath = localPath.substring(mainIdx + 6);
-                }
-            }
-
-            let absolutePath = path.isAbsolute(localPath) ? localPath : path.join(process.cwd(), localPath);
-
-            // Fallback auf neuesten Screenshot falls exakt nicht da
-            if (!fs.existsSync(absolutePath)) {
-                console.log(`   ⚠️ Screenshot nicht am Pfad gefunden, suche Alternative...`);
-                const screenshotsDir = path.join(process.cwd(), 'public/screenshots');
-                const filename = path.basename(localPath);
-                const usernamePart = filename.split('-')[0];
-                if (usernamePart && fs.existsSync(screenshotsDir)) {
-                    const files = fs.readdirSync(screenshotsDir)
-                        .filter(f => f.startsWith(usernamePart) && f.endsWith('.png'))
-                        .sort().reverse();
-                    if (files.length > 0) {
-                        absolutePath = path.join(screenshotsDir, files[0]);
-                        console.log(`   🖼️ Alternative gefunden: ${files[0]}`);
-                    }
-                }
-            }
-
-            if (fs.existsSync(absolutePath)) {
-                console.log(`   🖼️ Lade Bild hoch: ${path.basename(absolutePath)}`);
-                const fileInput = page.locator('input[type="file"]').first();
-                await fileInput.setInputFiles(absolutePath);
-                await page.waitForTimeout(8000);
-            } else {
-                console.log(`   ⚠️ Kein Bild verfügbar.`);
-            }
+            console.log(`   🖼️ Lade Bild hoch: ${path.basename(imagePath)}`);
+            const fileInput = page.locator('input[type="file"]').first();
+            await fileInput.setInputFiles(imagePath);
+            await page.waitForTimeout(8000);
         }
 
         // Hashtag-Dropdown schließen
@@ -105,37 +129,36 @@ async function postTweet(page: any, text: string, imagePath?: string): Promise<b
         await page.keyboard.press('Control+Enter');
         await page.waitForTimeout(3000);
 
-        // Verifikation: Suche nach "Your post was sent" Toast oder leeres Textfeld
+        // Verifikation: Toast oder leeres Textfeld
         let verified = false;
 
-        // Methode 1: Toast-Nachricht "Your post was sent"
+        // Methode 1: Toast "Your post was sent"
         try {
             const toast = page.getByText('Your post was sent').first();
             await toast.waitFor({ timeout: 8000 });
             console.log('   ✅ Toast erkannt: "Your post was sent"!');
             verified = true;
         } catch {
-            console.log('   ℹ️ Kein Toast erkannt, prüfe Textfeld...');
+            console.log('   ℹ️ Kein Toast, prüfe Textfeld...');
         }
 
-        // Methode 2: Textfeld ist leer (Post wurde gesendet)
+        // Methode 2: Textfeld ist leer
         if (!verified) {
             try {
                 const textarea = page.locator('[data-testid="tweetTextarea_0"]').first();
                 const textLeft = await textarea.innerText().catch(() => '');
                 if (!textLeft || textLeft.trim().length === 0) {
-                    console.log('   ✅ Textfeld ist leer -> Post gesendet!');
+                    console.log('   ✅ Textfeld leer -> Post gesendet!');
                     verified = true;
                 } else {
-                    console.log(`   ⚠️ Textfeld hat noch Inhalt: "${textLeft.substring(0, 30)}..."`);
                     // Fallback: Button klicken
-                    console.log('   🔄 Versuche Button zu klicken...');
+                    console.log('   🔄 Versuche Button...');
                     const postBtn = page.locator('[data-testid="tweetButtonInline"]').first();
                     if (await postBtn.isVisible()) {
                         await postBtn.click();
                         await page.waitForTimeout(5000);
-                        const textAfterBtn = await textarea.innerText().catch(() => '');
-                        if (!textAfterBtn || textAfterBtn.trim().length === 0) {
+                        const textAfter = await textarea.innerText().catch(() => '');
+                        if (!textAfter || textAfter.trim().length === 0) {
                             console.log('   ✅ Button-Klick erfolgreich!');
                             verified = true;
                         }
@@ -145,16 +168,9 @@ async function postTweet(page: any, text: string, imagePath?: string): Promise<b
         }
 
         await page.screenshot({ path: `${DEBUG_DIR}/after-post-${Date.now()}.png` }).catch(() => { });
-
-        if (verified) {
-            console.log('   ✅ Tweet erfolgreich gepostet!');
-            return true;
-        } else {
-            console.log('   ❌ Tweet konnte nicht verifiziert werden.');
-            return false;
-        }
+        return verified;
     } catch (err: any) {
-        console.log(`   ⚠️ Fehler im Post-Prozess: ${err.message}`);
+        console.log(`   ⚠️ Fehler: ${err.message}`);
         return false;
     }
 }
@@ -173,8 +189,7 @@ async function retryUnprocessedEvents() {
         JOIN MonitoredProfile mp ON ce.profileId = mp.id
         WHERE ce.processed = 0
         AND ce.detectedAt > datetime('now', '-1 day')
-        ORDER BY ce.detectedAt DESC
-        LIMIT ${MAX_EVENTS_PER_RUN}
+        ORDER BY ce.profileId, ce.type, ce.detectedAt DESC
     `);
 
     if (result.rows.length === 0) {
@@ -182,7 +197,39 @@ async function retryUnprocessedEvents() {
         return;
     }
 
-    console.log(`📋 ${result.rows.length} Events werden verarbeitet (max ${MAX_EVENTS_PER_RUN}).\n`);
+    // ═══ GRUPPIERUNG: Events pro Account + Typ zusammenfassen ═══
+    const groupMap = new Map<string, GroupedEvent>();
+
+    for (const event of result.rows) {
+        const key = `${event.monitoredUsername}_${event.type}`;
+
+        if (!groupMap.has(key)) {
+            groupMap.set(key, {
+                monitoredUsername: String(event.monitoredUsername),
+                monitoredFullName: String(event.monitoredFullName || ''),
+                type: String(event.type),
+                targets: [],
+                eventIds: [],
+                screenshotUrl: event.screenshotUrl ? String(event.screenshotUrl) : null,
+                profileId: String(event.profileId)
+            });
+        }
+
+        const group = groupMap.get(key)!;
+        group.targets.push({
+            username: String(event.targetUsername),
+            fullName: event.targetFullName ? String(event.targetFullName) : null
+        });
+        group.eventIds.push(String(event.id));
+    }
+
+    const groups = Array.from(groupMap.values()).slice(0, MAX_GROUPS_PER_RUN);
+
+    console.log(`📋 ${result.rows.length} Events → ${groups.length} gruppierte Posts\n`);
+
+    for (const group of groups) {
+        console.log(`   📦 @${group.monitoredUsername} ${group.type}: ${group.targets.length} Targets`);
+    }
 
     let page: any = null;
     let context: any = null;
@@ -191,56 +238,55 @@ async function retryUnprocessedEvents() {
     let consecutiveFailures = 0;
 
     async function startBrowser() {
-        console.log('🐦 Starte Twitter Session...');
+        console.log('\n🐦 Starte Twitter Session...');
         const ctx = await getTwitterContext(true);
         page = ctx.page;
         context = ctx.context;
-        console.log('   ✅ Twitter Session aktiv');
         console.log('   ✅ Browser bereit');
     }
 
     await startBrowser();
 
-    for (let i = 0; i < result.rows.length; i++) {
-        const event = result.rows[i];
-        const eventNum = i + 1;
+    for (let i = 0; i < groups.length; i++) {
+        const group = groups[i];
 
         console.log(`\n═══════════════════════════════════════════════════`);
-        console.log(`📝 Event ${eventNum}/${result.rows.length}`);
-        console.log(`   Monitor: @${event.monitoredUsername}`);
-        console.log(`   ${event.type}: @${event.targetUsername}`);
+        console.log(`📝 Gruppe ${i + 1}/${groups.length}`);
+        console.log(`   Monitor: @${group.monitoredUsername}`);
+        console.log(`   ${group.type}: ${group.targets.map(t => '@' + t.username).join(', ')}`);
         console.log(`═══════════════════════════════════════════════════`);
 
-        const emoji = event.type === 'FOLLOW' ? '✅' : '👀';
-        const actionEmoji = event.type === 'FOLLOW' ? '➕' : '❌';
-        const actionDE = event.type === 'FOLLOW' ? 'folgt jetzt' : 'folgt nicht mehr';
-        const actionEN = event.type === 'FOLLOW' ? 'now follows' : 'unfollowed';
+        const text = formatGroupedTweet(group);
 
-        const text = `${emoji} @${event.monitoredUsername} (${event.monitoredFullName || ''}) ${actionDE}:
-${emoji} @${event.monitoredUsername} ${actionEN}:
-
-${actionEmoji} @${event.targetUsername} (${event.targetFullName || ''})
-🔗 instagram.com/${event.targetUsername}
-
-#Instagram #FollowerWatch #Bundesliga`;
-
-        const imagePath = event.screenshotUrl ? String(event.screenshotUrl) : undefined;
+        // Bild auflösen
+        let imagePath: string | null = null;
+        if (group.screenshotUrl) {
+            console.log(`   🖼️ Suche Screenshot...`);
+            imagePath = resolveImagePath(group.screenshotUrl);
+            if (!imagePath) {
+                console.log(`   ⚠️ Kein Bild verfügbar.`);
+            }
+        }
 
         try {
             const success = await postTweet(page, text, imagePath);
 
             if (success) {
-                console.log(`   ✅ Tweet gepostet!`);
+                console.log(`   ✅ Gruppierter Tweet gepostet! (${group.targets.length} Targets)`);
                 successCount++;
                 consecutiveFailures = 0;
 
-                await db.execute({
-                    sql: `UPDATE ChangeEvent SET processed = 1 WHERE id = ?`,
-                    args: [event.id]
-                });
-                console.log(`   💾 Event markiert.`);
+                // Alle Events in der Gruppe als processed markieren
+                for (const eventId of group.eventIds) {
+                    await db.execute({
+                        sql: `UPDATE ChangeEvent SET processed = 1 WHERE id = ?`,
+                        args: [eventId]
+                    });
+                }
+                console.log(`   💾 ${group.eventIds.length} Events markiert.`);
 
-                console.log('   🔄 Starte Browser neu für nächsten Post...');
+                // Browser neu starten
+                console.log('   🔄 Browser-Neustart...');
                 await closeTwitterContext(context).catch(() => { });
                 await startBrowser();
             } else {
@@ -249,7 +295,7 @@ ${actionEmoji} @${event.targetUsername} (${event.targetFullName || ''})
                 consecutiveFailures++;
             }
         } catch (err: any) {
-            console.log(`   ❌ Kritischer Fehler: ${err.message}`);
+            console.log(`   ❌ Fehler: ${err.message}`);
             failCount++;
             consecutiveFailures++;
             await closeTwitterContext(context).catch(() => { });
@@ -261,18 +307,18 @@ ${actionEmoji} @${event.targetUsername} (${event.targetFullName || ''})
             break;
         }
 
-        if (i < result.rows.length - 1 && consecutiveFailures === 0) {
+        if (i < groups.length - 1 && consecutiveFailures === 0) {
             await sleep(DELAY_BETWEEN_POSTS_MS);
         }
     }
 
     console.log(`\n═══════════════════════════════════════════════════`);
     console.log(`📊 ZUSAMMENFASSUNG`);
-    console.log(`   ✅ Erfolgreich: ${successCount}`);
-    console.log(`   ❌ Fehlgeschlagen: ${failCount}`);
+    console.log(`   ✅ Erfolgreich: ${successCount} Gruppen`);
+    console.log(`   ❌ Fehlgeschlagen: ${failCount} Gruppen`);
     console.log(`═══════════════════════════════════════════════════\n`);
 
-    await closeTwitterContext(context);
+    await closeTwitterContext(context).catch(() => { });
 }
 
 retryUnprocessedEvents().catch(console.error);
