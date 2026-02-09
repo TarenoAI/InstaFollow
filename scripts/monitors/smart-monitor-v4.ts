@@ -1594,36 +1594,11 @@ async function main() {
                 scrapeQuote = currentCount > 0 ? ((currentFollowing.length / currentCount) * 100).toFixed(1) : '100';
                 console.log(`   📈 Scraping-Quote: ${currentFollowing.length}/${currentCount} (${scrapeQuote}%)`);
 
-                // ⚠️ KRITISCH: Wenn weniger als 95% gescrapt, keine Changes verarbeiten!
-                // Wir brauchen 95% um zuverlässig Änderungen zu identifizieren
-                const MIN_SCRAPE_QUOTA = 0.95;
-                if (currentFollowing.length < currentCount * MIN_SCRAPE_QUOTA) {
-                    console.log(`   🚫 ABBRUCH: Nur ${scrapeQuote}% gescrapt (benötigt 95%)`);
-
-                    // 📸 Screenshot vom Abbruch-Zustand
-                    const abortPath = `${DEBUG_DIR}/scrape-abort-${username}-${Date.now()}.png`;
-                    await page.screenshot({ path: abortPath });
-                    await pushDebugScreenshot(abortPath, `debug: scrape abort ${scrapeQuote}% - @${username}`);
-
-                    await saveMonitoringLog(db, {
-                        profileId,
-                        profileUsername: username,
-                        status: 'PARTIAL',
-                        followingCountLive: currentCount,
-                        followingCountDb: lastCount,
-                        scrapedCount: currentFollowing.length,
-                        scrapeQuote: parseFloat(scrapeQuote),
-                        errorMessage: `Nur ${scrapeQuote}% gescrapt, benötigt 95%`
-                    });
-                    await db.execute({
-                        sql: `UPDATE MonitoredProfile SET lastCheckedAt = datetime('now') WHERE id = ?`,
-                        args: [profileId]
-                    });
-                    await humanDelay(10000, 15000);
-                    continue;
-                }
-
-
+                // ════════════════════════════════════════════════════════════
+                // 🔄 MERGE-BASIERTE BASELINE: Partielle Ergebnisse ergänzen
+                // ════════════════════════════════════════════════════════════
+                // Statt 95%-Abbruch: Jedes Ergebnis wird gemergt.
+                // Scrape 1: A,B,C,D (93%) + Scrape 2: A,B,E,F (92%) = DB: A,B,C,D,E,F (≈99%)
 
                 if (currentFollowing.length > 0) {
                     const oldRows = await db.execute({
@@ -1632,109 +1607,155 @@ async function main() {
                     });
                     const oldFollowing = new Set(oldRows.rows.map(r => r.username as string));
 
-                    addedUsernames = currentFollowing.filter(u => !oldFollowing.has(u));
-                    removedUsernames = Array.from(oldFollowing).filter(u => !currentFollowing.includes(u));
+                    // Finde User, die im Scrape sind aber NICHT in der DB
+                    const newlyDiscovered = currentFollowing.filter(u => !oldFollowing.has(u));
+                    // Finde User, die in der DB sind aber NICHT im Scrape
+                    const missingFromScrape = Array.from(oldFollowing).filter(u => !currentFollowing.includes(u));
 
-                    console.log(`   ➕ Neu: ${addedUsernames.length} | ➖ Entfolgt: ${removedUsernames.length}`);
+                    console.log(`   📊 DB: ${oldFollowing.size} | Scrape: ${currentFollowing.length} | Neu entdeckt: ${newlyDiscovered.length} | Nicht im Scrape: ${missingFromScrape.length}`);
 
-                    // 🛡️ SANITY CHECK: Wenn DB viel weniger hat als gescrapt → Baseline ist korrupt
-                    // Beispiel: DB hat 80, gescrapt 176 → 96 "neue" wäre falsch!
-                    // Regel: Wenn DB < 80% von gescrapt UND "neue" > erwartete Änderung × 3 → Baseline neu
-                    const expectedChange = Math.abs(currentCount - lastCount);
-                    const dbCoveragePercent = (oldFollowing.size / currentFollowing.length) * 100;
-                    const isSuspiciouslyManyNew = addedUsernames.length > Math.max(expectedChange * 3, 20);
-
-                    if (isBaselineComplete && dbCoveragePercent < 80 && isSuspiciouslyManyNew) {
-                        console.log(`\n   ⚠️ BASELINE KORRUPT ERKANNT!`);
-                        console.log(`      DB: ${oldFollowing.size} | Gescrapt: ${currentFollowing.length} (${dbCoveragePercent.toFixed(1)}% Abdeckung)`);
-                        console.log(`      "Neue": ${addedUsernames.length} aber erwartete Änderung nur ${expectedChange}`);
-                        console.log(`      → Behandle als neue Baseline, keine Changes melden!`);
-                        // Setze Flag um Baseline-Logik zu triggern
-                        // (Der Code unten prüft !isBaselineComplete, daher lokale Variable überschreiben)
-                    }
-
-                    // Korrigiere lokale Variable wenn Baseline korrupt
-                    const needsBaselineRebuild = !isBaselineComplete || (dbCoveragePercent < 80 && isSuspiciouslyManyNew);
-
-                    // === BASELINE NICHT KOMPLETT: Erst Baseline erstellen ===
-                    if (needsBaselineRebuild) {
-                        console.log(`\n   🆕 BASELINE WIRD NEU ERSTELLT...`);
+                    // === BASELINE NOCH NICHT KOMPLETT ===
+                    if (!isBaselineComplete) {
+                        console.log(`\n   🔄 BASELINE AUFBAU (Merge-Modus)...`);
                         console.log(`      Bisherige Einträge in DB: ${oldFollowing.size}`);
-                        console.log(`      Gescrapt: ${currentFollowing.length}`);
+                        console.log(`      Neu entdeckt in diesem Scrape: ${newlyDiscovered.length}`);
 
-                        // Lösche alte Einträge und ersetze mit vollständigem Scrape
-                        await db.execute({
-                            sql: "DELETE FROM FollowingEntry WHERE profileId = ?",
-                            args: [profileId]
-                        });
-
-                        // Batch-Insert für bessere Performance
-                        const batchSize = 50;
-                        for (let batch = 0; batch < Math.ceil(currentFollowing.length / batchSize); batch++) {
-                            const start = batch * batchSize;
-                            const end = Math.min(start + batchSize, currentFollowing.length);
-
-                            for (let i = start; i < end; i++) {
-                                const uname = currentFollowing[i];
+                        // Nur NEUE User hinzufügen (bestehende behalten!)
+                        if (newlyDiscovered.length > 0) {
+                            let addedCount = 0;
+                            for (const uname of newlyDiscovered) {
                                 const pPic = userPicMap.get(uname) || null;
-                                await db.execute({
-                                    sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
-                                          VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
-                                    args: [`v4_${Date.now()}_${i}`, uname, i, profileId, pPic]
-                                });
+                                try {
+                                    await db.execute({
+                                        sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
+                                              VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
+                                        args: [`v4_${Date.now()}_${addedCount}`, uname, oldFollowing.size + addedCount, profileId, pPic]
+                                    });
+                                    addedCount++;
+                                } catch (e: any) {
+                                    // Duplikat ignorieren
+                                    if (!e.message?.includes('UNIQUE')) {
+                                        console.log(`      ⚠️ Fehler beim Einfügen von ${uname}: ${e.message}`);
+                                    }
+                                }
                             }
-                            console.log(`      💾 Batch ${batch + 1}: ${end}/${currentFollowing.length} gespeichert`);
+                            console.log(`      💾 ${addedCount} neue User zur DB hinzugefügt`);
                         }
 
-                        // Profilinfos holen (inkl. Profilbild)
-                        const baselineProfileInfo = await getProfileInfo(page, username, false);
+                        // Prüfe: Haben wir jetzt 100%?
+                        const newDbCount = oldFollowing.size + newlyDiscovered.length;
+                        const completionPercent = currentCount > 0 ? ((newDbCount / currentCount) * 100).toFixed(1) : '100';
+                        console.log(`      📊 DB-Fortschritt: ${newDbCount}/${currentCount} (${completionPercent}%)`);
 
-                        // Markiere als Baseline-complete + speichere Zeitpunkt + Profilinfos
-                        await db.execute({
-                            sql: `UPDATE MonitoredProfile SET 
-                                  followingCount = ?, 
-                                  followerCount = ?,
-                                  lastCheckedAt = datetime('now'),
-                                  isBaselineComplete = 1,
-                                  baselineCreatedAt = datetime('now'),
-                                  baselineFollowingCount = ?,
-                                  profilePicUrl = ?,
-                                  fullName = ?,
-                                  isVerified = ?,
-                                  lastSuccessfulScrapeAt = datetime('now')
-                                  WHERE id = ?`,
-                            args: [
-                                currentFollowing.length, // FIX: Nehme IMMER die echte Anzahl, nicht den Instagram-Header!
-                                parseInt(baselineProfileInfo?.followerCount.replace(/[.,KMB]/g, '') || '0'),
-                                currentFollowing.length,
-                                baselineProfileInfo?.profilePicUrl || null,
-                                baselineProfileInfo?.fullName || username,
-                                baselineProfileInfo?.isVerified ? 1 : 0,
-                                profileId
-                            ]
-                        });
+                        if (newDbCount >= currentCount) {
+                            // 🎉 100% erreicht!
+                            console.log(`      🎉 BASELINE KOMPLETT! 100% erreicht!`);
 
-                        console.log(`   ✅ Baseline erstellt (${currentFollowing.length} Einträge) - KEINE Changes gemeldet`);
-                        console.log(`   ℹ️ Ab jetzt werden Änderungen erkannt!\n`);
+                            const baselineProfileInfo = await getProfileInfo(page, username, false);
+                            await db.execute({
+                                sql: `UPDATE MonitoredProfile SET 
+                                      followingCount = ?, 
+                                      followerCount = ?,
+                                      lastCheckedAt = datetime('now'),
+                                      isBaselineComplete = 1,
+                                      baselineCreatedAt = datetime('now'),
+                                      baselineFollowingCount = ?,
+                                      profilePicUrl = ?,
+                                      fullName = ?,
+                                      isVerified = ?,
+                                      lastSuccessfulScrapeAt = datetime('now')
+                                      WHERE id = ?`,
+                                args: [
+                                    currentCount,
+                                    parseInt(baselineProfileInfo?.followerCount.replace(/[.,KMB]/g, '') || '0'),
+                                    currentCount,
+                                    baselineProfileInfo?.profilePicUrl || null,
+                                    baselineProfileInfo?.fullName || username,
+                                    baselineProfileInfo?.isVerified ? 1 : 0,
+                                    profileId
+                                ]
+                            });
 
-                        // 📊 Log: SUCCESS (Baseline)
+                            console.log(`   ✅ Baseline komplett (${newDbCount} Einträge) - Ab jetzt werden Änderungen erkannt!`);
+                        } else {
+                            // Noch nicht 100% - weiter aufbauen
+                            console.log(`      ⏳ Noch nicht komplett. Fehlende User werden beim nächsten Scrape ergänzt.`);
+
+                            await db.execute({
+                                sql: `UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now'), lastSuccessfulScrapeAt = datetime('now') WHERE id = ?`,
+                                args: [currentCount, profileId]
+                            });
+                        }
+
                         await saveMonitoringLog(db, {
                             profileId,
                             profileUsername: username,
-                            status: 'SUCCESS',
+                            status: newDbCount >= currentCount ? 'SUCCESS' : 'PARTIAL',
                             followingCountLive: currentCount,
                             followingCountDb: lastCount,
                             followerCountLive: followerNum,
                             scrapedCount: currentFollowing.length,
                             scrapeQuote: parseFloat(scrapeQuote),
-                            newFollowsCount: addedUsernames.length,
-                            unfollowsCount: removedUsernames.length,
-                            errorMessage: 'Initial Baseline erstellt'
+                            newFollowsCount: newlyDiscovered.length,
+                            unfollowsCount: 0,
+                            errorMessage: `Baseline: ${newDbCount}/${currentCount} (${completionPercent}%)`
                         });
 
                         await humanDelay(10000, 15000);
                         continue; // Zum nächsten Profil!
                     }
+
+                    // === BASELINE KOMPLETT: Echte Changes erkennen ===
+                    addedUsernames = newlyDiscovered;
+                    removedUsernames = missingFromScrape;
+
+                    // 🛡️ SANITY CHECK: Zu viele "Änderungen" = wahrscheinlich Scrape-Problem
+                    const expectedChange = Math.abs(currentCount - lastCount);
+                    const isSuspiciouslyManyChanges = (addedUsernames.length + removedUsernames.length) > Math.max(expectedChange * 3, 20);
+                    const scrapeRatio = currentFollowing.length / currentCount;
+
+                    if (isSuspiciouslyManyChanges && scrapeRatio < 0.95) {
+                        console.log(`\n   ⚠️ VERDÄCHTIGER SCRAPE: ${addedUsernames.length} neu + ${removedUsernames.length} entfernt bei ${(scrapeRatio * 100).toFixed(1)}% Scrape-Quote`);
+                        console.log(`      → Nur ${scrapeQuote}% gescrapt - Merge statt Change-Detection!`);
+
+                        // Merge: Neue User hinzufügen, aber keine "Entfernungen" melden
+                        if (newlyDiscovered.length > 0) {
+                            let addedCount = 0;
+                            for (const uname of newlyDiscovered) {
+                                const pPic = userPicMap.get(uname) || null;
+                                try {
+                                    await db.execute({
+                                        sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
+                                              VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
+                                        args: [`v4_${Date.now()}_${addedCount}`, uname, oldFollowing.size + addedCount, profileId, pPic]
+                                    });
+                                    addedCount++;
+                                } catch { }
+                            }
+                            console.log(`      💾 ${addedCount} neue User gemergt (keine Changes gemeldet)`);
+                        }
+
+                        await db.execute({
+                            sql: `UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now') WHERE id = ?`,
+                            args: [currentCount, profileId]
+                        });
+
+                        await saveMonitoringLog(db, {
+                            profileId,
+                            profileUsername: username,
+                            status: 'PARTIAL',
+                            followingCountLive: currentCount,
+                            followingCountDb: lastCount,
+                            scrapedCount: currentFollowing.length,
+                            scrapeQuote: parseFloat(scrapeQuote),
+                            errorMessage: `Verdächtiger Scrape: ${scrapeQuote}% - Merge statt Changes`
+                        });
+
+                        await humanDelay(10000, 15000);
+                        continue;
+                    }
+
+                    console.log(`   ➕ Neu: ${addedUsernames.length} | ➖ Entfolgt: ${removedUsernames.length}`);
 
                     // === ECHTER CHANGE: Profilinfos laden und tweeten ===
                     if (addedUsernames.length > 0 || removedUsernames.length > 0) {
@@ -1859,19 +1880,30 @@ async function main() {
                             }
                         }
 
-                        // DB aktualisieren
-                        console.log('\n   💾 Aktualisiere Datenbank...');
-                        await db.execute({ sql: "DELETE FROM FollowingEntry WHERE profileId = ?", args: [profileId] });
+                        // DB aktualisieren (Merge: Neue hinzufügen, Entfolgte entfernen)
+                        console.log('\n   💾 Aktualisiere Datenbank (Merge)...');
 
-                        for (let i = 0; i < currentFollowing.length; i++) {
-                            const uname = currentFollowing[i];
+                        // Neue User hinzufügen
+                        for (const uname of addedUsernames) {
                             const pPic = userPicMap.get(uname) || null;
+                            try {
+                                await db.execute({
+                                    sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
+                                          VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
+                                    args: [`v4_${Date.now()}_${Math.random().toString(36).slice(2)}`, uname, 0, profileId, pPic]
+                                });
+                            } catch { }
+                        }
+
+                        // Entfolgte User entfernen
+                        for (const uname of removedUsernames) {
                             await db.execute({
-                                sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
-                                      VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
-                                args: [`v4_${Date.now()}_${i}`, uname, i, profileId, pPic]
+                                sql: `DELETE FROM FollowingEntry WHERE profileId = ? AND username = ?`,
+                                args: [profileId, uname]
                             });
                         }
+
+                        console.log(`      ➕ ${addedUsernames.length} hinzugefügt, ➖ ${removedUsernames.length} entfernt`);
 
                         // Aktualisiere auch Profilinfos
                         await db.execute({
