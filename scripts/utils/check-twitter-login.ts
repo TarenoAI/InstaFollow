@@ -40,7 +40,8 @@ async function checkLogin() {
             try {
                 const { exec } = require('child_process');
                 console.log('   📸 Screenshot wird zu Git gepusht...');
-                exec(`git add ${screenshotPath} && git commit -m "chore: Update Twitter status screenshot" && git push`, (err: any, stdout: any, stderr: any) => {
+                // Force add (-f) weil public/debug ignoriert wird
+                exec(`git add -f ${screenshotPath} && git commit -m "chore: Update Twitter status screenshot" && git push`, (err: any, stdout: any, stderr: any) => {
                     if (err) console.log('   ⚠️ Git Push Fehler (nicht kritisch):', stderr);
                     else console.log('   ✅ Screenshot gepusht!');
                 });
