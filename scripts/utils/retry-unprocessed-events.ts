@@ -11,6 +11,7 @@ import { createClient } from '@libsql/client';
 import { getTwitterContext, closeTwitterContext } from '../lib/twitter-auto-login';
 import 'dotenv/config';
 import path from 'path';
+import fs from 'fs';
 
 const DELAY_BETWEEN_POSTS_MS = 15 * 60 * 1000; // 15 Minuten
 const MAX_EVENTS_PER_RUN = 10;
@@ -22,7 +23,7 @@ async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function postTweet(page: any, text: string): Promise<boolean> {
+async function postTweet(page: any, text: string, imagePath?: string): Promise<boolean> {
     try {
         // Prüfe ob Browser noch lebt
         await page.evaluate(() => true);
@@ -66,6 +67,14 @@ async function postTweet(page: any, text: string): Promise<boolean> {
         console.log('   ⌨️ Tippe Text ein...');
         await page.keyboard.type(text, { delay: 30 });
         await page.waitForTimeout(1500);
+
+        // Bild hochladen wenn vorhanden
+        if (imagePath && fs.existsSync(imagePath)) {
+            console.log(`   🖼️ Lade Bild hoch: ${path.basename(imagePath)}`);
+            const fileInput = page.locator('input[type="file"]').first();
+            await fileInput.setInputFiles(imagePath);
+            await page.waitForTimeout(5000); // Zeit für Upload
+        }
 
         // Screenshot VOR dem Posten (Debug)
         await page.screenshot({ path: `${DEBUG_DIR}/before-post-${Date.now()}.png` }).catch(() => { });
@@ -194,8 +203,11 @@ ${actionEmoji} @${event.targetUsername} (${event.targetFullName || ''})
 
 #Instagram #FollowerWatch #Bundesliga`;
 
+        // Hole das Bild (falls vorhanden)
+        const imagePath = event.screenshotUrl ? String(event.screenshotUrl) : undefined;
+
         try {
-            const success = await postTweet(page, text);
+            const success = await postTweet(page, text, imagePath);
 
             if (success) {
                 console.log(`   ✅ Tweet gepostet!`);
