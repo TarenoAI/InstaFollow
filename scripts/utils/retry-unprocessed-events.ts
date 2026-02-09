@@ -69,15 +69,36 @@ async function postTweet(page: any, text: string, imagePath?: string): Promise<b
                 }
             }
 
-            const absolutePath = path.isAbsolute(localPath) ? localPath : path.join(process.cwd(), localPath);
-            console.log(`   🖼️ Suche Bild: ${absolutePath}`);
+            let absolutePath = path.isAbsolute(localPath) ? localPath : path.join(process.cwd(), localPath);
+
+            // Falls exakte Datei nicht existiert: Suche neuesten Screenshot für diesen User
+            if (!fs.existsSync(absolutePath)) {
+                console.log(`   ⚠️ Exakter Screenshot nicht gefunden, suche Alternative...`);
+                const screenshotsDir = path.join(process.cwd(), 'public/screenshots');
+                // Extrahiere Username aus dem Pfad (z.B. "robingosens" aus "robingosens-1234.png")
+                const filename = path.basename(localPath);
+                const usernameFromFile = filename.split('-').slice(0, -1).join('-'); // alles vor dem letzten "-"
+
+                if (usernameFromFile && fs.existsSync(screenshotsDir)) {
+                    const files = fs.readdirSync(screenshotsDir)
+                        .filter(f => f.startsWith(usernameFromFile + '-') && f.endsWith('.png'))
+                        .sort()
+                        .reverse(); // Neueste zuerst (höherer Timestamp)
+
+                    if (files.length > 0) {
+                        absolutePath = path.join(screenshotsDir, files[0]);
+                        console.log(`   🖼️ Alternative gefunden: ${files[0]}`);
+                    }
+                }
+            }
+
             if (fs.existsSync(absolutePath)) {
                 console.log(`   🖼️ Lade Bild hoch: ${path.basename(absolutePath)}`);
                 const fileInput = page.locator('input[type="file"]').first();
                 await fileInput.setInputFiles(absolutePath);
                 await page.waitForTimeout(6000);
             } else {
-                console.log(`   ⚠️ Bild nicht gefunden: ${absolutePath}`);
+                console.log(`   ⚠️ Kein Screenshot verfügbar für dieses Profil.`);
             }
         }
 
