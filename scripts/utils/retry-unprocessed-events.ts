@@ -35,22 +35,21 @@ async function postTweet(page: any, text: string): Promise<boolean> {
         let textarea = page.locator('[data-testid="tweetTextarea_0"]').first();
 
         try {
-            await textarea.waitFor({ timeout: 5000 });
+            await textarea.waitFor({ timeout: 8000 });
         } catch {
-            // Fallback: Suche nach "What's happening?" Placeholder
-            console.log('   🔄 Versuche alternativen Selektor...');
-            textarea = page.locator('[aria-label="Post text"]').or(
-                page.locator('[placeholder="What\'s happening?"]')
-            ).or(
-                page.locator('.public-DraftEditor-content')
-            );
+            console.log('   🔄 Standard-Selektor nicht gefunden, suche nach "What\'s happening?"...');
+            // Gezielte Suche nach dem Text, den der User sieht
+            textarea = page.getByText("What's happening?").first();
             await textarea.waitFor({ timeout: 5000 });
         }
 
-        await textarea.click();
-        await page.waitForTimeout(500);
+        // Expliziter Klick auf das Feld, um den Cursor zu setzen
+        console.log('   🖱️ Klicke auf das Textfeld...');
+        await textarea.click({ force: true });
+        await page.waitForTimeout(1000);
 
         // Text eingeben
+        console.log('   ⌨️ Tippe Text ein...');
         await page.keyboard.type(text, { delay: 30 });
         await page.waitForTimeout(1500);
 
