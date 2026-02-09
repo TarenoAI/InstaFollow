@@ -31,21 +31,34 @@ async function postTweet(page: any, text: string): Promise<boolean> {
         await page.goto('https://x.com/compose/post', { waitUntil: 'domcontentloaded', timeout: 20000 });
         await page.waitForTimeout(4000); // Längeres Warten für Modal
 
-        // Finde Textfeld - WICHTIG: .first() wie in smart-monitor-v4.ts!
-        let textarea = page.locator('[data-testid="tweetTextarea_0"]').first();
+        // Finde und fokussiere das Textfeld
+        let clicked = false;
 
+        // Fall 1: Standard-Selektor (data-testid)
         try {
-            await textarea.waitFor({ timeout: 8000 });
+            const textarea = page.locator('[data-testid="tweetTextarea_0"]').first();
+            await textarea.waitFor({ timeout: 6000 });
+            await textarea.click({ force: true });
+            console.log('   🖱️ Fall 1: Klick auf Standard-Textfeld erfolgreich.');
+            clicked = true;
         } catch {
-            console.log('   🔄 Standard-Selektor nicht gefunden, suche nach "What\'s happening?"...');
-            // Gezielte Suche nach dem Text, den der User sieht
-            textarea = page.getByText("What's happening?").first();
-            await textarea.waitFor({ timeout: 5000 });
+            console.log('   🔄 Fall 1 (Standard-Selektor) nicht reagiert.');
         }
 
-        // Expliziter Klick auf das Feld, um den Cursor zu setzen
-        console.log('   🖱️ Klicke auf das Textfeld...');
-        await textarea.click({ force: true });
+        // Fall 2: Falls Fall 1 nicht geklappt hat -> Suche nach "What's happening?"
+        if (!clicked) {
+            try {
+                const fallback = page.getByText("What's happening?").first();
+                await fallback.waitFor({ timeout: 5000 });
+                await fallback.click({ force: true });
+                console.log('   🖱️ Fall 2: Klick auf "What\'s happening?" Text erfolgreich.');
+                clicked = true;
+            } catch (err: any) {
+                console.log('   ❌ Fall 2 ebenfalls fehlgeschlagen.');
+                throw new Error('Konnte kein Eingabefeld fokussieren.');
+            }
+        }
+
         await page.waitForTimeout(1000);
 
         // Text eingeben
