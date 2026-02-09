@@ -27,9 +27,10 @@ async function postTweet(page: any, text: string): Promise<boolean> {
         // Prüfe ob Browser noch lebt
         await page.evaluate(() => true);
 
-        // Gehe zur Compose-Seite (per Dokumentation: /compose/post)
-        await page.goto('https://x.com/compose/post', { waitUntil: 'domcontentloaded', timeout: 20000 });
-        await page.waitForTimeout(4000); // Längeres Warten für Modal
+        // Gehe zur HOME-Seite (dort ist das Compose-Feld oben)
+        console.log('   🏠 Gehe zu x.com/home...');
+        await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page.waitForTimeout(3000);
 
         // Finde und fokussiere das Textfeld
         let clicked = false;
@@ -66,13 +67,37 @@ async function postTweet(page: any, text: string): Promise<boolean> {
         await page.keyboard.type(text, { delay: 30 });
         await page.waitForTimeout(1500);
 
-        // Post absenden (per Dokumentation: Control+Enter ist primäre Methode)
-        await page.keyboard.press('Control+Enter');
-        await page.waitForTimeout(6000);
+        // Screenshot VOR dem Posten (Debug)
+        await page.screenshot({ path: `${DEBUG_DIR}/before-post-${Date.now()}.png` }).catch(() => { });
 
-        // Prüfe ob erfolgreich (URL sollte sich ändern, nicht mehr compose)
-        const url = page.url();
-        return !url.includes('compose');
+        // Post absenden - BUTTON klicken (zuverlässiger auf /home)
+        console.log('   📤 Klicke auf "Post/Posten" Button...');
+        const postButton = page.locator('[data-testid="tweetButtonInline"]').first();
+        try {
+            await postButton.waitFor({ timeout: 5000 });
+            await postButton.click();
+        } catch {
+            // Fallback: Normaler Tweet-Button
+            console.log('   🔄 Versuche alternativen Post-Button...');
+            await page.locator('[data-testid="tweetButton"]').first().click();
+        }
+
+        await page.waitForTimeout(5000);
+
+        // Screenshot NACH dem Posten (Debug)
+        await page.screenshot({ path: `${DEBUG_DIR}/after-post-${Date.now()}.png` }).catch(() => { });
+
+        // Prüfe ob Textfeld jetzt leer ist (= Post war erfolgreich)
+        const textareaContent = await page.locator('[data-testid="tweetTextarea_0"]').first().textContent().catch(() => '');
+        const success = textareaContent === '' || textareaContent === null;
+
+        if (success) {
+            console.log('   ✅ Textfeld ist leer -> Post erfolgreich!');
+        } else {
+            console.log('   ⚠️ Textfeld enthält noch Text -> Post evtl. fehlgeschlagen');
+        }
+
+        return success;
     } catch (err: any) {
         console.log(`   ⚠️ Fehler: ${err.message}`);
         return false;
