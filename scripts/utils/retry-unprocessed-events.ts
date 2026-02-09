@@ -84,6 +84,20 @@ async function postTweet(page: any, text: string, imagePath?: string): Promise<b
         // Debug-Screenshot VOR dem Senden
         await page.screenshot({ path: `${DEBUG_DIR}/before-post-${Date.now()}.png` }).catch(() => { });
 
+        // WICHTIG: Autocomplete-Dropdown schließen!
+        // X öffnet ein Dropdown bei Hashtags (#Bundesliga -> #Bundesliga, #Bundesliga2)
+        // Das blockiert Ctrl+Enter. Wir drücken Escape um es zu schließen.
+        console.log('   🔒 Schließe mögliches Autocomplete-Dropdown...');
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(500);
+
+        // Klick auf das Textfeld zurück, um den Fokus zu behalten
+        try {
+            const textarea = page.locator('[data-testid="tweetTextarea_0"]').first();
+            await textarea.click();
+            await page.waitForTimeout(300);
+        } catch { }
+
         console.log('   📤 Sende Tweet (Shortcut Ctrl+Enter)...');
         await page.keyboard.press('Control+Enter');
         await page.waitForTimeout(4000);
