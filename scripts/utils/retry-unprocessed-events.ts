@@ -31,8 +31,8 @@ async function postTweet(page: any, text: string): Promise<boolean> {
         await page.goto('https://x.com/compose/post', { waitUntil: 'domcontentloaded', timeout: 20000 });
         await page.waitForTimeout(4000); // Längeres Warten für Modal
 
-        // Finde Textfeld - versuche mehrere Selektoren
-        let textarea = page.locator('[data-testid="tweetTextarea_0"]');
+        // Finde Textfeld - WICHTIG: .first() wie in smart-monitor-v4.ts!
+        let textarea = page.locator('[data-testid="tweetTextarea_0"]').first();
 
         try {
             await textarea.waitFor({ timeout: 5000 });
