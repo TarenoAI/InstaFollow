@@ -34,10 +34,34 @@ async function checkLogin() {
 
         if (isLoggedIn) {
             console.log('✅ EINGELOGGT: Home-Feed ist sichtbar.');
-            await page.screenshot({ path: path.join(DEBUG_DIR, 'twitter-status-check.png') });
+            const screenshotPath = path.join(DEBUG_DIR, 'twitter-status-check.png');
+            await page.screenshot({ path: screenshotPath });
+            // Git Push für den Screenshot
+            try {
+                const { exec } = require('child_process');
+                console.log('   📸 Screenshot wird zu Git gepusht...');
+                exec(`git add ${screenshotPath} && git commit -m "chore: Update Twitter status screenshot" && git push`, (err: any, stdout: any, stderr: any) => {
+                    if (err) console.log('   ⚠️ Git Push Fehler (nicht kritisch):', stderr);
+                    else console.log('   ✅ Screenshot gepusht!');
+                });
+            } catch (e) { console.log('   ⚠️ Git Push Fehler:', e); }
+
             await updateDbStatus(true);
         } else {
             console.log('❌ NICHT EINGELOGGT: Login-Seite oder Flow sichtbar.');
+            const screenshotPath = path.join(DEBUG_DIR, 'twitter-login-fail.png');
+            await page.screenshot({ path: screenshotPath });
+
+            // Git Push auch bei Failure
+            try {
+                const { exec } = require('child_process');
+                console.log('   📸 Failure-Screenshot wird zu Git gepusht...');
+                exec(`git add ${screenshotPath} && git commit -m "chore: Update Twitter failure screenshot" && git push`, (err: any, stdout: any, stderr: any) => {
+                    if (err) console.log('   ⚠️ Git Push Fehler (nicht kritisch):', stderr);
+                    else console.log('   ✅ Failure-Screnshot gepusht!');
+                });
+            } catch (e) { console.log('   ⚠️ Git Push Fehler:', e); }
+
             await updateDbStatus(false);
         }
 
