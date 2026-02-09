@@ -1,10 +1,11 @@
 /**
- * 🔄 RETRY UNPROCESSED EVENTS (V2)
+ * 🔄 RETRY UNPROCESSED EVENTS (V3)
  * 
  * Verbesserte Version mit:
- * - Browser-Neustart bei Absturz
- * - Max 10 Events pro Durchlauf
- * - Abbruch nach 3 Fehlern in Folge
+ * - Strikter Profil-Verifikation
+ * - Support für Usernames mit Punkten
+ * - Hashtag-Autocomplete Fix (Escape)
+ * - Bild-Pfad Korrektur (GitHub URL -> Local)
  */
 
 import { createClient } from '@libsql/client';
@@ -26,10 +27,8 @@ async function sleep(ms: number) {
 async function postTweet(page: any, text: string, imagePath?: string): Promise<boolean> {
     const TWITTER_USERNAME = process.env.TWITTER_USERNAME || 'BuliFollows';
     try {
-        // Prüfe ob Browser noch lebt
         await page.evaluate(() => true);
 
-        // Gehe zur HOME-Seite (dort ist das Compose-Feld oben)
         console.log('   🏠 Gehe zu x.com/home...');
         await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded', timeout: 20000 });
         await page.waitForTimeout(3000);
@@ -59,32 +58,25 @@ async function postTweet(page: any, text: string, imagePath?: string): Promise<b
         // Bild-Check
         if (imagePath) {
             let localPath = imagePath;
-
-            // Falls die DB eine GitHub-URL enthält, extrahiere den lokalen Pfad
-            // z.B. "https://raw.githubusercontent.com/.../main/public/screenshots/abc.png" -> "public/screenshots/abc.png"
             if (localPath.startsWith('http')) {
                 const mainIdx = localPath.indexOf('/main/');
                 if (mainIdx !== -1) {
-                    localPath = localPath.substring(mainIdx + 6); // nach "/main/"
+                    localPath = localPath.substring(mainIdx + 6);
                 }
             }
 
             let absolutePath = path.isAbsolute(localPath) ? localPath : path.join(process.cwd(), localPath);
 
-            // Falls exakte Datei nicht existiert: Suche neuesten Screenshot für diesen User
+            // Fallback auf neuesten Screenshot falls exakt nicht da
             if (!fs.existsSync(absolutePath)) {
-                console.log(`   ⚠️ Exakter Screenshot nicht gefunden, suche Alternative...`);
+                console.log(`   ⚠️ Screenshot nicht am Pfad gefunden, suche Alternative...`);
                 const screenshotsDir = path.join(process.cwd(), 'public/screenshots');
-                // Extrahiere Username aus dem Pfad (z.B. "robingosens" aus "robingosens-1234.png")
                 const filename = path.basename(localPath);
-                const usernameFromFile = filename.split('-').slice(0, -1).join('-'); // alles vor dem letzten "-"
-
-                if (usernameFromFile && fs.existsSync(screenshotsDir)) {
+                const usernamePart = filename.split('-')[0];
+                if (usernamePart && fs.existsSync(screenshotsDir)) {
                     const files = fs.readdirSync(screenshotsDir)
-                        .filter(f => f.startsWith(usernameFromFile + '-') && f.endsWith('.png'))
-                        .sort()
-                        .reverse(); // Neueste zuerst (höherer Timestamp)
-
+                        .filter(f => f.startsWith(usernamePart) && f.endsWith('.png'))
+                        .sort().reverse();
                     if (files.length > 0) {
                         absolutePath = path.join(screenshotsDir, files[0]);
                         console.log(`   🖼️ Alternative gefunden: ${files[0]}`);
@@ -96,80 +88,54 @@ async function postTweet(page: any, text: string, imagePath?: string): Promise<b
                 console.log(`   🖼️ Lade Bild hoch: ${path.basename(absolutePath)}`);
                 const fileInput = page.locator('input[type="file"]').first();
                 await fileInput.setInputFiles(absolutePath);
-                await page.waitForTimeout(6000);
+                await page.waitForTimeout(8000);
             } else {
-                console.log(`   ⚠️ Kein Screenshot verfügbar für dieses Profil.`);
+                console.log(`   ⚠️ Kein Bild verfügbar.`);
             }
         }
+
+        // Hashtag-Dropdown schließen
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(500);
 
         // Debug-Screenshot VOR dem Senden
         await page.screenshot({ path: `${DEBUG_DIR}/before-post-${Date.now()}.png` }).catch(() => { });
 
-        // WICHTIG: Autocomplete-Dropdown schließen!
-        // X öffnet ein Dropdown bei Hashtags (#Bundesliga -> #Bundesliga, #Bundesliga2)
-        // Das blockiert Ctrl+Enter. Wir drücken Escape um es zu schließen.
-        console.log('   🔒 Schließe mögliches Autocomplete-Dropdown...');
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
+        console.log('   📤 Sende Tweet...');
+        await page.keyboard.press('Control+Enter');
+        await page.waitForTimeout(5000);
 
-        // Klick auf das Textfeld zurück, um den Fokus zu behalten
+        // Fallback: Button klicken falls Text noch da
         try {
             const textarea = page.locator('[data-testid="tweetTextarea_0"]').first();
-            await textarea.click();
-            await page.waitForTimeout(300);
-        } catch { }
-
-        console.log('   📤 Sende Tweet (Shortcut Ctrl+Enter)...');
-        await page.keyboard.press('Control+Enter');
-        await page.waitForTimeout(4000);
-
-        // Falls Ctrl+Enter nicht geklappt hat: Button klicken
-        try {
-            const textareaCheck = page.locator('[data-testid="tweetTextarea_0"]').first();
-            const stillHasText = await textareaCheck.innerText().catch(() => '');
-            if (stillHasText && stillHasText.trim().length > 0) {
-                console.log('   🔄 Shortcut hat nicht funktioniert, versuche Button...');
-                const buttonSelectors = [
-                    '[data-testid="tweetButtonInline"]',
-                    '[data-testid="tweetButton"]',
-                ];
-                for (const sel of buttonSelectors) {
-                    try {
-                        const btn = page.locator(sel).first();
-                        if (await btn.isVisible()) {
-                            await btn.click();
-                            console.log(`   🖱️ Button geklickt: ${sel}`);
-                            break;
-                        }
-                    } catch { }
+            const textLeft = await textarea.innerText().catch(() => '');
+            if (textLeft && textLeft.trim().length > 0) {
+                console.log('   🔄 Shortcut fehlgeschlagen, versuche Button...');
+                const postBtn = page.locator('[data-testid="tweetButtonInline"], [data-testid="tweetButton"]').filter({ hasText: /Post/i }).first();
+                if (await postBtn.isVisible()) {
+                    await postBtn.click();
+                    await page.waitForTimeout(6000);
                 }
-                await page.waitForTimeout(4000);
             }
         } catch { }
 
-        // Debug-Screenshot NACH dem Senden
-        await page.screenshot({ path: `${DEBUG_DIR}/after-post-${Date.now()}.png` }).catch(() => { });
-
         // --- STRIKTE VERIFIKATION ---
         console.log(`   🔍 Verifiziere Post auf Profil @${TWITTER_USERNAME}...`);
-        await page.goto(`https://x.com/${TWITTER_USERNAME}`, { waitUntil: 'domcontentloaded', timeout: 20000 });
-        await page.waitForTimeout(5000);
+        await page.goto(`https://x.com/${TWITTER_USERNAME}`, { waitUntil: 'domcontentloaded', timeout: 25000 });
+        await page.waitForTimeout(6000);
 
-        // Prüfe ob der Target-Username im obersten Bereich der Timeline vorkommt
-        const profileContent = await page.innerText('body');
+        const profileContent = await page.innerText('body').catch(() => '');
+        const match = text.match(/@([a-zA-Z0-9_\.]+)/g);
+        const lastMention = match ? match[match.length - 1] : 'folgt';
+        console.log(`   🔎 Suche nach "${lastMention}" auf Profil...`);
 
-        const match = text.match(/@(\w+)/g);
-        const verifyUser = match ? match[match.length - 1] : '';
-        console.log(`   🔎 Suche nach "${verifyUser}" auf Profil...`);
-
-        // Debug-Screenshot der Profilseite
         await page.screenshot({ path: `${DEBUG_DIR}/verify-profile-${Date.now()}.png` }).catch(() => { });
 
-        if (profileContent.includes(verifyUser)) {
-            console.log('   ✅ Verifikation erfolgreich: Tweet auf Profil gefunden!');
+        if (profileContent.includes(lastMention)) {
+            console.log('   ✅ Verifikation erfolgreich!');
             return true;
         } else {
-            console.log('   ❌ Verifikation fehlgeschlagen: Tweet nicht auf Profil sichtbar.');
+            console.log('   ❌ Verifikation fehlgeschlagen: Tweet nicht auf Profil.');
             return false;
         }
     } catch (err: any) {
@@ -209,15 +175,12 @@ async function retryUnprocessedEvents() {
     let failCount = 0;
     let consecutiveFailures = 0;
 
-    // Browser starten
     async function startBrowser() {
         console.log('🐦 Starte Twitter Session...');
-        const result = await getTwitterContext(true);
-        if (!result.page || !result.context) {
-            throw new Error('Browser konnte nicht gestartet werden');
-        }
-        page = result.page;
-        context = result.context;
+        const ctx = await getTwitterContext(true);
+        page = ctx.page;
+        context = ctx.context;
+        console.log('   ✅ Twitter Session aktiv');
         console.log('   ✅ Browser bereit');
     }
 
@@ -246,7 +209,6 @@ ${actionEmoji} @${event.targetUsername} (${event.targetFullName || ''})
 
 #Instagram #FollowerWatch #Bundesliga`;
 
-        // Hole das Bild (falls vorhanden)
         const imagePath = event.screenshotUrl ? String(event.screenshotUrl) : undefined;
 
         try {
@@ -263,7 +225,6 @@ ${actionEmoji} @${event.targetUsername} (${event.targetFullName || ''})
                 });
                 console.log(`   💾 Event markiert.`);
 
-                // WICHTIG: Browser nach jedem Post neu starten für frische Session
                 console.log('   🔄 Starte Browser neu für nächsten Post...');
                 await closeTwitterContext(context).catch(() => { });
                 await startBrowser();
@@ -273,42 +234,30 @@ ${actionEmoji} @${event.targetUsername} (${event.targetFullName || ''})
                 consecutiveFailures++;
             }
         } catch (err: any) {
-            console.log(`   ❌ Fehler: ${err.message}`);
+            console.log(`   ❌ Kritischer Fehler: ${err.message}`);
             failCount++;
             consecutiveFailures++;
-
-            // Browser neu starten bei Absturz
-            console.log('   🔄 Versuche Browser-Neustart...');
-            try {
-                await closeTwitterContext(context).catch(() => { });
-                await startBrowser();
-                consecutiveFailures = 0; // Reset nach erfolgreichem Neustart
-            } catch {
-                console.log('   ❌ Browser-Neustart fehlgeschlagen, breche ab.');
-                break;
-            }
+            await closeTwitterContext(context).catch(() => { });
+            await startBrowser();
         }
 
-        // Abbruch bei zu vielen Fehlern
         if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
             console.log(`\n🛑 ${MAX_CONSECUTIVE_FAILURES} Fehler in Folge - Abbruch!`);
             break;
         }
 
-        // Warte zwischen Posts
-        if (i < result.rows.length - 1 && successCount > 0) {
+        if (i < result.rows.length - 1 && consecutiveFailures === 0) {
             await sleep(DELAY_BETWEEN_POSTS_MS);
         }
     }
-
-    // Aufräumen
-    if (context) await closeTwitterContext(context).catch(() => { });
 
     console.log(`\n═══════════════════════════════════════════════════`);
     console.log(`📊 ZUSAMMENFASSUNG`);
     console.log(`   ✅ Erfolgreich: ${successCount}`);
     console.log(`   ❌ Fehlgeschlagen: ${failCount}`);
     console.log(`═══════════════════════════════════════════════════\n`);
+
+    await closeTwitterContext(context);
 }
 
 retryUnprocessedEvents().catch(console.error);
