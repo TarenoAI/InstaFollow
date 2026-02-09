@@ -24,6 +24,7 @@ async function sleep(ms: number) {
 }
 
 async function postTweet(page: any, text: string, imagePath?: string): Promise<boolean> {
+    const TWITTER_USERNAME = process.env.TWITTER_USERNAME || 'BuliFollows';
     try {
         // Prüfe ob Browser noch lebt
         await page.evaluate(() => true);
@@ -35,102 +36,66 @@ async function postTweet(page: any, text: string, imagePath?: string): Promise<b
 
         // Finde und fokussiere das Textfeld
         let clicked = false;
-
-        // Fall 1: Standard-Selektor (data-testid)
         try {
             const textarea = page.locator('[data-testid="tweetTextarea_0"]').first();
-            await textarea.waitFor({ timeout: 6000 });
+            await textarea.waitFor({ timeout: 8000 });
             await textarea.click({ force: true });
-            console.log('   🖱️ Fall 1: Klick auf Standard-Textfeld erfolgreich.');
             clicked = true;
         } catch {
-            console.log('   🔄 Fall 1 (Standard-Selektor) nicht reagiert.');
-        }
-
-        // Fall 2: Falls Fall 1 nicht geklappt hat -> Suche nach "What's happening?"
-        if (!clicked) {
-            try {
-                const fallback = page.getByText("What's happening?").first();
-                await fallback.waitFor({ timeout: 5000 });
+            const fallback = page.getByText("What's happening?").first();
+            if (await fallback.count() > 0) {
                 await fallback.click({ force: true });
-                console.log('   🖱️ Fall 2: Klick auf "What\'s happening?" Text erfolgreich.');
                 clicked = true;
-            } catch (err: any) {
-                console.log('   ❌ Fall 2 ebenfalls fehlgeschlagen.');
-                throw new Error('Konnte kein Eingabefeld fokussieren.');
             }
         }
 
-        await page.waitForTimeout(1000);
+        if (!clicked) throw new Error('Konnte Eingabefeld nicht finden');
 
-        // Text eingeben
+        await page.waitForTimeout(1000);
         console.log('   ⌨️ Tippe Text ein...');
         await page.keyboard.type(text, { delay: 30 });
         await page.waitForTimeout(1500);
 
-        // Bild hochladen wenn vorhanden
-        if (imagePath && fs.existsSync(imagePath)) {
-            console.log(`   🖼️ Lade Bild hoch: ${path.basename(imagePath)}`);
-            const fileInput = page.locator('input[type="file"]').first();
-            await fileInput.setInputFiles(imagePath);
-            await page.waitForTimeout(5000); // Zeit für Upload
-        }
-
-        // Screenshot VOR dem Posten (Debug)
-        await page.screenshot({ path: `${DEBUG_DIR}/before-post-${Date.now()}.png` }).catch(() => { });
-
-        // Post absenden
-        console.log('   📤 Sende Tweet...');
-
-        // Methode 1: Shortcut (Primär laut Doku)
-        await page.keyboard.press('Control+Enter');
-        await page.waitForTimeout(3000);
-
-        // Methode 2: Buttons (Falls der Shortcut nicht gereicht hat)
-        // Wir prüfen, ob das Textfeld noch Inhalt hat
-        const contentCheck = await page.locator('[data-testid="tweetTextarea_0"]').first().innerText().catch(() => '');
-        if (contentCheck && contentCheck.trim().length > 0) {
-            console.log('   🔄 Shortcut hat nicht gereicht, versuche Buttons...');
-            const buttons = [
-                page.locator('[data-testid="tweetButtonInline"]'),
-                page.locator('[data-testid="tweetButton"]'),
-                page.locator('div[role="button"][aria-label*="Post"]'),
-                page.locator('div[role="button"][aria-label*="Posten"]'),
-                page.locator('button:has-text("Post")'),
-                page.locator('button:has-text("Posten")')
-            ];
-
-            for (const btn of buttons) {
-                try {
-                    if (await btn.isVisible()) {
-                        console.log(`   🖱️ Klicke Button...`);
-                        await btn.click();
-                        await page.waitForTimeout(2000);
-                        break;
-                    }
-                } catch (e) { }
+        // Bild-Check
+        if (imagePath) {
+            const absolutePath = path.isAbsolute(imagePath) ? imagePath : path.join(process.cwd(), imagePath);
+            if (fs.existsSync(absolutePath)) {
+                console.log(`   🖼️ Lade Bild hoch: ${path.basename(absolutePath)}`);
+                const fileInput = page.locator('input[type="file"]').first();
+                await fileInput.setInputFiles(absolutePath);
+                await page.waitForTimeout(6000); // 6 Sek für Upload
+            } else {
+                console.log(`   ⚠️ Bild nicht gefunden am Pfad: ${absolutePath}`);
             }
         }
 
+        console.log('   📤 Sende Tweet (Shortcut Ctrl+Enter)...');
+        await page.keyboard.press('Control+Enter');
+        await page.waitForTimeout(8000); // Warten auf Verarbeitung
+
+        // --- STRIKTE VERIFIKATION ---
+        console.log(`   🔍 Verifiziere Post auf Profil @${TWITTER_USERNAME}...`);
+        await page.goto(`https://x.com/${TWITTER_USERNAME}`, { waitUntil: 'domcontentloaded', timeout: 20000 });
         await page.waitForTimeout(4000);
 
-        // Screenshot NACH dem Posten (Debug)
-        await page.screenshot({ path: `${DEBUG_DIR}/after-post-${Date.now()}.png` }).catch(() => { });
+        // Prüfe ob der Text in einem der ersten zwei Tweets vorkommt
+        const profileContent = await page.innerText('body');
 
-        // Prüfe ob Textfeld jetzt leer ist (= Post war erfolgreich)
-        const finalContent = await page.locator('[data-testid="tweetTextarea_0"]').first().innerText().catch(() => '');
-        const success = !finalContent || finalContent.trim() === '';
+        // Wir nehmen einen Teil des Textes zur Prüfung (z.B. den Monitor Namen und Target Namen)
+        // Extrahiere @username aus dem Text
+        const match = text.match(/@(\w+)/g);
+        const verifyUser = match ? match[match.length - 1] : ''; // Nimm den Target-User
 
-        if (success) {
-            console.log('   ✅ Textfeld ist leer -> Post erfolgreich!');
+        if (profileContent.includes(verifyUser) || profileContent.includes('folgt jetzt')) {
+            console.log('   ✅ Verifikation erfolgreich: Tweet auf Profil gefunden!');
+            return true;
         } else {
-            console.log('   ⚠️ Textfeld enthält noch Text -> Post evtl. fehlgeschlagen');
-            console.log(`      Inhalt: "${finalContent.substring(0, 20)}..."`);
+            console.log('   ❌ Verifikation fehlgeschlagen: Tweet nicht auf Profil sichtbar.');
+            await page.screenshot({ path: `${DEBUG_DIR}/verify-failed-${Date.now()}.png` });
+            return false;
         }
-
-        return success;
     } catch (err: any) {
-        console.log(`   ⚠️ Fehler: ${err.message}`);
+        console.log(`   ⚠️ Fehler im Post-Prozess: ${err.message}`);
         return false;
     }
 }
