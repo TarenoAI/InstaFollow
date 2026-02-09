@@ -27,11 +27,11 @@ async function postTweet(page: any, text: string): Promise<boolean> {
         // Prüfe ob Browser noch lebt
         await page.evaluate(() => true);
 
-        // Gehe zur Compose-Seite
-        await page.goto('https://x.com/compose/tweet', { waitUntil: 'domcontentloaded', timeout: 15000 });
+        // Gehe zur Compose-Seite (per Dokumentation: /compose/post)
+        await page.goto('https://x.com/compose/post', { waitUntil: 'domcontentloaded', timeout: 15000 });
         await page.waitForTimeout(2000);
 
-        // Finde Textfeld
+        // Finde Textfeld (per Dokumentation: div[data-testid="tweetTextarea_0"])
         const textarea = page.locator('[data-testid="tweetTextarea_0"]');
         await textarea.waitFor({ timeout: 10000 });
         await textarea.click();
@@ -41,12 +41,11 @@ async function postTweet(page: any, text: string): Promise<boolean> {
         await page.keyboard.type(text, { delay: 30 });
         await page.waitForTimeout(1000);
 
-        // Post Button klicken
-        const postButton = page.locator('[data-testid="tweetButton"]');
-        await postButton.click();
+        // Post absenden (per Dokumentation: Control+Enter ist primäre Methode)
+        await page.keyboard.press('Control+Enter');
         await page.waitForTimeout(5000);
 
-        // Prüfe ob erfolgreich
+        // Prüfe ob erfolgreich (URL sollte sich ändern, nicht mehr compose)
         const url = page.url();
         return !url.includes('compose');
     } catch (err: any) {
