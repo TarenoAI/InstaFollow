@@ -58,40 +58,83 @@ async function postTweet(page: any, text: string, imagePath?: string): Promise<b
 
         // Bild-Check
         if (imagePath) {
-            const absolutePath = path.isAbsolute(imagePath) ? imagePath : path.join(process.cwd(), imagePath);
+            let localPath = imagePath;
+
+            // Falls die DB eine GitHub-URL enthält, extrahiere den lokalen Pfad
+            // z.B. "https://raw.githubusercontent.com/.../main/public/screenshots/abc.png" -> "public/screenshots/abc.png"
+            if (localPath.startsWith('http')) {
+                const mainIdx = localPath.indexOf('/main/');
+                if (mainIdx !== -1) {
+                    localPath = localPath.substring(mainIdx + 6); // nach "/main/"
+                }
+            }
+
+            const absolutePath = path.isAbsolute(localPath) ? localPath : path.join(process.cwd(), localPath);
+            console.log(`   🖼️ Suche Bild: ${absolutePath}`);
             if (fs.existsSync(absolutePath)) {
                 console.log(`   🖼️ Lade Bild hoch: ${path.basename(absolutePath)}`);
                 const fileInput = page.locator('input[type="file"]').first();
                 await fileInput.setInputFiles(absolutePath);
-                await page.waitForTimeout(6000); // 6 Sek für Upload
+                await page.waitForTimeout(6000);
             } else {
-                console.log(`   ⚠️ Bild nicht gefunden am Pfad: ${absolutePath}`);
+                console.log(`   ⚠️ Bild nicht gefunden: ${absolutePath}`);
             }
         }
 
+        // Debug-Screenshot VOR dem Senden
+        await page.screenshot({ path: `${DEBUG_DIR}/before-post-${Date.now()}.png` }).catch(() => { });
+
         console.log('   📤 Sende Tweet (Shortcut Ctrl+Enter)...');
         await page.keyboard.press('Control+Enter');
-        await page.waitForTimeout(8000); // Warten auf Verarbeitung
+        await page.waitForTimeout(4000);
+
+        // Falls Ctrl+Enter nicht geklappt hat: Button klicken
+        try {
+            const textareaCheck = page.locator('[data-testid="tweetTextarea_0"]').first();
+            const stillHasText = await textareaCheck.innerText().catch(() => '');
+            if (stillHasText && stillHasText.trim().length > 0) {
+                console.log('   🔄 Shortcut hat nicht funktioniert, versuche Button...');
+                const buttonSelectors = [
+                    '[data-testid="tweetButtonInline"]',
+                    '[data-testid="tweetButton"]',
+                ];
+                for (const sel of buttonSelectors) {
+                    try {
+                        const btn = page.locator(sel).first();
+                        if (await btn.isVisible()) {
+                            await btn.click();
+                            console.log(`   🖱️ Button geklickt: ${sel}`);
+                            break;
+                        }
+                    } catch { }
+                }
+                await page.waitForTimeout(4000);
+            }
+        } catch { }
+
+        // Debug-Screenshot NACH dem Senden
+        await page.screenshot({ path: `${DEBUG_DIR}/after-post-${Date.now()}.png` }).catch(() => { });
 
         // --- STRIKTE VERIFIKATION ---
         console.log(`   🔍 Verifiziere Post auf Profil @${TWITTER_USERNAME}...`);
         await page.goto(`https://x.com/${TWITTER_USERNAME}`, { waitUntil: 'domcontentloaded', timeout: 20000 });
-        await page.waitForTimeout(4000);
+        await page.waitForTimeout(5000);
 
-        // Prüfe ob der Text in einem der ersten zwei Tweets vorkommt
+        // Prüfe ob der Target-Username im obersten Bereich der Timeline vorkommt
         const profileContent = await page.innerText('body');
 
-        // Wir nehmen einen Teil des Textes zur Prüfung (z.B. den Monitor Namen und Target Namen)
-        // Extrahiere @username aus dem Text
         const match = text.match(/@(\w+)/g);
-        const verifyUser = match ? match[match.length - 1] : ''; // Nimm den Target-User
+        const verifyUser = match ? match[match.length - 1] : '';
+        console.log(`   🔎 Suche nach "${verifyUser}" auf Profil...`);
 
-        if (profileContent.includes(verifyUser) || profileContent.includes('folgt jetzt')) {
+        // Debug-Screenshot der Profilseite
+        await page.screenshot({ path: `${DEBUG_DIR}/verify-profile-${Date.now()}.png` }).catch(() => { });
+
+        if (profileContent.includes(verifyUser)) {
             console.log('   ✅ Verifikation erfolgreich: Tweet auf Profil gefunden!');
             return true;
         } else {
             console.log('   ❌ Verifikation fehlgeschlagen: Tweet nicht auf Profil sichtbar.');
-            await page.screenshot({ path: `${DEBUG_DIR}/verify-failed-${Date.now()}.png` });
             return false;
         }
     } catch (err: any) {
