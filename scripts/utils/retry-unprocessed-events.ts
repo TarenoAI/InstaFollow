@@ -1,15 +1,14 @@
 /**
  * 🔄 RETRY UNPROCESSED EVENTS
  * 
- * Holt alle Events mit processed=0 und postet sie auf Twitter.
+ * Holt alle Events mit processed=0 von den letzten 24h und postet sie auf Twitter.
  * Wartet 15 Minuten zwischen den Posts, um Rate Limits zu vermeiden.
  */
 
 import { createClient } from '@libsql/client';
-import { getTwitterContext, closeTwitterContext, postTweet } from '../lib/twitter-auto-login';
+import { getTwitterContext, closeTwitterContext } from '../lib/twitter-auto-login';
 import 'dotenv/config';
 import path from 'path';
-import fs from 'fs';
 
 const DELAY_BETWEEN_POSTS_MS = 15 * 60 * 1000; // 15 Minuten
 const DEBUG_DIR = path.join(process.cwd(), 'public/debug');
@@ -19,25 +18,60 @@ async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+async function postTweetInline(page: any, text: string): Promise<string | null> {
+    try {
+        // Gehe zur Compose-Seite
+        await page.goto('https://x.com/compose/tweet', { waitUntil: 'domcontentloaded', timeout: 15000 });
+        await page.waitForTimeout(2000);
+
+        // Finde Textfeld
+        const textarea = page.locator('[data-testid="tweetTextarea_0"]');
+        await textarea.waitFor({ timeout: 10000 });
+        await textarea.click();
+        await page.waitForTimeout(500);
+
+        // Text eingeben
+        await page.keyboard.type(text, { delay: 30 });
+        await page.waitForTimeout(1000);
+
+        // Post Button klicken
+        const postButton = page.locator('[data-testid="tweetButton"]');
+        await postButton.click();
+        await page.waitForTimeout(5000);
+
+        // Prüfe ob erfolgreich (keine Fehlermeldung, URL ändert sich)
+        const url = page.url();
+        if (!url.includes('compose')) {
+            console.log(`   ✅ Tweet gepostet!`);
+            return url;
+        }
+        return null;
+    } catch (err: any) {
+        console.log(`   ⚠️ Post-Fehler: ${err.message}`);
+        return null;
+    }
+}
+
 async function retryUnprocessedEvents() {
     const db = createClient({
         url: process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL!,
         authToken: process.env.TURSO_AUTH_TOKEN
     });
 
-    console.log('\n🔍 Suche unverarbeitete Events...');
+    console.log('\n🔍 Suche unverarbeitete Events (letzte 24h)...');
 
-    // Hole alle unverarbeiteten Events
+    // Hole nur Events von den letzten 24 Stunden
     const result = await db.execute(`
         SELECT ce.*, mp.username as monitoredUsername, mp.fullName as monitoredFullName
         FROM ChangeEvent ce
         JOIN MonitoredProfile mp ON ce.profileId = mp.id
         WHERE ce.processed = 0
+        AND ce.detectedAt > datetime('now', '-1 day')
         ORDER BY ce.detectedAt ASC
     `);
 
     if (result.rows.length === 0) {
-        console.log('✅ Keine unverarbeiteten Events gefunden.');
+        console.log('✅ Keine unverarbeiteten Events in den letzten 24h gefunden.');
         return;
     }
 
@@ -45,7 +79,7 @@ async function retryUnprocessedEvents() {
 
     // Browser starten
     console.log('🐦 Starte Twitter Session...');
-    const { page, context, browser } = await getTwitterContext(true);
+    const { page, context } = await getTwitterContext(true);
     if (!page || !context) {
         console.error('❌ Konnte Browser nicht starten');
         return;
@@ -83,13 +117,10 @@ ${actionEmoji} @${event.targetUsername} (${event.targetFullName || ''})
         console.log(`\n   📝 Tweet:\n${text.split('\n').map(l => '      ' + l).join('\n')}\n`);
 
         try {
-            // Tweet posten
-            const tweetUrl = await postTweet(page, text);
+            const tweetUrl = await postTweetInline(page, text);
 
             if (tweetUrl) {
-                console.log(`   ✅ Gepostet: ${tweetUrl}`);
                 successCount++;
-
                 // Event als verarbeitet markieren
                 await db.execute({
                     sql: `UPDATE ChangeEvent SET processed = 1, processedAt = datetime('now') WHERE id = ?`,
@@ -97,15 +128,13 @@ ${actionEmoji} @${event.targetUsername} (${event.targetFullName || ''})
                 });
                 console.log(`   💾 Event als verarbeitet markiert.`);
             } else {
-                console.log(`   ⚠️ Tweet fehlgeschlagen (kein URL zurück)`);
+                console.log(`   ⚠️ Tweet fehlgeschlagen`);
                 failCount++;
             }
         } catch (err: any) {
             console.error(`   ❌ Fehler: ${err.message}`);
             failCount++;
-
-            // Screenshot bei Fehler
-            await page.screenshot({ path: path.join(DEBUG_DIR, `retry-error-${eventNum}.png`) });
+            await page.screenshot({ path: path.join(DEBUG_DIR, `retry-error-${eventNum}.png`) }).catch(() => { });
         }
 
         // Warte zwischen Posts (außer beim letzten)
