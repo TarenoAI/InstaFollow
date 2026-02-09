@@ -1797,7 +1797,7 @@ async function main() {
                                 for (const target of addedProfiles) {
                                     await db.execute({
                                         sql: `INSERT INTO ChangeEvent (id, type, targetUsername, targetFullName, targetPicUrl, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
-                                              VALUES (?, 'FOLLOW', ?, ?, ?, ?, datetime('now'), 1, 0, ?)`,
+                                              VALUES (?, 'FOLLOW', ?, ?, ?, ?, datetime('now'), 1, 1, ?)`,
                                         args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, target.fullName || null, target.profilePicUrl || null, changeScreenshotUrl, profileId]
                                     });
                                 }
@@ -1852,7 +1852,7 @@ async function main() {
                                 for (const target of removedProfiles) {
                                     await db.execute({
                                         sql: `INSERT INTO ChangeEvent (id, type, targetUsername, targetFullName, targetPicUrl, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
-                                              VALUES (?, 'UNFOLLOW', ?, ?, ?, ?, datetime('now'), 1, 0, ?)`,
+                                              VALUES (?, 'UNFOLLOW', ?, ?, ?, ?, datetime('now'), 1, 1, ?)`,
                                         args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, target.fullName || null, target.profilePicUrl || null, changeScreenshotUrl, profileId]
                                     });
                                 }
