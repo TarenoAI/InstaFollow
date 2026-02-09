@@ -70,31 +70,53 @@ async function postTweet(page: any, text: string): Promise<boolean> {
         // Screenshot VOR dem Posten (Debug)
         await page.screenshot({ path: `${DEBUG_DIR}/before-post-${Date.now()}.png` }).catch(() => { });
 
-        // Post absenden - BUTTON klicken (zuverlässiger auf /home)
-        console.log('   📤 Klicke auf "Post/Posten" Button...');
-        const postButton = page.locator('[data-testid="tweetButtonInline"]').first();
-        try {
-            await postButton.waitFor({ timeout: 5000 });
-            await postButton.click();
-        } catch {
-            // Fallback: Normaler Tweet-Button
-            console.log('   🔄 Versuche alternativen Post-Button...');
-            await page.locator('[data-testid="tweetButton"]').first().click();
+        // Post absenden
+        console.log('   📤 Sende Tweet...');
+
+        // Methode 1: Shortcut (Primär laut Doku)
+        await page.keyboard.press('Control+Enter');
+        await page.waitForTimeout(3000);
+
+        // Methode 2: Buttons (Falls der Shortcut nicht gereicht hat)
+        // Wir prüfen, ob das Textfeld noch Inhalt hat
+        const contentCheck = await page.locator('[data-testid="tweetTextarea_0"]').first().innerText().catch(() => '');
+        if (contentCheck && contentCheck.trim().length > 0) {
+            console.log('   🔄 Shortcut hat nicht gereicht, versuche Buttons...');
+            const buttons = [
+                page.locator('[data-testid="tweetButtonInline"]'),
+                page.locator('[data-testid="tweetButton"]'),
+                page.locator('div[role="button"][aria-label*="Post"]'),
+                page.locator('div[role="button"][aria-label*="Posten"]'),
+                page.locator('button:has-text("Post")'),
+                page.locator('button:has-text("Posten")')
+            ];
+
+            for (const btn of buttons) {
+                try {
+                    if (await btn.isVisible()) {
+                        console.log(`   🖱️ Klicke Button...`);
+                        await btn.click();
+                        await page.waitForTimeout(2000);
+                        break;
+                    }
+                } catch (e) { }
+            }
         }
 
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(4000);
 
         // Screenshot NACH dem Posten (Debug)
         await page.screenshot({ path: `${DEBUG_DIR}/after-post-${Date.now()}.png` }).catch(() => { });
 
         // Prüfe ob Textfeld jetzt leer ist (= Post war erfolgreich)
-        const textareaContent = await page.locator('[data-testid="tweetTextarea_0"]').first().textContent().catch(() => '');
-        const success = textareaContent === '' || textareaContent === null;
+        const finalContent = await page.locator('[data-testid="tweetTextarea_0"]').first().innerText().catch(() => '');
+        const success = !finalContent || finalContent.trim() === '';
 
         if (success) {
             console.log('   ✅ Textfeld ist leer -> Post erfolgreich!');
         } else {
             console.log('   ⚠️ Textfeld enthält noch Text -> Post evtl. fehlgeschlagen');
+            console.log(`      Inhalt: "${finalContent.substring(0, 20)}..."`);
         }
 
         return success;
