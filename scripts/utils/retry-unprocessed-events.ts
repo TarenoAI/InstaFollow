@@ -1,8 +1,10 @@
 /**
- * 🔄 RETRY UNPROCESSED EVENTS
+ * 🔄 RETRY UNPROCESSED EVENTS (V2)
  * 
- * Holt alle Events mit processed=0 von den letzten 24h und postet sie auf Twitter.
- * Wartet 15 Minuten zwischen den Posts, um Rate Limits zu vermeiden.
+ * Verbesserte Version mit:
+ * - Browser-Neustart bei Absturz
+ * - Max 10 Events pro Durchlauf
+ * - Abbruch nach 3 Fehlern in Folge
  */
 
 import { createClient } from '@libsql/client';
@@ -11,6 +13,8 @@ import 'dotenv/config';
 import path from 'path';
 
 const DELAY_BETWEEN_POSTS_MS = 15 * 60 * 1000; // 15 Minuten
+const MAX_EVENTS_PER_RUN = 10;
+const MAX_CONSECUTIVE_FAILURES = 3;
 const DEBUG_DIR = path.join(process.cwd(), 'public/debug');
 
 async function sleep(ms: number) {
@@ -18,8 +22,11 @@ async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function postTweetInline(page: any, text: string): Promise<string | null> {
+async function postTweet(page: any, text: string): Promise<boolean> {
     try {
+        // Prüfe ob Browser noch lebt
+        await page.evaluate(() => true);
+
         // Gehe zur Compose-Seite
         await page.goto('https://x.com/compose/tweet', { waitUntil: 'domcontentloaded', timeout: 15000 });
         await page.waitForTimeout(2000);
@@ -39,16 +46,12 @@ async function postTweetInline(page: any, text: string): Promise<string | null> 
         await postButton.click();
         await page.waitForTimeout(5000);
 
-        // Prüfe ob erfolgreich (keine Fehlermeldung, URL ändert sich)
+        // Prüfe ob erfolgreich
         const url = page.url();
-        if (!url.includes('compose')) {
-            console.log(`   ✅ Tweet gepostet!`);
-            return url;
-        }
-        return null;
+        return !url.includes('compose');
     } catch (err: any) {
-        console.log(`   ⚠️ Post-Fehler: ${err.message}`);
-        return null;
+        console.log(`   ⚠️ Fehler: ${err.message}`);
+        return false;
     }
 }
 
@@ -60,33 +63,42 @@ async function retryUnprocessedEvents() {
 
     console.log('\n🔍 Suche unverarbeitete Events (letzte 24h)...');
 
-    // Hole nur Events von den letzten 24 Stunden
     const result = await db.execute(`
         SELECT ce.*, mp.username as monitoredUsername, mp.fullName as monitoredFullName
         FROM ChangeEvent ce
         JOIN MonitoredProfile mp ON ce.profileId = mp.id
         WHERE ce.processed = 0
         AND ce.detectedAt > datetime('now', '-1 day')
-        ORDER BY ce.detectedAt ASC
+        ORDER BY ce.detectedAt DESC
+        LIMIT ${MAX_EVENTS_PER_RUN}
     `);
 
     if (result.rows.length === 0) {
-        console.log('✅ Keine unverarbeiteten Events in den letzten 24h gefunden.');
+        console.log('✅ Keine unverarbeiteten Events gefunden.');
         return;
     }
 
-    console.log(`📋 ${result.rows.length} Events gefunden.\n`);
+    console.log(`📋 ${result.rows.length} Events werden verarbeitet (max ${MAX_EVENTS_PER_RUN}).\n`);
 
-    // Browser starten
-    console.log('🐦 Starte Twitter Session...');
-    const { page, context } = await getTwitterContext(true);
-    if (!page || !context) {
-        console.error('❌ Konnte Browser nicht starten');
-        return;
-    }
-
+    let page: any = null;
+    let context: any = null;
     let successCount = 0;
     let failCount = 0;
+    let consecutiveFailures = 0;
+
+    // Browser starten
+    async function startBrowser() {
+        console.log('🐦 Starte Twitter Session...');
+        const result = await getTwitterContext(true);
+        if (!result.page || !result.context) {
+            throw new Error('Browser konnte nicht gestartet werden');
+        }
+        page = result.page;
+        context = result.context;
+        console.log('   ✅ Browser bereit');
+    }
+
+    await startBrowser();
 
     for (let i = 0; i < result.rows.length; i++) {
         const event = result.rows[i];
@@ -94,13 +106,10 @@ async function retryUnprocessedEvents() {
 
         console.log(`\n═══════════════════════════════════════════════════`);
         console.log(`📝 Event ${eventNum}/${result.rows.length}`);
-        console.log(`   Type: ${event.type}`);
         console.log(`   Monitor: @${event.monitoredUsername}`);
-        console.log(`   Target: @${event.targetUsername}`);
-        console.log(`   Detected: ${event.detectedAt}`);
+        console.log(`   ${event.type}: @${event.targetUsername}`);
         console.log(`═══════════════════════════════════════════════════`);
 
-        // Tweet Text erstellen
         const emoji = event.type === 'FOLLOW' ? '✅' : '👀';
         const actionEmoji = event.type === 'FOLLOW' ? '➕' : '❌';
         const actionDE = event.type === 'FOLLOW' ? 'folgt jetzt' : 'folgt nicht mehr';
@@ -114,37 +123,55 @@ ${actionEmoji} @${event.targetUsername} (${event.targetFullName || ''})
 
 #Instagram #FollowerWatch #Bundesliga`;
 
-        console.log(`\n   📝 Tweet:\n${text.split('\n').map(l => '      ' + l).join('\n')}\n`);
-
         try {
-            const tweetUrl = await postTweetInline(page, text);
+            const success = await postTweet(page, text);
 
-            if (tweetUrl) {
+            if (success) {
+                console.log(`   ✅ Tweet gepostet!`);
                 successCount++;
-                // Event als verarbeitet markieren
+                consecutiveFailures = 0;
+
                 await db.execute({
-                    sql: `UPDATE ChangeEvent SET processed = 1, processedAt = datetime('now') WHERE id = ?`,
+                    sql: `UPDATE ChangeEvent SET processed = 1 WHERE id = ?`,
                     args: [event.id]
                 });
-                console.log(`   💾 Event als verarbeitet markiert.`);
+                console.log(`   💾 Event markiert.`);
             } else {
-                console.log(`   ⚠️ Tweet fehlgeschlagen`);
+                console.log(`   ❌ Tweet fehlgeschlagen`);
                 failCount++;
+                consecutiveFailures++;
             }
         } catch (err: any) {
-            console.error(`   ❌ Fehler: ${err.message}`);
+            console.log(`   ❌ Fehler: ${err.message}`);
             failCount++;
-            await page.screenshot({ path: path.join(DEBUG_DIR, `retry-error-${eventNum}.png`) }).catch(() => { });
+            consecutiveFailures++;
+
+            // Browser neu starten bei Absturz
+            console.log('   🔄 Versuche Browser-Neustart...');
+            try {
+                await closeTwitterContext(context).catch(() => { });
+                await startBrowser();
+                consecutiveFailures = 0; // Reset nach erfolgreichem Neustart
+            } catch {
+                console.log('   ❌ Browser-Neustart fehlgeschlagen, breche ab.');
+                break;
+            }
         }
 
-        // Warte zwischen Posts (außer beim letzten)
-        if (i < result.rows.length - 1) {
+        // Abbruch bei zu vielen Fehlern
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            console.log(`\n🛑 ${MAX_CONSECUTIVE_FAILURES} Fehler in Folge - Abbruch!`);
+            break;
+        }
+
+        // Warte zwischen Posts
+        if (i < result.rows.length - 1 && successCount > 0) {
             await sleep(DELAY_BETWEEN_POSTS_MS);
         }
     }
 
     // Aufräumen
-    await closeTwitterContext(context);
+    if (context) await closeTwitterContext(context).catch(() => { });
 
     console.log(`\n═══════════════════════════════════════════════════`);
     console.log(`📊 ZUSAMMENFASSUNG`);
