@@ -284,6 +284,28 @@ async function performLogin(page: Page): Promise<boolean> {
     }
 }
 
+async function checkForRateLimit(page: Page): Promise<boolean> {
+    const rateLimitTexts = [
+        "Versuche es später noch einmal",
+        "Try again later",
+        "Handlungen auf Instagram ein",
+        "community zu schützen"
+    ];
+
+    try {
+        const bodyText = await page.evaluate(() => document.body.innerText);
+        for (const text of rateLimitTexts) {
+            if (bodyText.includes(text)) {
+                console.log(`\n🚨 RATE LIMIT ERKANNT! Message: "${text}"`);
+                globalRateLimited = true;
+                fs.writeFileSync(RATE_LIMIT_FILE, Date.now().toString());
+                return true;
+            }
+        }
+    } catch { }
+    return false;
+}
+
 async function dismissPopups(page: Page) {
     const selectors = [
         // Cookie consent
@@ -320,6 +342,9 @@ async function dismissPopups(page: Page) {
         'button svg[aria-label="Close"]',
         // Problem melden link (nicht klicken, aber OK daneben)
     ];
+
+    // Vorab-Check auf Rate Limit
+    await checkForRateLimit(page);
 
     for (const sel of selectors) {
         try {
@@ -775,6 +800,10 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
             }
 
             await dismissPopups(page);
+            if (globalRateLimited) {
+                console.log('   🛑 Abbrechen wegen Rate Limit...');
+                break;
+            }
             await humanDelay(3500, 5500); // Mehr Zeit für API-Response
 
             // Check ob neue API-Daten kamen
@@ -1259,6 +1288,8 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
 }
 
 const LOCK_FILE = path.join(process.cwd(), '.monitor.lock');
+const RATE_LIMIT_FILE = path.join(process.cwd(), '.rate_limit.lock');
+let globalRateLimited = false;
 
 /**
  * Pushes all screenshots and debug logs to Git
@@ -1338,6 +1369,20 @@ async function main() {
 
     // Stelle sicher dass MonitoringLog-Tabelle existiert
     await ensureMonitoringLogTable(db);
+
+    // RATE LIMIT CHECK
+    if (fs.existsSync(RATE_LIMIT_FILE)) {
+        const stats = fs.statSync(RATE_LIMIT_FILE);
+        const ageHours = (Date.now() - stats.mtimeMs) / (1000 * 60 * 60);
+        if (ageHours < 4) {
+            console.log(`\n🛑 RATE LIMIT COOLDOWN: Letztes Limit vor ${ageHours.toFixed(1)} Stunden erkannt.`);
+            console.log(`   Überspringe diesen Run zum Schutz des Accounts. (Cooldown: 4h)\n`);
+            return;
+        } else {
+            console.log(`\n✅ Rate Limit Cooldown abgelaufen (${ageHours.toFixed(1)}h). Entferne Lock...`);
+            fs.unlinkSync(RATE_LIMIT_FILE);
+        }
+    }
 
     // Nutze PERSISTENT CONTEXT für langlebige Sessions
     // Speichert alles: Cookies, LocalStorage, IndexedDB, Cache, etc.
@@ -1483,6 +1528,11 @@ async function main() {
 
             console.log('─'.repeat(60));
             console.log(`🔍 @${username}`);
+
+            if (globalRateLimited) {
+                console.log('   ⏭️ ÜBERSPRUNGEN: Globales Rate Limit aktiv. Breche gesamten Run ab.');
+                break;
+            }
 
             // 📊 DB-GESUNDHEITSCHECK: Zeige wie aktuell die DB ist
             const dbEntries = await db.execute({
