@@ -468,11 +468,28 @@ async function getProfileInfo(page: Page, username: string, takeScreenshot: bool
         // Extrahiere Full Name
         let fullName = username;
         try {
-            const nameEl = await page.$('header section span');
-            if (nameEl) {
-                fullName = await nameEl.innerText() || username;
-                fullName = fullName.replace(/\s*\(@.*\).*$/, '').trim();
-            }
+            fullName = await page.evaluate(() => {
+                // Selektoren für den echten Namen (Fett gedruckt unter dem Bild oder im Header)
+                // Auf Mobile oft ein <span> im h2 oder h1 Bereich
+                const selectors = [
+                    'h2',                     // Oft Name im Header
+                    'header section span',    // Standard mobile
+                    'header h1',              // Desktop/Tablet
+                    'span[dir="auto"]'        // Bio/Name container
+                ];
+
+                for (const sel of selectors) {
+                    const el = document.querySelector(sel) as HTMLElement;
+                    if (el && el.innerText && el.innerText.length > 1 && !el.innerText.includes('\n')) {
+                        return el.innerText.trim();
+                    }
+                }
+                return '';
+            }) || username;
+
+            // Clean: Falls es "(username)" oder ähnliches enthält
+            fullName = fullName.replace(/\s*\(@.*\).*$/, '').trim();
+            if (fullName === '') fullName = username;
         } catch { }
 
         // Extrahiere Follower/Following
@@ -1286,7 +1303,7 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
 
     // Zweite Zeile: Englisch
     const actionEN = isFollow ? `now follows ${count} ${personEN}` : `unfollowed ${count} ${personEN}`;
-    text += `\n${emoji} ${profile.username} ${actionEN}:`;
+    text += `\n${emoji} ${profile.username} (${profile.fullName}) ${actionEN}:`;
 
     text += '\n\n';
 
@@ -1838,10 +1855,8 @@ async function main() {
                             if (addedProfiles.length > 0) {
                                 const tweetText = formatTweetText('FOLLOW', monitoredProfileInfo, addedProfiles);
 
-                                // Screenshot: Bei 1 Target -> Target-Screenshot, sonst Monitor-Screenshot
-                                const screenshotToUse = addedProfiles.length === 1 && addedProfiles[0].screenshotPath
-                                    ? addedProfiles[0].screenshotPath
-                                    : monitoredProfileInfo.screenshotPath;
+                                // Screenshot: Immer Monitor-Screenshot (morewatchez)
+                                const screenshotToUse = monitoredProfileInfo.screenshotPath;
 
                                 const tweetUrl = await postToTwitter(
                                     context.browser()!,
@@ -1896,7 +1911,8 @@ async function main() {
 
                             if (removedProfiles.length > 0) {
                                 const tweetText = formatTweetText('UNFOLLOW', monitoredProfileInfo, removedProfiles);
-                                const unfollowScreenshot = removedProfiles[0]?.screenshotPath || monitoredProfileInfo.screenshotPath;
+                                // Screenshot: Immer Monitor-Screenshot
+                                const unfollowScreenshot = monitoredProfileInfo.screenshotPath;
 
                                 const tweetUrl = await postToTwitter(
                                     context.browser()!,
