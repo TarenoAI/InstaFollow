@@ -22,7 +22,20 @@ npx tsx scripts/utils/check-twitter-login.ts
 
 ---
 
-## 📸 2. Scraping & Monitoring
+## � 2.1 Diagnose & Fehlersuche
+
+Falls der Scraper blockiert wird oder keine Daten lädt, nutze das Step-by-Step Tool. Es macht nach jeder Aktion (Klick, Scroll, Wartezeit) einen Screenshot, damit du genau siehst, wo Instagram dich stoppt.
+
+### Step-by-Step Test ausführen
+```bash
+npx tsx scripts/debug/step-by-step-test.ts [username]
+```
+*   **Ergebnis:** Screenshots landen unter `public/debug/step-test/`.
+*   **Wichtig:** Vergleiche die Bilder mit der [Instagram Prozess-Doku](LOGIN-INSTAGRAM.md).
+
+---
+
+## �📸 3. Scraping & Monitoring
 
 ### Einzelnes Konto manuell scrapen
 Ideal, um zu sehen, ob ein bestimmtes Profil (z.B. @morewatchez) Probleme macht.
@@ -40,6 +53,9 @@ npx tsx scripts/debug/check-monitoring-status.ts
 Live-Ansicht dessen, was der Monitor gerade im Hintergrund tut:
 ```bash
 tail -f /var/log/instafollow-monitor.log
+
+## letzten 100 Zeilen
+tail -n 100 /var/log/instafollow-monitor.log
 ```
 
 ---
@@ -102,3 +118,12 @@ git pull
 # Falls das Datenbankschema geändert wurde:
 npx tsx scripts/utils/manual-migration.ts
 ```
+
+---
+
+## 🚨 7. Prozess-Sicherheit (Single Source of Truth)
+Alle Automatisierungen folgen strikten Regeln. Ändere keine Selektoren oder Abläufe, ohne die entsprechende Dokumentation zu prüfen:
+*   **Instagram:** [docs/LOGIN-INSTAGRAM.md](LOGIN-INSTAGRAM.md)
+*   **Twitter:** [docs/LOGIN-TWITTER.md](LOGIN-TWITTER.md)
+
+*Dieses Dokument wurde gemäß der `.agent/skills/process-documentation-reference` erstellt.*
