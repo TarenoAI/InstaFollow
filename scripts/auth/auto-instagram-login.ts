@@ -15,7 +15,10 @@ import fs from 'fs';
 import path from 'path';
 
 const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
+const DEBUG_DIR = path.join(process.cwd(), 'public/debug');
 const iPhone = devices['iPhone 13 Pro'];
+
+if (!fs.existsSync(DEBUG_DIR)) fs.mkdirSync(DEBUG_DIR, { recursive: true });
 
 const INSTAGRAM_USERNAME = process.env.INSTAGRAM_USERNAME;
 const INSTAGRAM_PASSWORD = process.env.INSTAGRAM_PASSWORD;
@@ -46,6 +49,28 @@ async function dismissPopups(page: any) {
                 await page.waitForTimeout(500);
             }
         } catch { }
+    }
+}
+
+/**
+ * Pushes a file to Git
+ */
+async function pushToGit(filePath: string, message: string) {
+    try {
+        const { execSync } = await import('child_process');
+        console.log(`   📤 Push to Git: ${path.basename(filePath)}...`);
+
+        // Config setzen
+        execSync(`git config user.email "bot@tareno.ai" && git config user.name "InstaBot"`, { stdio: 'ignore' });
+
+        // Add, Commit & Push
+        execSync(`git add -f "${filePath}"`, { stdio: 'ignore' });
+        execSync(`git commit -m "${message}"`, { stdio: 'ignore' });
+        execSync(`git push`, { stdio: 'ignore' });
+
+        console.log(`   ✅ Erfolgreich gepusht zu Git (Pfad: ${filePath.replace(process.cwd(), '')})`);
+    } catch (error: any) {
+        console.log(`   ⚠️ Git Push fehlgeschlagen: ${error.message}`);
     }
 }
 
@@ -236,6 +261,11 @@ async function autoLogin(): Promise<boolean> {
         await page.waitForTimeout(2000);
         await dismissPopups(page);
 
+        // Letzter Screenshot vor Abschluss
+        const finalScreenshot = path.join(DEBUG_DIR, 'instagram-login-success.png');
+        await page.screenshot({ path: finalScreenshot });
+        await pushToGit(finalScreenshot, `chore: Instagram login success for ${INSTAGRAM_USERNAME}`);
+
         console.log('✅ Login erfolgreich!');
 
         // Session speichern
@@ -248,7 +278,9 @@ async function autoLogin(): Promise<boolean> {
 
     } catch (err: any) {
         console.log(`❌ Fehler: ${err.message}`);
-        await page.screenshot({ path: 'debug-instagram-error.png' }).catch(() => { });
+        const errorScreenshot = path.join(DEBUG_DIR, 'instagram-login-error.png');
+        await page.screenshot({ path: errorScreenshot }).catch(() => { });
+        await pushToGit(errorScreenshot, `fix: Instagram login error for ${INSTAGRAM_USERNAME}`);
         await context.close();
         return false;
     }

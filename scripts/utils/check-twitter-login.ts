@@ -36,33 +36,13 @@ async function checkLogin() {
             console.log('✅ EINGELOGGT: Home-Feed ist sichtbar.');
             const screenshotPath = path.join(DEBUG_DIR, 'twitter-status-check.png');
             await page.screenshot({ path: screenshotPath });
-            // Git Push für den Screenshot
-            try {
-                const { exec } = require('child_process');
-                console.log('   📸 Screenshot wird zu Git gepusht...');
-                // Force add (-f) weil public/debug ignoriert wird
-                exec(`git add -f ${screenshotPath} && git commit -m "chore: Update Twitter status screenshot" && git push`, (err: any, stdout: any, stderr: any) => {
-                    if (err) console.log('   ⚠️ Git Push Fehler (nicht kritisch):', stderr);
-                    else console.log('   ✅ Screenshot gepusht!');
-                });
-            } catch (e) { console.log('   ⚠️ Git Push Fehler:', e); }
-
+            await pushToGit(screenshotPath, "chore: Update Twitter status screenshot");
             await updateDbStatus(true);
         } else {
             console.log('❌ NICHT EINGELOGGT: Login-Seite oder Flow sichtbar.');
             const screenshotPath = path.join(DEBUG_DIR, 'twitter-login-fail.png');
             await page.screenshot({ path: screenshotPath });
-
-            // Git Push auch bei Failure
-            try {
-                const { exec } = require('child_process');
-                console.log('   📸 Failure-Screenshot wird zu Git gepusht...');
-                exec(`git add ${screenshotPath} && git commit -m "chore: Update Twitter failure screenshot" && git push`, (err: any, stdout: any, stderr: any) => {
-                    if (err) console.log('   ⚠️ Git Push Fehler (nicht kritisch):', stderr);
-                    else console.log('   ✅ Failure-Screnshot gepusht!');
-                });
-            } catch (e) { console.log('   ⚠️ Git Push Fehler:', e); }
-
+            await pushToGit(screenshotPath, "chore: Update Twitter failure screenshot");
             await updateDbStatus(false);
         }
 
@@ -71,6 +51,28 @@ async function checkLogin() {
         console.log(`❌ FEHLER: ${err.message}`);
         await closeTwitterContext(context).catch(() => { });
         process.exit(1);
+    }
+}
+
+/**
+ * Pushes a file to Git
+ */
+async function pushToGit(filePath: string, message: string) {
+    try {
+        const { execSync } = require('child_process');
+        console.log(`   📤 Push to Git: ${path.basename(filePath)}...`);
+
+        // Config setzen
+        execSync(`git config user.email "bot@tareno.ai" && git config user.name "TwitterBot"`, { stdio: 'ignore' });
+
+        // Add, Commit & Push
+        execSync(`git add -f "${filePath}"`, { stdio: 'ignore' });
+        execSync(`git commit -m "${message}"`, { stdio: 'ignore' });
+        execSync(`git push`, { stdio: 'ignore' });
+
+        console.log(`   ✅ Erfolgreich gepusht zu Git (Pfad: ${filePath.replace(process.cwd(), '')})`);
+    } catch (error: any) {
+        console.log(`   ⚠️ Git Push fehlgeschlagen: ${error.message}`);
     }
 }
 
