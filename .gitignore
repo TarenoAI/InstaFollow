@@ -57,6 +57,7 @@ data/browser-profiles/
 *.jpg
 !public/profile-pics/*.jpg
 !public/profile-pics/*.png
+!public/sbs-instagram/*.png
 !public/file.svg
 
 # Auth & Sessions

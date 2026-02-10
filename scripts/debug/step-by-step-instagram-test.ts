@@ -19,7 +19,7 @@ async function pushToGit(username: string) {
         const { execSync } = await import('child_process');
         console.log(`\n📤 Pushe SBS-Screenshots für @${username} zu Git...`);
         execSync(`git config user.email "bot@tareno.ai" && git config user.name "InstaBot"`, { stdio: 'ignore' });
-        execSync(`git add public/sbs-instagram/`, { stdio: 'ignore' });
+        execSync(`git add -f public/sbs-instagram/`, { stdio: 'ignore' });
         const status = execSync('git status --porcelain').toString();
         if (status.trim().length > 0) {
             execSync(`git commit -m "debug: sbs instagram test @${username}"`, { stdio: 'ignore' });
