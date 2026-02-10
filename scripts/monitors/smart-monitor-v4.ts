@@ -63,6 +63,8 @@ async function humanDelay(minMs: number, maxMs: number) {
 async function pushDebugScreenshot(filepath: string, message: string = 'debug screenshot'): Promise<boolean> {
     const { execSync } = require('child_process');
     try {
+        // Erst pullen um Konflikte zu vermeiden
+        execSync('git pull --rebase', { cwd: process.cwd(), stdio: 'ignore' });
         execSync(`git add -f "${filepath}"`, { cwd: process.cwd(), stdio: 'pipe' });
         execSync(`git commit -m "${message}" --allow-empty`, { cwd: process.cwd(), stdio: 'pipe' });
         execSync('git push', { cwd: process.cwd(), stdio: 'pipe' });
@@ -307,6 +309,10 @@ async function checkForRateLimit(page: Page): Promise<boolean> {
 }
 
 async function dismissPopups(page: Page) {
+    // Vorab-Check auf Rate Limit (Text-basiert)
+    const isBlocked = await checkForRateLimit(page);
+    if (isBlocked) return;
+
     const selectors = [
         // Cookie consent
         'button:has-text("Alle akzeptieren")',
@@ -350,9 +356,26 @@ async function dismissPopups(page: Page) {
         try {
             const btn = await page.$(sel);
             if (btn && await btn.isVisible()) {
+                // Bei "OK" Buttons prüfen wir kurz den Kontext
+                if (sel.includes('OK') || sel.includes('Ok')) {
+                    const popupText = await page.evaluate((el: any) => {
+                        const dialog = el.closest('[role="dialog"]');
+                        return dialog ? dialog.innerText : 'Unbekannter Dialog';
+                    }, btn);
+
+                    if (popupText.includes('Versuche es später') || popupText.includes('Try again later')) {
+                        console.log(`\n🚨 RATE LIMIT IM POPUP GEFUNDEN: "${popupText.substring(0, 50)}..."`);
+                        globalRateLimited = true;
+                        fs.writeFileSync(RATE_LIMIT_FILE, Date.now().toString());
+                        return;
+                    }
+                    console.log(`      🔇 Info-Popup geschlossen: "${popupText.substring(0, 30)}..."`);
+                } else {
+                    console.log(`      🔇 Popup geschlossen: ${sel}`);
+                }
+
                 await btn.click({ force: true });
                 await page.waitForTimeout(300);
-                console.log(`      🔇 Popup geschlossen: ${sel}`);
             }
         } catch { }
     }
@@ -804,6 +827,13 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 console.log('   🛑 Abbrechen wegen Rate Limit...');
                 break;
             }
+
+            // 🎯 EARLY EXIT: Wenn wir alle Accounts haben, aufhören!
+            if (apiFollowing.size >= expectedCount && expectedCount > 0) {
+                console.log(`   🎯 ZIEL ERREICHT: ${apiFollowing.size}/${expectedCount} Accounts gescrapt. Beende Scrolling.`);
+                break;
+            }
+
             await humanDelay(3500, 5500); // Mehr Zeit für API-Response
 
             // Check ob neue API-Daten kamen
@@ -1313,6 +1343,7 @@ async function pushProgressToGit(username: string) {
         // 3. Nur committen wenn Änderungen vorhanden sind
         const status = execSync('git status --porcelain').toString();
         if (status.trim().length > 0) {
+            execSync(`git add -A`, { stdio: 'ignore' });
             execSync(`git commit -m "auto: progress update @${username}"`, { stdio: 'ignore' });
             console.log(`   🔄 Git Pull & Push...`);
             execSync(`git pull --rebase origin main && git push origin main`, { stdio: 'ignore' });
