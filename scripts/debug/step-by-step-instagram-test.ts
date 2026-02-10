@@ -43,9 +43,17 @@ async function takeStepScreenshot(page: Page, stepName: string) {
 async function runTest(username: string) {
     console.log(`🚀 Starte Step-by-Step Test für @${username}...`);
 
+    const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
+
+    if (!fs.existsSync(SESSION_PATH)) {
+        console.error(`❌ FEHLER: Session-Datei nicht gefunden unter: ${SESSION_PATH}`);
+        console.log(`💡 Tipp: Führe erst 'npx tsx scripts/auth/auto-instagram-login.ts' aus.`);
+        return;
+    }
+
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({
-        storageState: path.join(process.cwd(), 'data/browser-profiles/instagram-session.json'),
+        storageState: SESSION_PATH,
         viewport: { width: 390, height: 844 }, // Mobile Viewport
         userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1'
     });
