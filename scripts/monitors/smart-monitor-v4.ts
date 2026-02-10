@@ -452,13 +452,17 @@ async function getProfileInfo(page: Page, username: string, takeScreenshot: bool
 
         // Screenshot wenn gewünscht
         let screenshotPath = '';
-        if (takeScreenshot) {
-            await page.waitForSelector('header img', { timeout: 5000 }).catch(() => { });
-            screenshotPath = path.join(SCREENSHOTS_DIR, `${username}_${Date.now()}.png`);
-            await page.screenshot({
-                path: screenshotPath,
-                clip: { x: 0, y: 0, width: 390, height: 500 }
-            });
+        if (takeScreenshot && page && !page.isClosed()) {
+            try {
+                await page.waitForSelector('header img', { timeout: 5000 }).catch(() => { });
+                screenshotPath = path.join(SCREENSHOTS_DIR, `${username}_${Date.now()}.png`);
+                await page.screenshot({
+                    path: screenshotPath,
+                    clip: { x: 0, y: 0, width: 390, height: 500 }
+                });
+            } catch (err: any) {
+                console.log(`      ⚠️ Screenshot fehlgeschlagen (Browser ggf. zu): ${err.message}`);
+            }
         }
 
         // Extrahiere Profilbild
@@ -2073,8 +2077,12 @@ async function main() {
             await humanDelay(10000, 15000);
         }
 
-        await context.storageState({ path: SESSION_PATH });
-        console.log('💾 Instagram Session gespeichert');
+        if (context && !context.browser()?.isConnected()) {
+            console.log('   ⚠️ Browser-Verbindung verloren – speichere Session nicht.');
+        } else {
+            await context.storageState({ path: SESSION_PATH });
+            console.log('💾 Instagram Session gespeichert');
+        }
 
         // 🐦 Twitter Status Check am Ende des Cron-Runs
         try {
