@@ -62,18 +62,25 @@ function resolveImagePath(imagePath: string): string | null {
 }
 
 function formatGroupedTweet(group: GroupedEvent): string {
-    const emoji = group.type === 'FOLLOW' ? '✅' : '👀';
-    const actionDE = group.type === 'FOLLOW' ? 'folgt jetzt' : 'folgt nicht mehr';
-    const actionEN = group.type === 'FOLLOW' ? 'now follows' : 'unfollowed';
-    const actionEmoji = group.type === 'FOLLOW' ? '➕' : '❌';
+    const count = group.targets.length;
+    const personDE = count === 1 ? 'Person' : 'Personen';
+    const personEN = count === 1 ? 'person' : 'people';
+
+    const isFollow = group.type === 'FOLLOW';
+    const emoji = isFollow ? '✅' : '👀';
+    const actionDE = isFollow ? `folgt ${count} neuen ${personDE}` : `entfolgte ${count} ${personDE}`;
+    const actionEN = isFollow ? `now follows ${count} ${personEN}` : `unfollowed ${count} ${personEN}`;
+    const actionEmoji = isFollow ? '➕' : '❌';
+
+    const monitorName = group.monitoredFullName || group.monitoredUsername;
 
     const targetLines = group.targets.map(t => {
         const name = t.fullName ? ` (${t.fullName})` : '';
-        return `${actionEmoji} @${t.username}${name}`;
-    }).join('\n');
+        return `${actionEmoji} ${t.username}${name}\n🔗 instagram.com/${t.username}`;
+    }).join('\n\n');
 
-    return `${emoji} @${group.monitoredUsername} (${group.monitoredFullName || ''}) ${actionDE}:
-${emoji} @${group.monitoredUsername} ${actionEN}:
+    return `${emoji} ${group.monitoredUsername} (${monitorName}) ${actionDE}:
+${emoji} ${group.monitoredUsername} ${actionEN}:
 
 ${targetLines}
 

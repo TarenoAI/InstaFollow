@@ -1222,21 +1222,20 @@ async function sendWebhook(payload: WebhookPayload) {
  * Zeigt max 5 Accounts um Tweet-Länge zu respektieren
  */
 function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, targets: ProfileInfo[]): string {
-    const emoji = event === 'FOLLOW' ? '✅' : '👀';
-    const actionEmoji = event === 'FOLLOW' ? '➕' : '❌';
+    const isFollow = event === 'FOLLOW';
+    const emoji = isFollow ? '✅' : '👀';
+    const actionEmoji = isFollow ? '➕' : '❌';
     const count = targets.length;
+    const personDE = count === 1 ? 'Person' : 'Personen';
+    const personEN = count === 1 ? 'person' : 'people';
 
     // Erste Zeile: Deutsch
-    let text = `${emoji} @${profile.username} (${profile.fullName}) `;
-    text += event === 'FOLLOW'
-        ? `folgt jetzt ${count} ${count === 1 ? 'Person' : 'Personen'}`
-        : `folgt nicht mehr ${count} ${count === 1 ? 'Person' : 'Personen'}`;
+    const actionDE = isFollow ? `folgt ${count} neuen ${personDE}` : `entfolgte ${count} ${personDE}`;
+    let text = `${emoji} ${profile.username} (${profile.fullName}) ${actionDE}:`;
 
     // Zweite Zeile: Englisch
-    text += '\n';
-    text += event === 'FOLLOW'
-        ? `${emoji} @${profile.username} now follows ${count} ${count === 1 ? 'person' : 'people'}`
-        : `${emoji} @${profile.username} unfollowed ${count} ${count === 1 ? 'person' : 'people'}`;
+    const actionEN = isFollow ? `now follows ${count} ${personEN}` : `unfollowed ${count} ${personEN}`;
+    text += `\n${emoji} ${profile.username} ${actionEN}:`;
 
     text += '\n\n';
 
@@ -1244,8 +1243,10 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
     const displayCount = Math.min(targets.length, 5);
     for (let i = 0; i < displayCount; i++) {
         const target = targets[i];
-        text += `${actionEmoji} @${target.username} (${target.fullName})\n`;
+        const name = target.fullName ? ` (${target.fullName})` : '';
+        text += `${actionEmoji} ${target.username}${name}\n`;
         text += `🔗 instagram.com/${target.username}\n`;
+        if (i < displayCount - 1) text += '\n';
     }
 
     if (targets.length > 5) {
