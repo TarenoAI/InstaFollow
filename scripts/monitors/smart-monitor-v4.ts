@@ -362,7 +362,9 @@ async function dismissPopups(page: Page): Promise<boolean> {
                     }, btn);
 
                     if (popupText.includes('Versuche es später') || popupText.includes('Try again later')) {
-                        console.log(`\n🚨 RATE LIMIT IM POPUP GEFUNDEN: "${popupText.substring(0, 50)}..."`);
+                        console.log(`\n🚨 RATE LIMIT ERKANNT: Klicke OK und versuche trotzdem weiter...`);
+                        await btn.click({ force: true });
+                        await page.waitForTimeout(500);
                         return true;
                     }
                     console.log(`      🔇 Info-Popup geschlossen: "${popupText.substring(0, 30)}..."`);
@@ -836,11 +838,8 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 await page.mouse.wheel(0, 600);
             }
 
-            const isBlocked = await dismissPopups(page);
-            if (isBlocked) {
-                console.log('   ⚠️ Breche Scraping für dieses Profil ab (Rate Limit). Gehe zum Nächsten...');
-                break;
-            }
+            await dismissPopups(page);
+            // Wir brechen nicht mehr sofort ab, sondern lassen die "noNewCount" Logik entscheiden ob es noch weitergeht
 
             // 🎯 EARLY EXIT: Wenn wir alle Accounts haben, aufhören!
             if (apiFollowing.size >= expectedCount && expectedCount > 0) {
