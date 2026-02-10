@@ -30,7 +30,7 @@ Falls der Scraper blockiert wird oder keine Daten lädt, nutze das Step-by-Step 
 ```bash
 npx tsx scripts/debug/step-by-step-instagram-test.ts [username]
 ```
-*   **Ergebnis:** Screenshots landen unter `public/debug/step-test/`.
+*   **Ergebnis:** Screenshots landen unter `public/sbs-instagram/`.
 *   **Wichtig:** Vergleiche die Bilder mit der [Instagram Prozess-Doku](LOGIN-INSTAGRAM.md).
 
 ---

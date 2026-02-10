@@ -11,18 +11,18 @@ import fs from 'fs';
  * Ideal um Rate-Limits oder UI-Änderungen zu verstehen.
  */
 
-const DEBUG_DIR = path.join(process.cwd(), 'public/debug/step-test');
+const DEBUG_DIR = path.join(process.cwd(), 'public/sbs-instagram');
 if (!fs.existsSync(DEBUG_DIR)) fs.mkdirSync(DEBUG_DIR, { recursive: true });
 
 async function pushToGit(username: string) {
     try {
         const { execSync } = await import('child_process');
-        console.log(`\n📤 Pushe Debug-Screenshots für @${username} zu Git...`);
+        console.log(`\n📤 Pushe SBS-Screenshots für @${username} zu Git...`);
         execSync(`git config user.email "bot@tareno.ai" && git config user.name "InstaBot"`, { stdio: 'ignore' });
-        execSync(`git add public/debug/step-test/`, { stdio: 'ignore' });
+        execSync(`git add public/sbs-instagram/`, { stdio: 'ignore' });
         const status = execSync('git status --porcelain').toString();
         if (status.trim().length > 0) {
-            execSync(`git commit -m "debug: step-by-step instagram test @${username}"`, { stdio: 'ignore' });
+            execSync(`git commit -m "debug: sbs instagram test @${username}"`, { stdio: 'ignore' });
             execSync(`git pull --rebase origin main && git push origin main`, { stdio: 'ignore' });
             console.log(`✅ Screenshots gepusht!`);
         } else {
