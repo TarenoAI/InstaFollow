@@ -153,6 +153,12 @@ async function autoLogin(): Promise<boolean> {
 
             if (!page.url().includes('login')) {
                 console.log('✅ Session ist gültig!');
+
+                // Screenshot vom erfolgreichen Status (auch wenn schon eingeloggt)
+                const statusScreenshot = path.join(DEBUG_DIR, 'instagram-session-valid.png');
+                await page.screenshot({ path: statusScreenshot });
+                await pushToGit(statusScreenshot, `chore: Instagram session check valid for ${INSTAGRAM_USERNAME}`);
+
                 await context.storageState({ path: SESSION_PATH });
                 await context.close();
                 return true;
