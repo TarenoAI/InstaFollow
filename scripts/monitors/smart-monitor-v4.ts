@@ -23,6 +23,10 @@ const SCREENSHOTS_DIR = path.join(process.cwd(), 'public/screenshots');
 const DEBUG_DIR = path.join(process.cwd(), 'public/debug');
 const INCIDENTS_DIR = path.join(process.cwd(), '.incidents');
 const iPhone = devices['iPhone 13 Pro'];
+
+const LOCK_FILE = path.join(process.cwd(), '.monitor.lock');
+const RATE_LIMIT_FILE = path.join(process.cwd(), '.rate_limit.lock');
+let globalRateLimited = false;
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 const TWITTER_USERNAME = process.env.TWITTER_USERNAME;
 const TWITTER_PASSWORD = process.env.TWITTER_PASSWORD;
@@ -299,6 +303,9 @@ async function checkForRateLimit(page: Page): Promise<boolean> {
         for (const text of rateLimitTexts) {
             if (bodyText.includes(text)) {
                 console.log(`\n🚨 RATE LIMIT ERKANNT! Message: "${text}"`);
+                // Erstelle Lock-Datei für 2 Stunden Pause
+                fs.writeFileSync(RATE_LIMIT_FILE, Date.now().toString());
+                globalRateLimited = true;
                 return true;
             }
         }
@@ -362,7 +369,9 @@ async function dismissPopups(page: Page): Promise<boolean> {
                     }, btn);
 
                     if (popupText.includes('Versuche es später') || popupText.includes('Try again later')) {
-                        console.log(`\n🚨 RATE LIMIT ERKANNT: Klicke OK und versuche trotzdem weiter...`);
+                        console.log(`\n🚨 RATE LIMIT ERKANNT: Setze 2 Std. Pause und breche ab...`);
+                        fs.writeFileSync(RATE_LIMIT_FILE, Date.now().toString());
+                        globalRateLimited = true;
                         await btn.click({ force: true });
                         await page.waitForTimeout(500);
                         return true;
@@ -1334,7 +1343,6 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
     return text.trim();
 }
 
-const LOCK_FILE = path.join(process.cwd(), '.monitor.lock');
 
 /**
  * Pushes all screenshots and debug logs to Git
@@ -1407,6 +1415,28 @@ async function main() {
     console.log('\n' + '═'.repeat(60));
     console.log(`🕵️ SMART MONITORING v4 - ${new Date().toLocaleString()}`);
     console.log('═'.repeat(60) + '\n');
+
+    // 🕒 1. RATE LIMIT COOLDOWN CHECK (2 Stunden)
+    if (fs.existsSync(RATE_LIMIT_FILE)) {
+        try {
+            const stats = fs.statSync(RATE_LIMIT_FILE);
+            const mtime = stats.mtimeMs;
+            const now = Date.now();
+            const diffHours = (now - mtime) / (1000 * 60 * 60);
+
+            if (diffHours < 2) {
+                const remaining = (2 - diffHours).toFixed(1);
+                console.log(`\n⏳ PAUSE AKTIV: Instagram blockiert uns noch (${remaining} Std. verbleibend).`);
+                console.log(`🚀 Wir warten bis die Sperre abläuft um den Account zu schützen.\n`);
+                return;
+            } else {
+                console.log('✅ Cooldown abgelaufen. Lösche Sperre...');
+                fs.unlinkSync(RATE_LIMIT_FILE);
+            }
+        } catch (e) {
+            console.log('⚠️ Fehler beim Cooldown-Check:', e);
+        }
+    }
 
     const db = createClient({
         url: process.env.TURSO_DATABASE_URL!,
@@ -1555,6 +1585,10 @@ async function main() {
         console.log(`📋 ${profiles.rows.length} Profile zu prüfen:\n`);
 
         for (const row of profiles.rows) {
+            if (globalRateLimited) {
+                console.log('\n🛑 ABBRUCH: Rate Limit global erkannt. Stoppe Monitoring-Run.');
+                break;
+            }
             const profileId = row.id as string;
             const username = row.username as string;
             const lastCount = (row.followingCount as number) || 0;
