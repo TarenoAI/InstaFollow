@@ -10,5 +10,6 @@ if pgrep -f "smart-monitor-v4" > /dev/null; then
 fi
 
 # Starte den Monitor
-cd ~/insta-follows
+cd ~/InstaFollow
+git fetch --all && git reset --hard origin/main >> /var/log/instafollow-monitor.log 2>&1
 npx tsx scripts/monitors/smart-monitor-v4.ts >> /var/log/instafollow-monitor.log 2>&1
