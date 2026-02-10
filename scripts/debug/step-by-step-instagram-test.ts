@@ -14,6 +14,25 @@ import fs from 'fs';
 const DEBUG_DIR = path.join(process.cwd(), 'public/debug/step-test');
 if (!fs.existsSync(DEBUG_DIR)) fs.mkdirSync(DEBUG_DIR, { recursive: true });
 
+async function pushToGit(username: string) {
+    try {
+        const { execSync } = await import('child_process');
+        console.log(`\n📤 Pushe Debug-Screenshots für @${username} zu Git...`);
+        execSync(`git config user.email "bot@tareno.ai" && git config user.name "InstaBot"`, { stdio: 'ignore' });
+        execSync(`git add public/debug/step-test/`, { stdio: 'ignore' });
+        const status = execSync('git status --porcelain').toString();
+        if (status.trim().length > 0) {
+            execSync(`git commit -m "debug: step-by-step instagram test @${username}"`, { stdio: 'ignore' });
+            execSync(`git pull --rebase origin main && git push origin main`, { stdio: 'ignore' });
+            console.log(`✅ Screenshots gepusht!`);
+        } else {
+            console.log(`ℹ️ Keine neuen Bilder zum Pushen.`);
+        }
+    } catch (err: any) {
+        console.log(`⚠️ Git-Push fehlgeschlagen: ${err.message}`);
+    }
+}
+
 async function takeStepScreenshot(page: Page, stepName: string) {
     const filename = `step_${Date.now()}_${stepName.replace(/\s+/g, '_')}.png`;
     const fullPath = path.join(DEBUG_DIR, filename);
@@ -97,6 +116,7 @@ async function runTest(username: string) {
         console.error(`❌ Test fehlgeschlagen: ${err.message}`);
     } finally {
         await browser.close();
+        await pushToGit(username);
         console.log(`🏁 Test abgeschlossen.`);
     }
 }
