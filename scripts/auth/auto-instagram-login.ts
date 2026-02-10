@@ -67,6 +67,19 @@ async function autoLogin(): Promise<boolean> {
     console.log(`👤 Username: ${INSTAGRAM_USERNAME}`);
     console.log('');
 
+    // Erkenne ob wir eine GUI haben (XServer)
+    const hasDisplay = !!process.env.DISPLAY;
+    const isVps = process.platform === 'linux' && !hasDisplay;
+
+    // Headless Modus: Standardmäßig true auf VPS, außer --headed wird übergeben
+    const isHeaded = process.argv.includes('--headed');
+    const headless = isVps ? !isHeaded : false;
+
+    if (isVps && isHeaded) {
+        console.log('⚠️  WARNUNG: --headed wurde auf dem VPS ohne XServer angefordert.');
+        console.log('   Nutze "xvfb-run" oder logge dich über VNC ein.');
+    }
+
     // Stelle sicher, dass der Browser-Profil-Ordner existiert
     const BROWSER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/instagram');
     if (!fs.existsSync(BROWSER_PROFILE_DIR)) {
@@ -74,9 +87,8 @@ async function autoLogin(): Promise<boolean> {
     }
 
     // Nutze PERSISTENT CONTEXT für langlebige Sessions
-    // Speichert alles: Cookies, LocalStorage, IndexedDB, Cache, etc.
     const context = await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, {
-        headless: false,
+        headless: headless,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
