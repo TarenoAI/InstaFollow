@@ -306,10 +306,10 @@ async function checkForRateLimit(page: Page): Promise<boolean> {
     return false;
 }
 
-async function dismissPopups(page: Page) {
+async function dismissPopups(page: Page): Promise<boolean> {
     // Vorab-Check auf Rate Limit (Text-basiert)
     const isBlocked = await checkForRateLimit(page);
-    if (isBlocked) return;
+    if (isBlocked) return true;
 
     const selectors = [
         // Cookie consent
@@ -363,7 +363,7 @@ async function dismissPopups(page: Page) {
 
                     if (popupText.includes('Versuche es später') || popupText.includes('Try again later')) {
                         console.log(`\n🚨 RATE LIMIT IM POPUP GEFUNDEN: "${popupText.substring(0, 50)}..."`);
-                        return;
+                        return true;
                     }
                     console.log(`      🔇 Info-Popup geschlossen: "${popupText.substring(0, 30)}..."`);
                 } else {
@@ -393,6 +393,7 @@ async function dismissPopups(page: Page) {
             await page.waitForTimeout(300);
         }
     } catch { }
+    return false;
 }
 
 /**
@@ -835,7 +836,11 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
                 await page.mouse.wheel(0, 600);
             }
 
-            await dismissPopups(page);
+            const isBlocked = await dismissPopups(page);
+            if (isBlocked) {
+                console.log('   ⚠️ Breche Scraping für dieses Profil ab (Rate Limit). Gehe zum Nächsten...');
+                break;
+            }
 
             // 🎯 EARLY EXIT: Wenn wir alle Accounts haben, aufhören!
             if (apiFollowing.size >= expectedCount && expectedCount > 0) {
