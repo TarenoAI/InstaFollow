@@ -1424,8 +1424,8 @@ async function main() {
             const now = Date.now();
             const diffHours = (now - mtime) / (1000 * 60 * 60);
 
-            if (diffHours < 2) {
-                const remaining = (2 - diffHours).toFixed(1);
+            if (diffHours < 1.5) {
+                const remaining = (1.5 - diffHours).toFixed(1);
                 console.log(`\n⏳ PAUSE AKTIV: Instagram blockiert uns noch (${remaining} Std. verbleibend).`);
                 console.log(`🚀 Wir warten bis die Sperre abläuft um den Account zu schützen.\n`);
                 return;
