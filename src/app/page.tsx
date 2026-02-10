@@ -959,6 +959,9 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
   // Aktive Scrape-Jobs pro Profil (username -> status)
   const [activeJobs, setActiveJobs] = useState<Map<string, ScrapeJobStatus>>(new Map());
 
+  // Sortierung
+  const [sortBy, setSortBy] = useState<'name' | 'lastChecked'>('name');
+
   const SCRAPE_API_URL = process.env.NEXT_PUBLIC_SCRAPE_API_URL || 'http://localhost:3001';
 
   // Polling für aktive Jobs
@@ -1211,6 +1214,28 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
           </button>
         </div>
 
+        {/* Filters & Sorting */}
+        <div className="flex items-center justify-between mb-4 gap-4">
+          <div className="flex bg-[var(--card)] p-1 rounded-lg border border-[var(--border)]">
+            <button
+              onClick={() => setSortBy('name')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${sortBy === 'name' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--text-muted)] hover:text-white'}`}
+            >
+              Name
+            </button>
+            <button
+              onClick={() => setSortBy('lastChecked')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${sortBy === 'lastChecked' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--text-muted)] hover:text-white'}`}
+            >
+              Geprüft am
+            </button>
+          </div>
+
+          <div className="text-xs text-[var(--text-muted)] italic">
+            {sortBy === 'lastChecked' ? 'Zuletzt geprüfte Profile zuerst' : 'Alphabetische Reihenfolge'}
+          </div>
+        </div>
+
         {/* Add Profile Input */}
         <div className="glass-card p-4 mb-6 bg-[var(--card)]/50">
           <p className="text-sm font-medium mb-3">Profil hinzufügen</p>
@@ -1239,218 +1264,227 @@ function SetDetail({ set, onBack, onRefresh, onShowDetails }: SetDetailProps) {
         {/* Profiles List */}
         {set.profiles.length > 0 ? (
           <div className="space-y-2">
-            {set.profiles.map((profile: ProfileInfo) => {
-              const job = activeJobs.get(profile.username);
-              const isActive = !!job;
+            {[...set.profiles]
+              .sort((a, b) => {
+                if (sortBy === 'lastChecked') {
+                  const dateA = a.lastCheckedAt ? new Date(a.lastCheckedAt).getTime() : 0;
+                  const dateB = b.lastCheckedAt ? new Date(b.lastCheckedAt).getTime() : 0;
+                  return dateB - dateA;
+                }
+                return a.username.localeCompare(b.username);
+              })
+              .map((profile: ProfileInfo) => {
+                const job = activeJobs.get(profile.username);
+                const isActive = !!job;
 
-              return (
-                <div
-                  key={profile.username}
-                  className="follower-card group relative overflow-hidden"
-                >
-                  {/* Inline Progress Bar (Hintergrund) */}
-                  {isActive && job.status !== 'done' && job.status !== 'error' && (
-                    <div
-                      className="absolute inset-0 bg-gradient-to-r from-[var(--accent)]/20 to-purple-500/20 transition-all duration-500"
-                      style={{ width: `${job.progress}%` }}
-                    />
-                  )}
-
-                  {/* Done overlay */}
-                  {isActive && job.status === 'done' && (
-                    <div className="absolute inset-0 bg-[var(--success)]/10 animate-pulse" />
-                  )}
-
-                  {/* Error overlay */}
-                  {isActive && job.status === 'error' && (
-                    <div className="absolute inset-0 bg-[var(--error)]/10" />
-                  )}
-
-                  <div className="relative flex items-center gap-4 z-10">
-                    <div className="relative w-12 h-12 flex-shrink-0">
-                      {profile.profilePicUrl ? (
-                        <img
-                          src={proxyImageUrl(profile.profilePicUrl)}
-                          alt={profile.username}
-                          className="w-12 h-12 rounded-full object-cover bg-[var(--card)]"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                            if (fallback) fallback.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
+                return (
+                  <div
+                    key={profile.username}
+                    className="follower-card group relative overflow-hidden"
+                  >
+                    {/* Inline Progress Bar (Hintergrund) */}
+                    {isActive && job.status !== 'done' && job.status !== 'error' && (
                       <div
-                        className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-secondary)] items-center justify-center absolute inset-0"
-                        style={{ display: profile.profilePicUrl ? 'none' : 'flex' }}
-                      >
-                        <span className="text-sm font-bold text-white uppercase">
-                          {profile.username.substring(0, 2)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <a
-                          href={`https://www.instagram.com/${profile.username}/`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-semibold truncate hover:text-[var(--accent)] transition-colors flex items-center gap-1"
+                        className="absolute inset-0 bg-gradient-to-r from-[var(--accent)]/20 to-purple-500/20 transition-all duration-500"
+                        style={{ width: `${job.progress}%` }}
+                      />
+                    )}
+
+                    {/* Done overlay */}
+                    {isActive && job.status === 'done' && (
+                      <div className="absolute inset-0 bg-[var(--success)]/10 animate-pulse" />
+                    )}
+
+                    {/* Error overlay */}
+                    {isActive && job.status === 'error' && (
+                      <div className="absolute inset-0 bg-[var(--error)]/10" />
+                    )}
+
+                    <div className="relative flex items-center gap-4 z-10">
+                      <div className="relative w-12 h-12 flex-shrink-0">
+                        {profile.profilePicUrl ? (
+                          <img
+                            src={proxyImageUrl(profile.profilePicUrl)}
+                            alt={profile.username}
+                            className="w-12 h-12 rounded-full object-cover bg-[var(--card)]"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-secondary)] items-center justify-center absolute inset-0"
+                          style={{ display: profile.profilePicUrl ? 'none' : 'flex' }}
                         >
-                          {profile.username}
-                          <svg className="w-3.5 h-3.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
-                        {profile.isVerified && (
-                          <span className="text-[var(--accent)] text-xs">
-                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                              <path fillRule="evenodd" d="M8.603 3.799A4.49 4.49 0 0112 2.25c1.357 0 2.573.6 3.397 1.549a4.49 4.49 0 013.498 1.307 4.491 4.491 0 011.307 3.497A4.49 4.49 0 0121.75 12a4.49 4.49 0 01-1.549 3.397 4.491 4.491 0 01-1.307 3.497 4.491 4.491 0 01-3.497 1.307A4.49 4.49 0 0112 21.75a4.49 4.49 0 01-3.397-1.549 4.49 4.49 0 01-3.498-1.306 4.491 4.491 0 01-1.307-3.498A4.49 4.49 0 012.25 12c0-1.357.6-2.573 1.549-3.397a4.49 4.49 0 011.307-3.497 4.49 4.49 0 013.497-1.307zm7.007 6.387a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
-                            </svg>
+                          <span className="text-sm font-bold text-white uppercase">
+                            {profile.username.substring(0, 2)}
                           </span>
-                        )}
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-0.5">
-                        <p className="text-sm text-[var(--text-muted)] truncate">
-                          {profile.fullName || profile.username}
-                        </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={`https://www.instagram.com/${profile.username}/`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold truncate hover:text-[var(--accent)] transition-colors flex items-center gap-1"
+                          >
+                            {profile.username}
+                            <svg className="w-3.5 h-3.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                          {profile.isVerified && (
+                            <span className="text-[var(--accent)] text-xs">
+                              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                                <path fillRule="evenodd" d="M8.603 3.799A4.49 4.49 0 0112 2.25c1.357 0 2.573.6 3.397 1.549a4.49 4.49 0 013.498 1.307 4.491 4.491 0 011.307 3.497A4.49 4.49 0 0121.75 12a4.49 4.49 0 01-1.549 3.397 4.491 4.491 0 01-1.307 3.497 4.491 4.491 0 01-3.497 1.307A4.49 4.49 0 0112 21.75a4.49 4.49 0 01-3.397-1.549 4.49 4.49 0 01-3.498-1.306 4.491 4.491 0 01-1.307-3.498A4.49 4.49 0 012.25 12c0-1.357.6-2.573 1.549-3.397a4.49 4.49 0 011.307-3.497 4.49 4.49 0 013.497-1.307zm7.007 6.387a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                              </svg>
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-sm text-[var(--text-muted)] truncate">
+                            {profile.fullName || profile.username}
+                          </p>
 
-                        {/* Scrape Status inline */}
-                        {isActive ? (
-                          <div className="flex items-center gap-2">
-                            {job.status === 'done' ? (
-                              <p className="text-xs text-[var(--success)] flex items-center gap-1">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                {job.found.toLocaleString()} Following gescrapt
-                              </p>
-                            ) : job.status === 'error' ? (
-                              <p className="text-xs text-[var(--error)] flex items-center gap-1">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                {job.error || 'Fehler'}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-[var(--accent)] flex items-center gap-2">
-                                <div className="spinner w-3 h-3" />
-                                <span>
-                                  {job.status === 'queued' && `In Warteschlange${job.queuePosition ? ` (Position ${job.queuePosition})` : ''}`}
-                                  {job.status === 'counting' && 'Lade Profil...'}
-                                  {job.status === 'scraping' && `${job.found}/${job.total} (${Math.round(job.progress)}%)`}
-                                  {job.status === 'saving' && 'Speichern...'}
-                                  {job.status === 'starting' && 'Starte...'}
-                                </span>
-                                {job.estimatedSeconds > 0 && (
-                                  <span className="text-[var(--text-muted)]">
-                                    ~{Math.max(0, job.estimatedSeconds - job.elapsedSeconds)}s
+                          {/* Scrape Status inline */}
+                          {isActive ? (
+                            <div className="flex items-center gap-2">
+                              {job.status === 'done' ? (
+                                <p className="text-xs text-[var(--success)] flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  {job.found.toLocaleString()} Following gescrapt
+                                </p>
+                              ) : job.status === 'error' ? (
+                                <p className="text-xs text-[var(--error)] flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                  {job.error || 'Fehler'}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-[var(--accent)] flex items-center gap-2">
+                                  <div className="spinner w-3 h-3" />
+                                  <span>
+                                    {job.status === 'queued' && `In Warteschlange${job.queuePosition ? ` (Position ${job.queuePosition})` : ''}`}
+                                    {job.status === 'counting' && 'Lade Profil...'}
+                                    {job.status === 'scraping' && `${job.found}/${job.total} (${Math.round(job.progress)}%)`}
+                                    {job.status === 'saving' && 'Speichern...'}
+                                    {job.status === 'starting' && 'Starte...'}
                                   </span>
-                                )}
+                                  {job.estimatedSeconds > 0 && (
+                                    <span className="text-[var(--text-muted)]">
+                                      ~{Math.max(0, job.estimatedSeconds - job.elapsedSeconds)}s
+                                    </span>
+                                  )}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-xs text-[var(--text-muted)] truncate">
+                                {profile.followerCount?.toLocaleString() || 0} Follower • {profile.followingCount?.toLocaleString() || 0} Following
                               </p>
-                            )}
-                          </div>
+                              {profile.lastCheckedAt && (
+                                <p className="text-xs text-[var(--success)] flex items-center gap-1 mt-0.5 animate-fade-in">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]"></span>
+                                  Geprüft: {new Date(profile.lastCheckedAt).toLocaleString('de-DE', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    day: '2-digit',
+                                    month: '2-digit'
+                                  })}
+                                </p>
+                              )}
+                              {profile.isBaselineComplete ? (
+                                <p className="text-xs text-[var(--accent)] flex items-center gap-1 mt-0.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"></span>
+                                  Baseline: {profile.baselineFollowingCount || profile.followingCount} Following
+                                  {profile.baselineCreatedAt && (
+                                    <span className="text-[var(--text-muted)]">
+                                      • {new Date(profile.baselineCreatedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                                    </span>
+                                  )}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-[var(--warning)] flex items-center gap-1 mt-0.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--warning)]"></span>
+                                  Baseline: Nicht erstellt
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Scrape Button */}
+                      <button
+                        onClick={() => startScrape(profile)}
+                        disabled={isActive}
+                        className={`p-2 rounded-lg transition-colors ${isActive
+                          ? 'opacity-50 cursor-not-allowed text-[var(--text-muted)]'
+                          : 'hover:bg-[var(--accent)]/20 text-[var(--text-muted)] hover:text-[var(--accent)]'
+                          }`}
+                        title={isActive ? 'Scrape läuft...' : 'Jetzt scrapen'}
+                      >
+                        {isActive && job.status !== 'done' && job.status !== 'error' ? (
+                          <div className="spinner w-5 h-5" />
                         ) : (
-                          <>
-                            <p className="text-xs text-[var(--text-muted)] truncate">
-                              {profile.followerCount?.toLocaleString() || 0} Follower • {profile.followingCount?.toLocaleString() || 0} Following
-                            </p>
-                            {profile.lastCheckedAt && (
-                              <p className="text-xs text-[var(--success)] flex items-center gap-1 mt-0.5 animate-fade-in">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]"></span>
-                                Geprüft: {new Date(profile.lastCheckedAt).toLocaleString('de-DE', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  day: '2-digit',
-                                  month: '2-digit'
-                                })}
-                              </p>
-                            )}
-                            {profile.isBaselineComplete ? (
-                              <p className="text-xs text-[var(--accent)] flex items-center gap-1 mt-0.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"></span>
-                                Baseline: {profile.baselineFollowingCount || profile.followingCount} Following
-                                {profile.baselineCreatedAt && (
-                                  <span className="text-[var(--text-muted)]">
-                                    • {new Date(profile.baselineCreatedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                                  </span>
-                                )}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-[var(--warning)] flex items-center gap-1 mt-0.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--warning)]"></span>
-                                Baseline: Nicht erstellt
-                              </p>
-                            )}
-                          </>
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
                         )}
-                      </div>
-                    </div>
+                      </button>
 
-                    {/* Scrape Button */}
-                    <button
-                      onClick={() => startScrape(profile)}
-                      disabled={isActive}
-                      className={`p-2 rounded-lg transition-colors ${isActive
-                        ? 'opacity-50 cursor-not-allowed text-[var(--text-muted)]'
-                        : 'hover:bg-[var(--accent)]/20 text-[var(--text-muted)] hover:text-[var(--accent)]'
-                        }`}
-                      title={isActive ? 'Scrape läuft...' : 'Jetzt scrapen'}
-                    >
-                      {isActive && job.status !== 'done' && job.status !== 'error' ? (
-                        <div className="spinner w-5 h-5" />
-                      ) : (
+                      {/* Logs Button */}
+                      <button
+                        onClick={() => setLogsProfileId(profile.id)}
+                        className="p-2 hover:bg-purple-500/20 rounded-lg transition-colors text-[var(--text-muted)] hover:text-purple-400"
+                        title="Monitoring Logs"
+                      >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                      )}
-                    </button>
+                      </button>
 
-                    {/* Logs Button */}
-                    <button
-                      onClick={() => setLogsProfileId(profile.id)}
-                      className="p-2 hover:bg-purple-500/20 rounded-lg transition-colors text-[var(--text-muted)] hover:text-purple-400"
-                      title="Monitoring Logs"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </button>
-
-                    <button
-                      onClick={() => onShowDetails(profile.id, profile.username)}
-                      className="p-2 hover:bg-[var(--card-hover)] rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--accent)]"
-                      title="Details & Verlauf anzeigen"
-                    >
-                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </button>
-                    <a
-                      href={`/api/screenshot/latest?username=${encodeURIComponent(profile.username)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 hover:bg-[var(--card-hover)] rounded-lg transition-colors text-[var(--text-muted)] hover:text-green-400"
-                      title="Screenshot anzeigen"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </a>
-                    <button
-                      onClick={() => handleRemoveProfile(profile.username)}
-                      className="p-2 hover:bg-[var(--error)]/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                      title="Aus Set entfernen"
-                    >
-                      <svg className="w-5 h-5 text-[var(--error)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                      <button
+                        onClick={() => onShowDetails(profile.id, profile.username)}
+                        className="p-2 hover:bg-[var(--card-hover)] rounded-lg transition-colors text-[var(--text-muted)] hover:text-[var(--accent)]"
+                        title="Details & Verlauf anzeigen"
+                      >
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </button>
+                      <a
+                        href={`/api/screenshot/latest?username=${encodeURIComponent(profile.username)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 hover:bg-[var(--card-hover)] rounded-lg transition-colors text-[var(--text-muted)] hover:text-green-400"
+                        title="Screenshot anzeigen"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </a>
+                      <button
+                        onClick={() => handleRemoveProfile(profile.username)}
+                        className="p-2 hover:bg-[var(--error)]/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        title="Aus Set entfernen"
+                      >
+                        <svg className="w-5 h-5 text-[var(--error)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         ) : (
           <div className="glass-card p-12 text-center">
