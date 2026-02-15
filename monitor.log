@@ -1,0 +1,1133 @@
+nohup: ignoring input
+
+════════════════════════════════════════════════════════════
+🕵️ SMART MONITORING v4 - 2/8/2026, 2:33:14 PM
+════════════════════════════════════════════════════════════
+
+🌐 Starte Browser mit persistentem Profil...
+🌐 Prüfe Instagram Login...
+🔓 Lock gesetzt
+📋 83 Profile zu prüfen:
+
+────────────────────────────────────────────────────────────
+🔍 @bvb09
+   📊 DB-Status: 98 Einträge | Soll: 98 | Abdeckung: 100.0%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @bvb09...
+      📄 Body text length: 365, pageReady: true
+      [M2] Following via Meta: 99
+   📡 Live: 99 Following
+   🚨 ÄNDERUNG ERKANNT: 98 → 99
+   📸 Screenshot gespeichert: bvb09-1770561200756.png
+      🔇 Popup geschlossen: [aria-label="Schließen"]
+      🔇 Popup geschlossen: [aria-label="Schließen"]
+   🔍 DEBUG: 22 Links auf der Seite
+   🔍 Following-Links gefunden: 1
+   🔗 Links: [ { href: 'https://www.instagram.com/bvb09/#', text: '98 Gefolgt' } ]
+   📄 URL: https://www.instagram.com/bvb09/
+   💬 Dialog offen: false
+   📝 Body Preview: Anmelden
+App öffnen
+bvb09
+Borussia Dortmund
+20,8 Mio. Follower
+98 Gefolgt
+⚫️ Offizieller Account von...
+   ⚠️ Versuche JavaScript-Klick auf Following...
+   📍 URL nach Klick: https://www.instagram.com/bvb09/
+   💬 Dialog gefunden: false
+   ⚠️ Weder Dialog noch Following-Seite - navigiere direkt...
+   📍 Neue URL: https://www.instagram.com/bvb09/following/
+   📸 Debug Screenshot: debug-dialog-bvb09.png
+   ⏳ Warte auf Laden der Following-Liste...
+   🔍 Check 1: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (1/15)
+   🔍 Check 2: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (2/15)
+   🔍 Check 3: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (3/15)
+   🔍 Check 4: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (4/15)
+   🔍 Check 5: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (5/15)
+   🔍 Check 6: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (6/15)
+   🔍 Check 7: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (7/15)
+   🔍 Check 8: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (8/15)
+   🔍 Check 9: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (9/15)
+   🔍 Check 10: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (10/15)
+   🔍 Check 11: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (11/15)
+   🔍 Check 12: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (12/15)
+   🔍 Check 13: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (13/15)
+   🔍 Check 14: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (14/15)
+   🔍 Check 15: container=dialog, users=0, hasDialog=true
+   ⏳ Warte auf Daten... (15/15)
+   ⚠️ Following-Liste lädt sehr langsam - versuche trotzdem...
+   📜 Max Scrolls: 80 (für 99 Following)
+   📦 Scroll-Container gefunden: true
+   Scroll 1/80: API=0
+      🔇 Popup geschlossen: [aria-label="Schließen"]
+   Scroll 6/80: API=0
+   ✅ Scraping beendet: API=0 Accounts
+   📋 0 Following gescrapt
+   📈 Scraping-Quote: 0/99 (0.0%)
+   🚫 ABBRUCH: Nur 0.0% gescrapt (benötigt 95%)
+   ⚠️ Konnte Log nicht speichern: LibsqlError: SQLITE_UNKNOWN: SQLite error: table MonitoringLog has no column named followerCountLive
+    at mapHranaError (/root/insta-follows/node_modules/@libsql/client/lib-cjs/hrana.js:340:16)
+    at /root/insta-follows/node_modules/@libsql/client/lib-cjs/http.js:120:52
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async saveMonitoringLog (/root/insta-follows/scripts/lib/monitoring-log.ts:40:9)
+    at async main (/root/insta-follows/scripts/monitors/smart-monitor-v4.ts:1168:21) {
+  code: 'SQLITE_UNKNOWN',
+  extendedCode: undefined,
+  rawCode: undefined,
+  [cause]: [ResponseError: SQLite error: table MonitoringLog has no column named followerCountLive] {
+    code: 'SQLITE_UNKNOWN',
+    proto: {
+      message: 'SQLite error: table MonitoringLog has no column named followerCountLive',
+      code: 'SQLITE_UNKNOWN'
+    }
+  }
+}
+────────────────────────────────────────────────────────────
+🔍 @fcbayern
+   📊 DB-Status: 78 Einträge | Soll: 78 | Abdeckung: 100.0%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @fcbayern...
+      📄 Body text length: 267, pageReady: true
+      [M2] Following via Meta: 81
+   📡 Live: 81 Following
+   🚨 ÄNDERUNG ERKANNT: 78 → 81
+   📸 Screenshot gespeichert: fcbayern-1770561293146.png
+   🔍 DEBUG: 0 Links auf der Seite
+   🔍 Following-Links gefunden: 0
+   📄 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Ffcbayern%2F&is_from_rle
+   💬 Dialog offen: false
+   📝 Body Preview: ...
+   ⚠️ Versuche JavaScript-Klick auf Following...
+   ❌ Following-Link nicht gefunden
+   📋 0 Following gescrapt
+   📈 Scraping-Quote: 0/81 (0.0%)
+   🚫 ABBRUCH: Nur 0.0% gescrapt (benötigt 95%)
+   ⚠️ Konnte Log nicht speichern: LibsqlError: SQLITE_UNKNOWN: SQLite error: table MonitoringLog has no column named followerCountLive
+    at mapHranaError (/root/insta-follows/node_modules/@libsql/client/lib-cjs/hrana.js:340:16)
+    at /root/insta-follows/node_modules/@libsql/client/lib-cjs/http.js:120:52
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async saveMonitoringLog (/root/insta-follows/scripts/lib/monitoring-log.ts:40:9)
+    at async main (/root/insta-follows/scripts/monitors/smart-monitor-v4.ts:1168:21) {
+  code: 'SQLITE_UNKNOWN',
+  extendedCode: undefined,
+  rawCode: undefined,
+  [cause]: [ResponseError: SQLite error: table MonitoringLog has no column named followerCountLive] {
+    code: 'SQLITE_UNKNOWN',
+    proto: {
+      message: 'SQLite error: table MonitoringLog has no column named followerCountLive',
+      code: 'SQLITE_UNKNOWN'
+    }
+  }
+}
+────────────────────────────────────────────────────────────
+🔍 @lennart_kl10
+   📊 DB-Status: 217 Einträge | Soll: 373 | Abdeckung: 58.2%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @lennart_kl10...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=0]
+      ⏳ Warte auf Content (3/5)... [bodyLen=0]
+      ⏳ Warte auf Content (4/5)... [bodyLen=0]
+      ⏳ Warte auf Content (5/5)... [bodyLen=0]
+      📄 Body text length: 0, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-lennart_kl10-1770561346484.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Flennart_kl10%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+   ⚠️ Konnte Log nicht speichern: LibsqlError: SQLITE_UNKNOWN: SQLite error: table MonitoringLog has no column named followerCountLive
+    at mapHranaError (/root/insta-follows/node_modules/@libsql/client/lib-cjs/hrana.js:340:16)
+    at /root/insta-follows/node_modules/@libsql/client/lib-cjs/http.js:120:52
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async saveMonitoringLog (/root/insta-follows/scripts/lib/monitoring-log.ts:40:9)
+    at async main (/root/insta-follows/scripts/monitors/smart-monitor-v4.ts:1085:17) {
+  code: 'SQLITE_UNKNOWN',
+  extendedCode: undefined,
+  rawCode: undefined,
+  [cause]: [ResponseError: SQLite error: table MonitoringLog has no column named followerCountLive] {
+    code: 'SQLITE_UNKNOWN',
+    proto: {
+      message: 'SQLite error: table MonitoringLog has no column named followerCountLive',
+      code: 'SQLITE_UNKNOWN'
+    }
+  }
+}
+────────────────────────────────────────────────────────────
+🔍 @morewatchez
+   📊 DB-Status: 177 Einträge | Soll: 177 | Abdeckung: 100.0%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @morewatchez...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-morewatchez-1770561372550.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fmorewatchez%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+   ⚠️ Konnte Log nicht speichern: LibsqlError: SQLITE_UNKNOWN: SQLite error: table MonitoringLog has no column named followerCountLive
+    at mapHranaError (/root/insta-follows/node_modules/@libsql/client/lib-cjs/hrana.js:340:16)
+    at /root/insta-follows/node_modules/@libsql/client/lib-cjs/http.js:120:52
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async saveMonitoringLog (/root/insta-follows/scripts/lib/monitoring-log.ts:40:9)
+    at async main (/root/insta-follows/scripts/monitors/smart-monitor-v4.ts:1085:17) {
+  code: 'SQLITE_UNKNOWN',
+  extendedCode: undefined,
+  rawCode: undefined,
+  [cause]: [ResponseError: SQLite error: table MonitoringLog has no column named followerCountLive] {
+    code: 'SQLITE_UNKNOWN',
+    proto: {
+      message: 'SQLite error: table MonitoringLog has no column named followerCountLive',
+      code: 'SQLITE_UNKNOWN'
+    }
+  }
+}
+────────────────────────────────────────────────────────────
+🔍 @harrykane
+   📊 DB-Status: 298 Einträge | Soll: 298 | Abdeckung: 100.0%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @harrykane...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-harrykane-1770561398532.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fharrykane%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+   ⚠️ Konnte Log nicht speichern: LibsqlError: SQLITE_UNKNOWN: SQLite error: table MonitoringLog has no column named followerCountLive
+    at mapHranaError (/root/insta-follows/node_modules/@libsql/client/lib-cjs/hrana.js:340:16)
+    at /root/insta-follows/node_modules/@libsql/client/lib-cjs/http.js:120:52
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async saveMonitoringLog (/root/insta-follows/scripts/lib/monitoring-log.ts:40:9)
+    at async main (/root/insta-follows/scripts/monitors/smart-monitor-v4.ts:1085:17) {
+  code: 'SQLITE_UNKNOWN',
+  extendedCode: undefined,
+  rawCode: undefined,
+  [cause]: [ResponseError: SQLite error: table MonitoringLog has no column named followerCountLive] {
+    code: 'SQLITE_UNKNOWN',
+    proto: {
+      message: 'SQLite error: table MonitoringLog has no column named followerCountLive',
+      code: 'SQLITE_UNKNOWN'
+    }
+  }
+}
+────────────────────────────────────────────────────────────
+🔍 @marcinho11
+   📊 DB-Status: 13 Einträge | Soll: 259 | Abdeckung: 5.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @marcinho11...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-marcinho11-1770561424556.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fmarcinho11%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @dfb_team
+   📊 DB-Status: 202 Einträge | Soll: 203 | Abdeckung: 99.5%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @dfb_team...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-dfb_team-1770561450537.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fdfb_team%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @manuelneuer
+   📊 DB-Status: 13 Einträge | Soll: 275 | Abdeckung: 4.7%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @manuelneuer...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-manuelneuer-1770561476561.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fmanuelneuer%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @luisdiaz19_
+   📊 DB-Status: 13 Einträge | Soll: 415 | Abdeckung: 3.1%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @luisdiaz19_...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-luisdiaz19_-1770561503753.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fluisdiaz19_%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @jamalmusiala10
+   📊 DB-Status: 414 Einträge | Soll: 411 | Abdeckung: 100.7%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @jamalmusiala10...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-jamalmusiala10-1770561529728.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fjamalmusiala10%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @alphonsodavies
+   📊 DB-Status: 287 Einträge | Soll: 287 | Abdeckung: 100.0%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @alphonsodavies...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-alphonsodavies-1770561556164.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Falphonsodavies%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @sergegnabry
+   📊 DB-Status: 509 Einträge | Soll: 509 | Abdeckung: 100.0%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @sergegnabry...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-sergegnabry-1770561582279.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fsergegnabry%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @leon_goretzka
+   📊 DB-Status: 13 Einträge | Soll: 510 | Abdeckung: 2.5%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @leon_goretzka...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-leon_goretzka-1770561608810.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fleon_goretzka%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @m.olise
+   📊 DB-Status: 23 Einträge | Soll: 23 | Abdeckung: 100.0%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @m.olise...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-m.olise-1770561635703.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fm.olise%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @jackson.nj11
+   📊 DB-Status: 13 Einträge | Soll: 593 | Abdeckung: 2.2%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @jackson.nj11...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-jackson.nj11-1770561661709.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fjackson.nj11%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @sacha_boey
+   📊 DB-Status: 551 Einträge | Soll: 554 | Abdeckung: 99.5%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @sacha_boey...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-sacha_boey-1770561688200.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fsacha_boey%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @upamecano
+   📊 DB-Status: 399 Einträge | Soll: 398 | Abdeckung: 100.3%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @upamecano...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-upamecano-1770561714444.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fupamecano%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @esmuellert
+   📊 DB-Status: 0 Einträge | Soll: 723 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @esmuellert...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-esmuellert-1770561740585.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fesmuellert%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @leroysane
+   📊 DB-Status: 0 Einträge | Soll: 318 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @leroysane...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-leroysane-1770561766514.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fleroysane%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @mariogotze
+   📊 DB-Status: 0 Einträge | Soll: 1963 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @mariogotze...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-mariogotze-1770561792694.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fmariogotze%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @xavisimons
+   📊 DB-Status: 0 Einträge | Soll: 831 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @xavisimons...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-xavisimons-1770561818752.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fxavisimons%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @flowirtz
+   📊 DB-Status: 324 Einträge | Soll: 345 | Abdeckung: 93.9%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @flowirtz...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-flowirtz-1770561844811.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fflowirtz%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @granitxhaka
+   📊 DB-Status: 0 Einträge | Soll: 1011 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @granitxhaka...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-granitxhaka-1770561870679.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fgranitxhaka%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @king
+   📊 DB-Status: 228 Einträge | Soll: 243 | Abdeckung: 93.8%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @king...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-king-1770561896752.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fking%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @sergegnabry#
+   📊 DB-Status: 0 Einträge | Soll: 509 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @sergegnabry#...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-sergegnabry#-1770561923275.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Fsergegnabry&is_from_rle#/
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @rbens.official
+   📊 DB-Status: 0 Einträge | Soll: 600 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @rbens.official...
+      ⏳ Warte auf Content (1/5)... [bodyLen=0]
+      ⏳ Warte auf Content (2/5)... [bodyLen=120]
+      ⏳ Warte auf Content (3/5)... [bodyLen=120]
+      ⏳ Warte auf Content (4/5)... [bodyLen=120]
+      ⏳ Warte auf Content (5/5)... [bodyLen=120]
+      📄 Body text length: 120, pageReady: false
+      ⚠️ Seite nicht bereit - versuche Reload...
+      🔄 Letzter Versuch mit direkter URL...
+      📄 Nach direkter URL: bodyLen=120, hasFollowing=false
+      📸 Empty page debug: /root/insta-follows/.incidents/empty-page-rbens.official-1770561949367.png
+      🔍 URL: https://www.instagram.com/accounts/login/?next=https%3A%2F%2Fwww.instagram.com%2Frbens.official%2F&is_from_rle
+      🔍 Title: Instagram
+      🔍 Body length: 120
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @emrecan23
+   📊 DB-Status: 0 Einträge | Soll: 476 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @emrecan23...
+      ❌ getFollowingCount Error: page.goto: net::ERR_ABORTED at https://www.instagram.com/
+Call log:
+[2m  - navigating to "https://www.instagram.com/", waiting until "domcontentloaded"[22m
+
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @jobebellingham
+   📊 DB-Status: 0 Einträge | Soll: 597 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @jobebellingham...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @jeremiefrimpong
+   📊 DB-Status: 0 Einträge | Soll: 1272 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @jeremiefrimpong...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @hekitike
+   📊 DB-Status: 0 Einträge | Soll: 428 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @hekitike...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @mbatshuayi
+   📊 DB-Status: 0 Einträge | Soll: 346 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @mbatshuayi...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @el_bilal_9
+   📊 DB-Status: 0 Einträge | Soll: 282 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @el_bilal_9...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @karim_adeyemi
+   📊 DB-Status: 315 Einträge | Soll: 324 | Abdeckung: 97.2%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @karim_adeyemi...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @pierohincapie
+   📊 DB-Status: 0 Einträge | Soll: 406 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @pierohincapie...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @benjaminsesko
+   📊 DB-Status: 267 Einträge | Soll: 274 | Abdeckung: 97.4%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @benjaminsesko...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @andresilva9
+   📊 DB-Status: 0 Einträge | Soll: 437 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @andresilva9...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @kevintrapp
+   📊 DB-Status: 312 Einträge | Soll: 316 | Abdeckung: 98.7%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @kevintrapp...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @joaopalhinha6
+   📊 DB-Status: 0 Einträge | Soll: 853 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @joaopalhinha6...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @julianbrandt
+   📊 DB-Status: 383 Einträge | Soll: 391 | Abdeckung: 98.0%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @julianbrandt...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @sebastien.haller
+   📊 DB-Status: 0 Einträge | Soll: 332 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @sebastien.haller...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @grimaldo35
+   📊 DB-Status: 0 Einträge | Soll: 1114 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @grimaldo35...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @boniface_jrn
+   📊 DB-Status: 0 Einträge | Soll: 1089 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @boniface_jrn...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @nickwoltemade
+   📊 DB-Status: 0 Einträge | Soll: 869 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @nickwoltemade...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @amoura_mohammed_el_amine
+   📊 DB-Status: 269 Einträge | Soll: 276 | Abdeckung: 97.5%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @amoura_mohammed_el_amine...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @raphaelguerreiro14
+   📊 DB-Status: 0 Einträge | Soll: 450 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @raphaelguerreiro14...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @giftorban
+   📊 DB-Status: 170 Einträge | Soll: 177 | Abdeckung: 96.0%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @giftorban...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @rolandsallai
+   📊 DB-Status: 0 Einträge | Soll: 345 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @rolandsallai...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @m.tel14
+   📊 DB-Status: 0 Einträge | Soll: 341 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @m.tel14...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @edmondtapsoba
+   📊 DB-Status: 0 Einträge | Soll: 392 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @edmondtapsoba...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @fareschaibi28
+   📊 DB-Status: 0 Einträge | Soll: 522 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @fareschaibi28...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @doanritsu
+   📊 DB-Status: 0 Einträge | Soll: 286 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @doanritsu...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @jbgittens
+   📊 DB-Status: 0 Einträge | Soll: 411 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @jbgittens...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @ozankabak4
+   📊 DB-Status: 0 Einträge | Soll: 653 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @ozankabak4...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @elifelmas24
+   📊 DB-Status: 0 Einträge | Soll: 573 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @elifelmas24...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @amine_ad10
+   📊 DB-Status: 0 Einträge | Soll: 564 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @amine_ad10...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @nico.schlotterbeck
+   📊 DB-Status: 0 Einträge | Soll: 510 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @nico.schlotterbeck...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @gregorkobel
+   📊 DB-Status: 0 Einträge | Soll: 304 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @gregorkobel...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @chukwuemeka10
+   📊 DB-Status: 0 Einträge | Soll: 416 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @chukwuemeka10...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @juweigl
+   📊 DB-Status: 0 Einträge | Soll: 711 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @juweigl...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @adamaznou
+   📊 DB-Status: 0 Einträge | Soll: 627 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @adamaznou...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @modahoud8
+   📊 DB-Status: 0 Einträge | Soll: 265 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @modahoud8...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @donyellmalen
+   📊 DB-Status: 0 Einträge | Soll: 388 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @donyellmalen...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @gioareyna
+   📊 DB-Status: 0 Einträge | Soll: 351 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @gioareyna...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @denizundav
+   📊 DB-Status: 0 Einträge | Soll: 83 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @denizundav...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @transfermarkt.de
+   📊 DB-Status: 0 Einträge | Soll: 874 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @transfermarkt.de...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @robingosens
+   📊 DB-Status: 0 Einträge | Soll: 596 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @robingosens...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @alekspavlovic_
+   📊 DB-Status: 0 Einträge | Soll: 480 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @alekspavlovic_...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @szancso41
+   📊 DB-Status: 0 Einträge | Soll: 525 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @szancso41...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @nordimukiele
+   📊 DB-Status: 227 Einträge | Soll: 236 | Abdeckung: 96.2%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @nordimukiele...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @p_schicky
+   📊 DB-Status: 0 Einträge | Soll: 512 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @p_schicky...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @l.openda
+   📊 DB-Status: 0 Einträge | Soll: 414 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @l.openda...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @manu_kne
+   📊 DB-Status: 0 Einträge | Soll: 844 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @manu_kne...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @dkoehn27
+   📊 DB-Status: 0 Einträge | Soll: 501 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @dkoehn27...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @yan.couto
+   📊 DB-Status: 0 Einträge | Soll: 700 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @yan.couto...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @konradlaimer
+   📊 DB-Status: 0 Einträge | Soll: 343 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @konradlaimer...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @andrejkramaric
+   📊 DB-Status: 0 Einträge | Soll: 724 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @andrejkramaric...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @svenulreichoffiziell
+   📊 DB-Status: 0 Einträge | Soll: 371 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @svenulreichoffiziell...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @amadou_haidara04
+   📊 DB-Status: 0 Einträge | Soll: 388 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @amadou_haidara04...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @simakan2
+   📊 DB-Status: 0 Einträge | Soll: 476 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @simakan2...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @matzeginter28
+   📊 DB-Status: 0 Einträge | Soll: 541 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @matzeginter28...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @felix_nmecha
+   📊 DB-Status: 0 Einträge | Soll: 856 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @felix_nmecha...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @jacksonirvine_
+   📊 DB-Status: 0 Einträge | Soll: 982 | Abdeckung: 0.0%
+   📋 Baseline: ⚠️ Nicht komplett
+      🔍 Suche @jacksonirvine_...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+────────────────────────────────────────────────────────────
+🔍 @aymenbarkok
+   📊 DB-Status: 171 Einträge | Soll: 178 | Abdeckung: 96.1%
+   📋 Baseline: ✅ Komplett
+      🔍 Suche @aymenbarkok...
+      ❌ getFollowingCount Error: page.goto: Target page, context or browser has been closed
+   ⚠️ Konnte Zahl nicht lesen
+
+
+❌ Fehler: browserContext.storageState: Target page, context or browser has been closed
+
+════════════════════════════════════════════════════════════
+✅ Monitoring abgeschlossen
+════════════════════════════════════════════════════════════
+

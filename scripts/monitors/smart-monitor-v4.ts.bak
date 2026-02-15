@@ -14,7 +14,6 @@ import fs from 'fs';
 import axios from 'axios';
 import { saveMonitoringLog, ensureMonitoringLogTable, LogStatus } from '../lib/monitoring-log';
 import { addToQueue } from '../lib/twitter-queue';
-import { getTwitterContext, closeTwitterContext, checkTwitterSession } from '../lib/twitter-auto-login';
 
 // === KONFIGURATION ===
 const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
@@ -23,10 +22,6 @@ const SCREENSHOTS_DIR = path.join(process.cwd(), 'public/screenshots');
 const DEBUG_DIR = path.join(process.cwd(), 'public/debug');
 const INCIDENTS_DIR = path.join(process.cwd(), '.incidents');
 const iPhone = devices['iPhone 13 Pro'];
-
-const LOCK_FILE = path.join(process.cwd(), '.monitor.lock');
-const RATE_LIMIT_FILE = path.join(process.cwd(), '.rate_limit.lock');
-let globalRateLimited = false;
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 const TWITTER_USERNAME = process.env.TWITTER_USERNAME;
 const TWITTER_PASSWORD = process.env.TWITTER_PASSWORD;
@@ -67,8 +62,6 @@ async function humanDelay(minMs: number, maxMs: number) {
 async function pushDebugScreenshot(filepath: string, message: string = 'debug screenshot'): Promise<boolean> {
     const { execSync } = require('child_process');
     try {
-        // Erst pullen um Konflikte zu vermeiden
-        execSync('git pull --rebase', { cwd: process.cwd(), stdio: 'ignore' });
         execSync(`git add -f "${filepath}"`, { cwd: process.cwd(), stdio: 'pipe' });
         execSync(`git commit -m "${message}" --allow-empty`, { cwd: process.cwd(), stdio: 'pipe' });
         execSync('git push', { cwd: process.cwd(), stdio: 'pipe' });
@@ -290,34 +283,7 @@ async function performLogin(page: Page): Promise<boolean> {
     }
 }
 
-async function checkForRateLimit(page: Page): Promise<boolean> {
-    const rateLimitTexts = [
-        "Versuche es später noch einmal",
-        "Try again later",
-        "Handlungen auf Instagram ein",
-        "community zu schützen"
-    ];
-
-    try {
-        const bodyText = await page.evaluate(() => document.body.innerText);
-        for (const text of rateLimitTexts) {
-            if (bodyText.includes(text)) {
-                console.log(`\n🚨 RATE LIMIT ERKANNT! Message: "${text}"`);
-                // Erstelle Lock-Datei für 2 Stunden Pause
-                fs.writeFileSync(RATE_LIMIT_FILE, Date.now().toString());
-                globalRateLimited = true;
-                return true;
-            }
-        }
-    } catch { }
-    return false;
-}
-
-async function dismissPopups(page: Page): Promise<boolean> {
-    // Vorab-Check auf Rate Limit (Text-basiert)
-    const isBlocked = await checkForRateLimit(page);
-    if (isBlocked) return true;
-
+async function dismissPopups(page: Page) {
     const selectors = [
         // Cookie consent
         'button:has-text("Alle akzeptieren")',
@@ -328,14 +294,11 @@ async function dismissPopups(page: Page): Promise<boolean> {
         'button:has-text("Not Now")',
         'button:has-text("Nicht jetzt")',
         // Save login info popup
-        'button:has-text("Informationen speichern")',
-        'button:has-text("Save Info")',
         'button:has-text("Informationen nicht speichern")',
         'button:has-text("Not now")',
         // Turn on notifications
         'button:has-text("Nicht aktivieren")',
         'button:has-text("Not Now")',
-        'button:has-text("Jetzt nicht")',
         // Close buttons (X icons)
         '[aria-label="Schließen"]',
         '[aria-label="Close"]',
@@ -347,7 +310,6 @@ async function dismissPopups(page: Page): Promise<boolean> {
         // RATE LIMIT POPUP - "Versuche es später noch einmal"
         'button:has-text("OK")',
         'button:has-text("Ok")',
-        'button:has-text("Bestätigen")',
         // "View profile in app" popup - X button at top right
         'div[role="dialog"] button[type="button"]',
         'div[role="dialog"] svg[aria-label="Schließen"]',
@@ -358,35 +320,13 @@ async function dismissPopups(page: Page): Promise<boolean> {
         // Problem melden link (nicht klicken, aber OK daneben)
     ];
 
-    // Vorab-Check auf Rate Limit
-    await checkForRateLimit(page);
-
     for (const sel of selectors) {
         try {
             const btn = await page.$(sel);
             if (btn && await btn.isVisible()) {
-                // Bei "OK" Buttons prüfen wir kurz den Kontext
-                if (sel.includes('OK') || sel.includes('Ok')) {
-                    const popupText = await page.evaluate((el: any) => {
-                        const dialog = el.closest('[role="dialog"]');
-                        return dialog ? dialog.innerText : 'Unbekannter Dialog';
-                    }, btn);
-
-                    if (popupText.includes('Versuche es später') || popupText.includes('Try again later')) {
-                        console.log(`\n🚨 RATE LIMIT ERKANNT: Setze 2 Std. Pause und breche ab...`);
-                        fs.writeFileSync(RATE_LIMIT_FILE, Date.now().toString());
-                        globalRateLimited = true;
-                        await btn.click({ force: true });
-                        await page.waitForTimeout(500);
-                        return true;
-                    }
-                    console.log(`      🔇 Info-Popup geschlossen: "${popupText.substring(0, 30)}..."`);
-                } else {
-                    console.log(`      🔇 Popup geschlossen: ${sel}`);
-                }
-
                 await btn.click({ force: true });
                 await page.waitForTimeout(300);
+                console.log(`      🔇 Popup geschlossen: ${sel}`);
             }
         } catch { }
     }
@@ -408,7 +348,6 @@ async function dismissPopups(page: Page): Promise<boolean> {
             await page.waitForTimeout(300);
         }
     } catch { }
-    return false;
 }
 
 /**
@@ -465,17 +404,13 @@ async function getProfileInfo(page: Page, username: string, takeScreenshot: bool
 
         // Screenshot wenn gewünscht
         let screenshotPath = '';
-        if (takeScreenshot && page && !page.isClosed()) {
-            try {
-                await page.waitForSelector('header img', { timeout: 5000 }).catch(() => { });
-                screenshotPath = path.join(SCREENSHOTS_DIR, `${username}_${Date.now()}.png`);
-                await page.screenshot({
-                    path: screenshotPath,
-                    clip: { x: 0, y: 0, width: 390, height: 500 }
-                });
-            } catch (err: any) {
-                console.log(`      ⚠️ Screenshot fehlgeschlagen (Browser ggf. zu): ${err.message}`);
-            }
+        if (takeScreenshot) {
+            await page.waitForSelector('header img', { timeout: 5000 }).catch(() => { });
+            screenshotPath = path.join(SCREENSHOTS_DIR, `${username}_${Date.now()}.png`);
+            await page.screenshot({
+                path: screenshotPath,
+                clip: { x: 0, y: 0, width: 390, height: 500 }
+            });
         }
 
         // Extrahiere Profilbild
@@ -488,28 +423,11 @@ async function getProfileInfo(page: Page, username: string, takeScreenshot: bool
         // Extrahiere Full Name
         let fullName = username;
         try {
-            fullName = await page.evaluate(() => {
-                // Selektoren für den echten Namen (Fett gedruckt unter dem Bild oder im Header)
-                // Auf Mobile oft ein <span> im h2 oder h1 Bereich
-                const selectors = [
-                    'h2',                     // Oft Name im Header
-                    'header section span',    // Standard mobile
-                    'header h1',              // Desktop/Tablet
-                    'span[dir="auto"]'        // Bio/Name container
-                ];
-
-                for (const sel of selectors) {
-                    const el = document.querySelector(sel) as HTMLElement;
-                    if (el && el.innerText && el.innerText.length > 1 && !el.innerText.includes('\n')) {
-                        return el.innerText.trim();
-                    }
-                }
-                return '';
-            }) || username;
-
-            // Clean: Falls es "(username)" oder ähnliches enthält
-            fullName = fullName.replace(/\s*\(@.*\).*$/, '').trim();
-            if (fullName === '') fullName = username;
+            const nameEl = await page.$('header section span');
+            if (nameEl) {
+                fullName = await nameEl.innerText() || username;
+                fullName = fullName.replace(/\s*\(@.*\).*$/, '').trim();
+            }
         } catch { }
 
         // Extrahiere Follower/Following
@@ -856,14 +774,6 @@ async function getFollowingList(page: Page, username: string, expectedCount: num
             }
 
             await dismissPopups(page);
-            // Wir brechen nicht mehr sofort ab, sondern lassen die "noNewCount" Logik entscheiden ob es noch weitergeht
-
-            // 🎯 EARLY EXIT: Wenn wir alle Accounts haben, aufhören!
-            if (apiFollowing.size >= expectedCount && expectedCount > 0) {
-                console.log(`   🎯 ZIEL ERREICHT: ${apiFollowing.size}/${expectedCount} Accounts gescrapt. Beende Scrolling.`);
-                break;
-            }
-
             await humanDelay(3500, 5500); // Mehr Zeit für API-Response
 
             // Check ob neue API-Daten kamen
@@ -1307,46 +1217,28 @@ async function sendWebhook(payload: WebhookPayload) {
 }
 
 /**
- * Formatiert den Tweet-Text bilingual (DE/EN) mit Emojis
- * Zeigt max 5 Accounts um Tweet-Länge zu respektieren
+ * Formatiert den Tweet-Text im Stil von @takiprazzi
+ * Zeigt ALLE Accounts, nicht nur 3!
  */
 function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, targets: ProfileInfo[]): string {
-    const isFollow = event === 'FOLLOW';
-    const emoji = isFollow ? '✅' : '👀';
-    const actionEmoji = isFollow ? '➕' : '❌';
-    const count = targets.length;
-    const personDE = count === 1 ? 'Person' : 'Personen';
-    const personEN = count === 1 ? 'person' : 'people';
+    const emoji = event === 'FOLLOW' ? '👉' : '👀';
+    const actionEmoji = event === 'FOLLOW' ? '✅' : '❌';
+    const action = event === 'FOLLOW'
+        ? `folgt jetzt ${targets.length} ${targets.length === 1 ? 'Person' : 'Personen'}`
+        : `folgt nicht mehr ${targets.length} ${targets.length === 1 ? 'Person' : 'Personen'}`;
 
-    // Erste Zeile: Deutsch
-    const actionDE = isFollow ? `folgt ${count} neuen ${personDE}` : `entfolgte ${count} ${personDE}`;
-    let text = `${emoji} ${profile.username} (${profile.fullName}) ${actionDE}:`;
+    let text = `${emoji} ${profile.username} (${profile.fullName}) ${action}:\n\n`;
 
-    // Zweite Zeile: Englisch
-    const actionEN = isFollow ? `now follows ${count} ${personEN}` : `unfollowed ${count} ${personEN}`;
-    text += `\n${emoji} ${profile.username} (${profile.fullName}) ${actionEN}:`;
-
-    text += '\n\n';
-
-    // Max 5 Targets anzeigen um Tweet-Länge zu respektieren
-    const displayCount = Math.min(targets.length, 5);
-    for (let i = 0; i < displayCount; i++) {
-        const target = targets[i];
-        const name = target.fullName ? ` (${target.fullName})` : '';
-        text += `${actionEmoji} ${target.username}${name}\n`;
-        text += `🔗 instagram.com/${target.username}\n`;
-        if (i < displayCount - 1) text += '\n';
+    // ALLE Targets anzeigen - Twitter erlaubt bis zu 280 Zeichen, aber Threads sind möglich
+    for (const target of targets) {
+        text += `${actionEmoji} ${target.username} (${target.fullName})\n`;
+        text += `🔗 instagram.com/${target.username}\n\n`;
     }
-
-    if (targets.length > 5) {
-        text += `\n... und ${targets.length - 5} weitere / ... and ${targets.length - 5} more`;
-    }
-
-    text += '\n\n#Instagram #FollowerWatch #Bundesliga';
 
     return text.trim();
 }
 
+const LOCK_FILE = path.join(process.cwd(), '.monitor.lock');
 
 /**
  * Pushes all screenshots and debug logs to Git
@@ -1370,7 +1262,6 @@ async function pushProgressToGit(username: string) {
         // 3. Nur committen wenn Änderungen vorhanden sind
         const status = execSync('git status --porcelain').toString();
         if (status.trim().length > 0) {
-            execSync(`git add -A`, { stdio: 'ignore' });
             execSync(`git commit -m "auto: progress update @${username}"`, { stdio: 'ignore' });
             console.log(`   🔄 Git Pull & Push...`);
             execSync(`git pull --rebase origin main && git push origin main`, { stdio: 'ignore' });
@@ -1384,71 +1275,15 @@ async function pushProgressToGit(username: string) {
 }
 
 // === MAIN ===
-/**
- * 🐦 Prüft den Twitter Login-Status für alle Accounts in der DB
- */
-async function updateTwitterStatusInDb(db: any) {
-    console.log('\n🐦 Prüfe X/Twitter Login-Status für Datenbank...');
-
-    // Hole alle Twitter Accounts
-    const accounts = await db.execute("SELECT id, username FROM TwitterAccount");
-
-    if (accounts.rows.length === 0) return;
-
-    // Wir brauchen nur EINE Session um zu prüfen ob die globale Session (Firefox Profile) noch geht
-    const result = await getTwitterContext(true);
-
-    let isLoggedIn = false;
-    if (result.success && result.page) {
-        isLoggedIn = await checkTwitterSession(result.page);
-        await closeTwitterContext(result.context!);
-    }
-
-    console.log(`   📊 Status: ${isLoggedIn ? '✅ Eingeloggt' : '❌ Login erforderlich'}`);
-
-    for (const row of accounts.rows) {
-        await db.execute({
-            sql: "UPDATE TwitterAccount SET lastLoginStatus = ?, lastStatusCheckAt = datetime('now') WHERE id = ?",
-            args: [isLoggedIn ? 1 : 0, row.id]
-        });
-        console.log(`   💾 DB aktualisiert für @${row.username}`);
-    }
-}
-
 async function main() {
     console.log('\n' + '═'.repeat(60));
     console.log(`🕵️ SMART MONITORING v4 - ${new Date().toLocaleString()}`);
     console.log('═'.repeat(60) + '\n');
 
-    // 🕒 1. RATE LIMIT COOLDOWN CHECK (2 Stunden)
-    if (fs.existsSync(RATE_LIMIT_FILE)) {
-        try {
-            const stats = fs.statSync(RATE_LIMIT_FILE);
-            const mtime = stats.mtimeMs;
-            const now = Date.now();
-            const diffHours = (now - mtime) / (1000 * 60 * 60);
-
-            if (diffHours < 1.5) {
-                const remaining = (1.5 - diffHours).toFixed(1);
-                console.log(`\n⏳ PAUSE AKTIV: Instagram blockiert uns noch (${remaining} Std. verbleibend).`);
-                console.log(`🚀 Wir warten bis die Sperre abläuft um den Account zu schützen.\n`);
-                return;
-            } else {
-                console.log('✅ Cooldown abgelaufen. Lösche Sperre...');
-                fs.unlinkSync(RATE_LIMIT_FILE);
-            }
-        } catch (e) {
-            console.log('⚠️ Fehler beim Cooldown-Check:', e);
-        }
-    }
-
     const db = createClient({
         url: process.env.TURSO_DATABASE_URL!,
         authToken: process.env.TURSO_AUTH_TOKEN!
     });
-
-    // Stelle sicher dass MonitoringLog-Tabelle existiert
-    await ensureMonitoringLogTable(db);
 
     // Stelle sicher dass MonitoringLog-Tabelle existiert
     await ensureMonitoringLogTable(db);
@@ -1477,74 +1312,70 @@ async function main() {
         timezoneId: 'Europe/Berlin'
     });
 
+    const page = await context.newPage();
+
     let createdLock = false;
     const targetUsername = process.argv[2];
 
     try {
-        // Login Check für Instagram (einmalig mit temporärer Page)
-        const checkPage = await context.newPage();
+        // Login Check für Instagram
         console.log('🌐 Prüfe Instagram Login...');
-        try {
-            await checkPage.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded' });
-            await checkPage.waitForTimeout(3000);
-            await dismissPopups(checkPage);
+        await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(3000);
+        await dismissPopups(page);
 
-            if (checkPage.url().includes('login')) {
-                console.log('⚠️ Nicht eingeloggt! Versuche Session aus .env wiederherzustellen...');
+        if (page.url().includes('login')) {
+            console.log('⚠️ Nicht eingeloggt! Versuche Session aus .env wiederherzustellen...');
 
-                const cookies = [];
-                if (process.env.INSTAGRAM_SESSION_ID) {
-                    cookies.push({
-                        name: 'sessionid',
-                        value: process.env.INSTAGRAM_SESSION_ID,
-                        domain: '.instagram.com',
-                        path: '/',
-                        secure: true,
-                        httpOnly: true
-                    });
-                }
-                if (process.env.INSTAGRAM_CSRF_TOKEN) {
-                    cookies.push({
-                        name: 'csrftoken',
-                        value: process.env.INSTAGRAM_CSRF_TOKEN,
-                        domain: '.instagram.com',
-                        path: '/',
-                        secure: true
-                    });
-                }
-                if (process.env.INSTAGRAM_DS_USER_ID) {
-                    cookies.push({
-                        name: 'ds_user_id',
-                        value: process.env.INSTAGRAM_DS_USER_ID,
-                        domain: '.instagram.com',
-                        path: '/',
-                        secure: true
-                    });
-                }
-
-                if (cookies.length > 0) {
-                    await context.addCookies(cookies);
-                    console.log(`   🍪 ${cookies.length} Cookies injiziert. Lade neu...`);
-                    await checkPage.goto('https://www.instagram.com/', { waitUntil: 'networkidle' });
-                    await checkPage.waitForTimeout(3000);
-                    await dismissPopups(checkPage);
-                }
-
-                if (checkPage.url().includes('login')) {
-                    console.log('⚠️ Cookies allein reichen nicht. Starte Auto-Login mit User/Pass...');
-                    const loginSuccess = await performLogin(checkPage);
-                    if (!loginSuccess) {
-                        console.log('❌ Auto-Login fehlgeschlagen! Bitte Session via VNC erneuern.');
-                        await checkPage.close();
-                        await context.close();
-                        return;
-                    }
-                } else {
-                    console.log('✅ Session erfolgreich via .env wiederhergestellt!');
-                }
+            const cookies = [];
+            if (process.env.INSTAGRAM_SESSION_ID) {
+                cookies.push({
+                    name: 'sessionid',
+                    value: process.env.INSTAGRAM_SESSION_ID,
+                    domain: '.instagram.com',
+                    path: '/',
+                    secure: true,
+                    httpOnly: true
+                });
             }
-        } finally {
-            await checkPage.close();
+            if (process.env.INSTAGRAM_CSRF_TOKEN) {
+                cookies.push({
+                    name: 'csrftoken',
+                    value: process.env.INSTAGRAM_CSRF_TOKEN,
+                    domain: '.instagram.com',
+                    path: '/',
+                    secure: true
+                });
+            }
+            if (process.env.INSTAGRAM_DS_USER_ID) {
+                cookies.push({
+                    name: 'ds_user_id',
+                    value: process.env.INSTAGRAM_DS_USER_ID,
+                    domain: '.instagram.com',
+                    path: '/',
+                    secure: true
+                });
+            }
+
+            if (cookies.length > 0) {
+                await context.addCookies(cookies);
+                console.log(`   🍪 ${cookies.length} Cookies injiziert. Lade neu...`);
+                await page.goto('https://www.instagram.com/', { waitUntil: 'networkidle' });
+                await page.waitForTimeout(3000);
+                await dismissPopups(page);
+            }
+
+            if (page.url().includes('login')) {
+                console.log('⚠️ Cookies allein reichen nicht. Starte Auto-Login mit User/Pass...');
+                const loginSuccess = await performLogin(page);
+                if (!loginSuccess) {
+                    console.log('❌ Auto-Login fehlgeschlagen! Bitte Session via VNC erneuern.');
+                    await context.close();
+                    return;
+                }
+            } else {
+                console.log('✅ Session erfolgreich via .env wiederhergestellt!');
+            }
         }
 
         let query = `
@@ -1563,7 +1394,6 @@ async function main() {
         } else {
             // Im Automatik-Modus: Nur aktive Sets!
             query += " AND ps.isActive = 1";
-            query += " ORDER BY lastCheckedAt ASC"; // Älteste zuerst!
 
             // LOCK-System (nur bei Full Run)
             if (fs.existsSync(LOCK_FILE)) {
@@ -1593,10 +1423,6 @@ async function main() {
         console.log(`📋 ${profiles.rows.length} Profile zu prüfen:\n`);
 
         for (const row of profiles.rows) {
-            if (globalRateLimited) {
-                console.log('\n🛑 ABBRUCH: Rate Limit global erkannt. Stoppe Monitoring-Run.');
-                break;
-            }
             const profileId = row.id as string;
             const username = row.username as string;
             const lastCount = (row.followingCount as number) || 0;
@@ -1606,40 +1432,37 @@ async function main() {
             console.log('─'.repeat(60));
             console.log(`🔍 @${username}`);
 
-            // Frische Page für jedes Profil für maximale Robustheit
-            const page = await context.newPage();
+            // 📊 DB-GESUNDHEITSCHECK: Zeige wie aktuell die DB ist
+            const dbEntries = await db.execute({
+                sql: 'SELECT COUNT(*) as cnt FROM FollowingEntry WHERE profileId = ?',
+                args: [profileId]
+            });
+            const actualDbCount = (dbEntries.rows[0]?.cnt as number) || 0;
+            const dbCoverage = lastCount > 0 ? ((actualDbCount / lastCount) * 100).toFixed(1) : '0';
 
-            try {
-                // 📊 DB-GESUNDHEITSCHECK: Zeige wie aktuell die DB ist
-                const dbEntries = await db.execute({
-                    sql: 'SELECT COUNT(*) as cnt FROM FollowingEntry WHERE profileId = ?',
-                    args: [profileId]
+            console.log(`   📊 DB-Status: ${actualDbCount} Einträge | Soll: ${lastCount} | Abdeckung: ${dbCoverage}%`);
+            console.log(`   📋 Baseline: ${isBaselineComplete ? '✅ Komplett' : '⚠️ Nicht komplett'}`);
+
+            // Warnung wenn DB-Abdeckung schlecht ist
+            if (isBaselineComplete && actualDbCount < lastCount * 0.9) {
+                console.log(`   ⚠️ WARNUNG: DB hat nur ${dbCoverage}% der erwarteten Einträge!`);
+            }
+
+            const currentCount = await getFollowingCount(page, username);
+
+            if (currentCount === null) {
+                console.log('   ⚠️ Konnte Zahl nicht lesen\n');
+                await saveMonitoringLog(db, {
+                    profileId,
+                    profileUsername: username,
+                    status: 'ERROR',
+                    followingCountLive: 0,
+                    followingCountDb: lastCount,
+                    errorMessage: 'Following-Count konnte nicht gelesen werden'
                 });
-                const actualDbCount = (dbEntries.rows[0]?.cnt as number) || 0;
-                const dbCoverage = lastCount > 0 ? ((actualDbCount / lastCount) * 100).toFixed(1) : '0';
-
-                console.log(`   📊 DB-Status: ${actualDbCount} Einträge | Soll: ${lastCount} | Abdeckung: ${dbCoverage}%`);
-                console.log(`   📋 Baseline: ${isBaselineComplete ? '✅ Komplett' : '⚠️ Nicht komplett'}`);
-
-                // Warnung wenn DB-Abdeckung schlecht ist
-                if (isBaselineComplete && actualDbCount < lastCount * 0.9) {
-                    console.log(`   ⚠️ WARNUNG: DB hat nur ${dbCoverage}% der erwarteten Einträge!`);
-                }
-
-                const currentCount = await getFollowingCount(page, username);
-
-                if (currentCount === null) {
-                    console.log('   ⚠️ Konnte Zahl nicht lesen\n');
-                    await saveMonitoringLog(db, {
-                        profileId,
-                        profileUsername: username,
-                        status: 'ERROR',
-                        followingCountLive: 0,
-                        followingCountDb: lastCount,
-                        errorMessage: 'Following-Count konnte nicht gelesen werden'
-                    });
-                    continue;
-                }
+                await pushProgressToGit(username);
+                continue;
+            }
 
             console.log(`   📡 Live: ${currentCount} Following`);
 
@@ -1720,11 +1543,36 @@ async function main() {
                 scrapeQuote = currentCount > 0 ? ((currentFollowing.length / currentCount) * 100).toFixed(1) : '100';
                 console.log(`   📈 Scraping-Quote: ${currentFollowing.length}/${currentCount} (${scrapeQuote}%)`);
 
-                // ════════════════════════════════════════════════════════════
-                // 🔄 MERGE-BASIERTE BASELINE: Partielle Ergebnisse ergänzen
-                // ════════════════════════════════════════════════════════════
-                // Statt 95%-Abbruch: Jedes Ergebnis wird gemergt.
-                // Scrape 1: A,B,C,D (93%) + Scrape 2: A,B,E,F (92%) = DB: A,B,C,D,E,F (≈99%)
+                // ⚠️ KRITISCH: Wenn weniger als 95% gescrapt, keine Changes verarbeiten!
+                // Wir brauchen 95% um zuverlässig Änderungen zu identifizieren
+                const MIN_SCRAPE_QUOTA = 0.95;
+                if (currentFollowing.length < currentCount * MIN_SCRAPE_QUOTA) {
+                    console.log(`   🚫 ABBRUCH: Nur ${scrapeQuote}% gescrapt (benötigt 95%)`);
+
+                    // 📸 Screenshot vom Abbruch-Zustand
+                    const abortPath = `${DEBUG_DIR}/scrape-abort-${username}-${Date.now()}.png`;
+                    await page.screenshot({ path: abortPath });
+                    await pushDebugScreenshot(abortPath, `debug: scrape abort ${scrapeQuote}% - @${username}`);
+
+                    await saveMonitoringLog(db, {
+                        profileId,
+                        profileUsername: username,
+                        status: 'PARTIAL',
+                        followingCountLive: currentCount,
+                        followingCountDb: lastCount,
+                        scrapedCount: currentFollowing.length,
+                        scrapeQuote: parseFloat(scrapeQuote),
+                        errorMessage: `Nur ${scrapeQuote}% gescrapt, benötigt 95%`
+                    });
+                    await db.execute({
+                        sql: `UPDATE MonitoredProfile SET lastCheckedAt = datetime('now') WHERE id = ?`,
+                        args: [profileId]
+                    });
+                    await humanDelay(10000, 15000);
+                    continue;
+                }
+
+
 
                 if (currentFollowing.length > 0) {
                     const oldRows = await db.execute({
@@ -1733,155 +1581,109 @@ async function main() {
                     });
                     const oldFollowing = new Set(oldRows.rows.map(r => r.username as string));
 
-                    // Finde User, die im Scrape sind aber NICHT in der DB
-                    const newlyDiscovered = currentFollowing.filter(u => !oldFollowing.has(u));
-                    // Finde User, die in der DB sind aber NICHT im Scrape
-                    const missingFromScrape = Array.from(oldFollowing).filter(u => !currentFollowing.includes(u));
+                    addedUsernames = currentFollowing.filter(u => !oldFollowing.has(u));
+                    removedUsernames = Array.from(oldFollowing).filter(u => !currentFollowing.includes(u));
 
-                    console.log(`   📊 DB: ${oldFollowing.size} | Scrape: ${currentFollowing.length} | Neu entdeckt: ${newlyDiscovered.length} | Nicht im Scrape: ${missingFromScrape.length}`);
+                    console.log(`   ➕ Neu: ${addedUsernames.length} | ➖ Entfolgt: ${removedUsernames.length}`);
 
-                    // === BASELINE NOCH NICHT KOMPLETT ===
-                    if (!isBaselineComplete) {
-                        console.log(`\n   🔄 BASELINE AUFBAU (Merge-Modus)...`);
+                    // 🛡️ SANITY CHECK: Wenn DB viel weniger hat als gescrapt → Baseline ist korrupt
+                    // Beispiel: DB hat 80, gescrapt 176 → 96 "neue" wäre falsch!
+                    // Regel: Wenn DB < 80% von gescrapt UND "neue" > erwartete Änderung × 3 → Baseline neu
+                    const expectedChange = Math.abs(currentCount - lastCount);
+                    const dbCoveragePercent = (oldFollowing.size / currentFollowing.length) * 100;
+                    const isSuspiciouslyManyNew = addedUsernames.length > Math.max(expectedChange * 3, 20);
+
+                    if (isBaselineComplete && dbCoveragePercent < 80 && isSuspiciouslyManyNew) {
+                        console.log(`\n   ⚠️ BASELINE KORRUPT ERKANNT!`);
+                        console.log(`      DB: ${oldFollowing.size} | Gescrapt: ${currentFollowing.length} (${dbCoveragePercent.toFixed(1)}% Abdeckung)`);
+                        console.log(`      "Neue": ${addedUsernames.length} aber erwartete Änderung nur ${expectedChange}`);
+                        console.log(`      → Behandle als neue Baseline, keine Changes melden!`);
+                        // Setze Flag um Baseline-Logik zu triggern
+                        // (Der Code unten prüft !isBaselineComplete, daher lokale Variable überschreiben)
+                    }
+
+                    // Korrigiere lokale Variable wenn Baseline korrupt
+                    const needsBaselineRebuild = !isBaselineComplete || (dbCoveragePercent < 80 && isSuspiciouslyManyNew);
+
+                    // === BASELINE NICHT KOMPLETT: Erst Baseline erstellen ===
+                    if (needsBaselineRebuild) {
+                        console.log(`\n   🆕 BASELINE WIRD NEU ERSTELLT...`);
                         console.log(`      Bisherige Einträge in DB: ${oldFollowing.size}`);
-                        console.log(`      Neu entdeckt in diesem Scrape: ${newlyDiscovered.length}`);
+                        console.log(`      Gescrapt: ${currentFollowing.length}`);
 
-                        // Nur NEUE User hinzufügen (bestehende behalten!)
-                        if (newlyDiscovered.length > 0) {
-                            let addedCount = 0;
-                            for (const uname of newlyDiscovered) {
+                        // Lösche alte Einträge und ersetze mit vollständigem Scrape
+                        await db.execute({
+                            sql: "DELETE FROM FollowingEntry WHERE profileId = ?",
+                            args: [profileId]
+                        });
+
+                        // Batch-Insert für bessere Performance
+                        const batchSize = 50;
+                        for (let batch = 0; batch < Math.ceil(currentFollowing.length / batchSize); batch++) {
+                            const start = batch * batchSize;
+                            const end = Math.min(start + batchSize, currentFollowing.length);
+
+                            for (let i = start; i < end; i++) {
+                                const uname = currentFollowing[i];
                                 const pPic = userPicMap.get(uname) || null;
-                                try {
-                                    await db.execute({
-                                        sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
-                                              VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
-                                        args: [`v4_${Date.now()}_${addedCount}`, uname, oldFollowing.size + addedCount, profileId, pPic]
-                                    });
-                                    addedCount++;
-                                } catch (e: any) {
-                                    // Duplikat ignorieren
-                                    if (!e.message?.includes('UNIQUE')) {
-                                        console.log(`      ⚠️ Fehler beim Einfügen von ${uname}: ${e.message}`);
-                                    }
-                                }
+                                await db.execute({
+                                    sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
+                                          VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
+                                    args: [`v4_${Date.now()}_${i}`, uname, i, profileId, pPic]
+                                });
                             }
-                            console.log(`      💾 ${addedCount} neue User zur DB hinzugefügt`);
+                            console.log(`      💾 Batch ${batch + 1}: ${end}/${currentFollowing.length} gespeichert`);
                         }
 
-                        // Prüfe: Haben wir jetzt 100%?
-                        const newDbCount = oldFollowing.size + newlyDiscovered.length;
-                        const completionPercent = currentCount > 0 ? ((newDbCount / currentCount) * 100).toFixed(1) : '100';
-                        console.log(`      📊 DB-Fortschritt: ${newDbCount}/${currentCount} (${completionPercent}%)`);
+                        // Profilinfos holen (inkl. Profilbild)
+                        const baselineProfileInfo = await getProfileInfo(page, username, false);
 
-                        if (newDbCount >= currentCount) {
-                            // 🎉 100% erreicht!
-                            console.log(`      🎉 BASELINE KOMPLETT! 100% erreicht!`);
+                        // Markiere als Baseline-complete + speichere Zeitpunkt + Profilinfos
+                        await db.execute({
+                            sql: `UPDATE MonitoredProfile SET 
+                                  followingCount = ?, 
+                                  followerCount = ?,
+                                  lastCheckedAt = datetime('now'),
+                                  isBaselineComplete = 1,
+                                  baselineCreatedAt = datetime('now'),
+                                  baselineFollowingCount = ?,
+                                  profilePicUrl = ?,
+                                  fullName = ?,
+                                  isVerified = ?,
+                                  lastSuccessfulScrapeAt = datetime('now')
+                                  WHERE id = ?`,
+                            args: [
+                                currentFollowing.length, // FIX: Nehme IMMER die echte Anzahl, nicht den Instagram-Header!
+                                parseInt(baselineProfileInfo?.followerCount.replace(/[.,KMB]/g, '') || '0'),
+                                currentFollowing.length,
+                                baselineProfileInfo?.profilePicUrl || null,
+                                baselineProfileInfo?.fullName || username,
+                                baselineProfileInfo?.isVerified ? 1 : 0,
+                                profileId
+                            ]
+                        });
 
-                            const baselineProfileInfo = await getProfileInfo(page, username, false);
-                            await db.execute({
-                                sql: `UPDATE MonitoredProfile SET 
-                                      followingCount = ?, 
-                                      followerCount = ?,
-                                      lastCheckedAt = datetime('now'),
-                                      isBaselineComplete = 1,
-                                      baselineCreatedAt = datetime('now'),
-                                      baselineFollowingCount = ?,
-                                      profilePicUrl = ?,
-                                      fullName = ?,
-                                      isVerified = ?,
-                                      lastSuccessfulScrapeAt = datetime('now')
-                                      WHERE id = ?`,
-                                args: [
-                                    currentCount,
-                                    parseInt(baselineProfileInfo?.followerCount.replace(/[.,KMB]/g, '') || '0'),
-                                    currentCount,
-                                    baselineProfileInfo?.profilePicUrl || null,
-                                    baselineProfileInfo?.fullName || username,
-                                    baselineProfileInfo?.isVerified ? 1 : 0,
-                                    profileId
-                                ]
-                            });
+                        console.log(`   ✅ Baseline erstellt (${currentFollowing.length} Einträge) - KEINE Changes gemeldet`);
+                        console.log(`   ℹ️ Ab jetzt werden Änderungen erkannt!\n`);
 
-                            console.log(`   ✅ Baseline komplett (${newDbCount} Einträge) - Ab jetzt werden Änderungen erkannt!`);
-                        } else {
-                            // Noch nicht 100% - weiter aufbauen
-                            console.log(`      ⏳ Noch nicht komplett. Fehlende User werden beim nächsten Scrape ergänzt.`);
-
-                            await db.execute({
-                                sql: `UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now'), lastSuccessfulScrapeAt = datetime('now') WHERE id = ?`,
-                                args: [currentCount, profileId]
-                            });
-                        }
-
+                        // 📊 Log: SUCCESS (Baseline)
                         await saveMonitoringLog(db, {
                             profileId,
                             profileUsername: username,
-                            status: newDbCount >= currentCount ? 'SUCCESS' : 'PARTIAL',
+                            status: 'SUCCESS',
                             followingCountLive: currentCount,
                             followingCountDb: lastCount,
                             followerCountLive: followerNum,
                             scrapedCount: currentFollowing.length,
                             scrapeQuote: parseFloat(scrapeQuote),
-                            newFollowsCount: newlyDiscovered.length,
-                            unfollowsCount: 0,
-                            errorMessage: `Baseline: ${newDbCount}/${currentCount} (${completionPercent}%)`
+                            newFollowsCount: addedUsernames.length,
+                            unfollowsCount: removedUsernames.length,
+                            errorMessage: 'Initial Baseline erstellt'
                         });
 
                         await humanDelay(10000, 15000);
                         continue; // Zum nächsten Profil!
                     }
-
-                    // === BASELINE KOMPLETT: Echte Changes erkennen ===
-                    addedUsernames = newlyDiscovered;
-                    removedUsernames = missingFromScrape;
-
-                    // 🛡️ SANITY CHECK: Zu viele "Änderungen" = wahrscheinlich Scrape-Problem
-                    const expectedChange = Math.abs(currentCount - lastCount);
-                    const isSuspiciouslyManyChanges = (addedUsernames.length + removedUsernames.length) > Math.max(expectedChange * 3, 20);
-                    const scrapeRatio = currentFollowing.length / currentCount;
-
-                    if (isSuspiciouslyManyChanges && scrapeRatio < 0.95) {
-                        console.log(`\n   ⚠️ VERDÄCHTIGER SCRAPE: ${addedUsernames.length} neu + ${removedUsernames.length} entfernt bei ${(scrapeRatio * 100).toFixed(1)}% Scrape-Quote`);
-                        console.log(`      → Nur ${scrapeQuote}% gescrapt - Merge statt Change-Detection!`);
-
-                        // Merge: Neue User hinzufügen, aber keine "Entfernungen" melden
-                        if (newlyDiscovered.length > 0) {
-                            let addedCount = 0;
-                            for (const uname of newlyDiscovered) {
-                                const pPic = userPicMap.get(uname) || null;
-                                try {
-                                    await db.execute({
-                                        sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
-                                              VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
-                                        args: [`v4_${Date.now()}_${addedCount}`, uname, oldFollowing.size + addedCount, profileId, pPic]
-                                    });
-                                    addedCount++;
-                                } catch { }
-                            }
-                            console.log(`      💾 ${addedCount} neue User gemergt (keine Changes gemeldet)`);
-                        }
-
-                        await db.execute({
-                            sql: `UPDATE MonitoredProfile SET followingCount = ?, lastCheckedAt = datetime('now') WHERE id = ?`,
-                            args: [currentCount, profileId]
-                        });
-
-                        await saveMonitoringLog(db, {
-                            profileId,
-                            profileUsername: username,
-                            status: 'PARTIAL',
-                            followingCountLive: currentCount,
-                            followingCountDb: lastCount,
-                            scrapedCount: currentFollowing.length,
-                            scrapeQuote: parseFloat(scrapeQuote),
-                            errorMessage: `Verdächtiger Scrape: ${scrapeQuote}% - Merge statt Changes`
-                        });
-
-                        await humanDelay(10000, 15000);
-                        continue;
-                    }
-
-                    console.log(`   ➕ Neu: ${addedUsernames.length} | ➖ Entfolgt: ${removedUsernames.length}`);
 
                     // === ECHTER CHANGE: Profilinfos laden und tweeten ===
                     if (addedUsernames.length > 0 || removedUsernames.length > 0) {
@@ -1908,8 +1710,10 @@ async function main() {
                             if (addedProfiles.length > 0) {
                                 const tweetText = formatTweetText('FOLLOW', monitoredProfileInfo, addedProfiles);
 
-                                // Screenshot: Immer Monitor-Screenshot (morewatchez)
-                                const screenshotToUse = monitoredProfileInfo.screenshotPath;
+                                // Screenshot: Bei 1 Target -> Target-Screenshot, sonst Monitor-Screenshot
+                                const screenshotToUse = addedProfiles.length === 1 && addedProfiles[0].screenshotPath
+                                    ? addedProfiles[0].screenshotPath
+                                    : monitoredProfileInfo.screenshotPath;
 
                                 const tweetUrl = await postToTwitter(
                                     context.browser()!,
@@ -1942,7 +1746,7 @@ async function main() {
                                 for (const target of addedProfiles) {
                                     await db.execute({
                                         sql: `INSERT INTO ChangeEvent (id, type, targetUsername, targetFullName, targetPicUrl, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
-                                              VALUES (?, 'FOLLOW', ?, ?, ?, ?, datetime('now'), 1, 1, ?)`,
+                                              VALUES (?, 'FOLLOW', ?, ?, ?, ?, datetime('now'), 1, 0, ?)`,
                                         args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, target.fullName || null, target.profilePicUrl || null, changeScreenshotUrl, profileId]
                                     });
                                 }
@@ -1964,8 +1768,7 @@ async function main() {
 
                             if (removedProfiles.length > 0) {
                                 const tweetText = formatTweetText('UNFOLLOW', monitoredProfileInfo, removedProfiles);
-                                // Screenshot: Immer Monitor-Screenshot
-                                const unfollowScreenshot = monitoredProfileInfo.screenshotPath;
+                                const unfollowScreenshot = removedProfiles[0]?.screenshotPath || monitoredProfileInfo.screenshotPath;
 
                                 const tweetUrl = await postToTwitter(
                                     context.browser()!,
@@ -1998,37 +1801,26 @@ async function main() {
                                 for (const target of removedProfiles) {
                                     await db.execute({
                                         sql: `INSERT INTO ChangeEvent (id, type, targetUsername, targetFullName, targetPicUrl, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
-                                              VALUES (?, 'UNFOLLOW', ?, ?, ?, ?, datetime('now'), 1, 1, ?)`,
+                                              VALUES (?, 'UNFOLLOW', ?, ?, ?, ?, datetime('now'), 1, 0, ?)`,
                                         args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, target.fullName || null, target.profilePicUrl || null, changeScreenshotUrl, profileId]
                                     });
                                 }
                             }
                         }
 
-                        // DB aktualisieren (Merge: Neue hinzufügen, Entfolgte entfernen)
-                        console.log('\n   💾 Aktualisiere Datenbank (Merge)...');
+                        // DB aktualisieren
+                        console.log('\n   💾 Aktualisiere Datenbank...');
+                        await db.execute({ sql: "DELETE FROM FollowingEntry WHERE profileId = ?", args: [profileId] });
 
-                        // Neue User hinzufügen
-                        for (const uname of addedUsernames) {
+                        for (let i = 0; i < currentFollowing.length; i++) {
+                            const uname = currentFollowing[i];
                             const pPic = userPicMap.get(uname) || null;
-                            try {
-                                await db.execute({
-                                    sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
-                                          VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
-                                    args: [`v4_${Date.now()}_${Math.random().toString(36).slice(2)}`, uname, 0, profileId, pPic]
-                                });
-                            } catch { }
-                        }
-
-                        // Entfolgte User entfernen
-                        for (const uname of removedUsernames) {
                             await db.execute({
-                                sql: `DELETE FROM FollowingEntry WHERE profileId = ? AND username = ?`,
-                                args: [profileId, uname]
+                                sql: `INSERT INTO FollowingEntry (id, username, position, profileId, profilePicUrl, addedAt, lastSeenAt, missedScans) 
+                                      VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0)`,
+                                args: [`v4_${Date.now()}_${i}`, uname, i, profileId, pPic]
                             });
                         }
-
-                        console.log(`      ➕ ${addedUsernames.length} hinzugefügt, ➖ ${removedUsernames.length} entfernt`);
 
                         // Aktualisiere auch Profilinfos
                         await db.execute({
@@ -2115,29 +1907,12 @@ async function main() {
                 }
             }
 
-            } catch (err: any) {
-                console.log(`   ❌ Fehler bei @${username}: ${err.message}`);
-                await saveMonitoringLog(db, {
-                    profileId,
-                    profileUsername: username,
-                    status: 'ERROR',
-                    followingCountLive: 0,
-                    followingCountDb: lastCount,
-                    errorMessage: `Loop-Error: ${err.message}`
-                });
-            } finally {
-                await page.close().catch(() => { });
-                // Push progress at the end of each profile if you want, 
-                // but maybe only if changes occurred? For now, I'll keep it disabled for speed.
-                // await pushProgressToGit(username);
-            }
+            // 📤 Nach jedem Profil: Screenshots und Debug-Bilder zu Git pushen
+            await pushProgressToGit(username);
 
             console.log('');
             await humanDelay(10000, 15000);
         }
-
-        // Globaler Push am Ende
-        await pushProgressToGit("final_sync");
 
         await context.storageState({ path: SESSION_PATH });
         console.log('💾 Instagram Session gespeichert');
