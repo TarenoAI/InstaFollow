@@ -72,15 +72,12 @@ function formatGroupedTweet(group: GroupedEvent): string {
     const actionEN = isFollow ? `now follows ${count} ${personEN}` : `unfollowed ${count} ${personEN}`;
     const actionEmoji = isFollow ? '➕' : '❌';
 
-    const monitorName = group.monitoredFullName || group.monitoredUsername;
-
     const targetLines = group.targets.map(t => {
-        const name = t.fullName ? ` (${t.fullName})` : '';
-        return `${actionEmoji} ${t.username}${name}\n🔗 instagram.com/${t.username}`;
+        return `${actionEmoji} @${t.username}\n🔗 instagram.com/${t.username}`;
     }).join('\n\n');
 
-    return `${emoji} ${group.monitoredUsername} (${monitorName}) ${actionDE}:
-${emoji} ${group.monitoredUsername} ${actionEN}:
+    return `${emoji} @${group.monitoredUsername} ${actionDE}:
+${emoji} @${group.monitoredUsername} ${actionEN}:
 
 ${targetLines}
 

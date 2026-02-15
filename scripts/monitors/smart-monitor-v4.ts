@@ -1320,11 +1320,11 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
 
     // Erste Zeile: Deutsch
     const actionDE = isFollow ? `folgt ${count} neuen ${personDE}` : `entfolgte ${count} ${personDE}`;
-    let text = `${emoji} ${profile.username} (${profile.fullName}) ${actionDE}:`;
+    let text = `${emoji} @${profile.username} ${actionDE}:`;
 
     // Zweite Zeile: Englisch
     const actionEN = isFollow ? `now follows ${count} ${personEN}` : `unfollowed ${count} ${personEN}`;
-    text += `\n${emoji} ${profile.username} (${profile.fullName}) ${actionEN}:`;
+    text += `\n${emoji} @${profile.username} ${actionEN}:`;
 
     text += '\n\n';
 
@@ -1332,8 +1332,7 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
     const displayCount = Math.min(targets.length, 5);
     for (let i = 0; i < displayCount; i++) {
         const target = targets[i];
-        const name = target.fullName ? ` (${target.fullName})` : '';
-        text += `${actionEmoji} ${target.username}${name}\n`;
+        text += `${actionEmoji} @${target.username}\n`;
         text += `🔗 instagram.com/${target.username}\n`;
         if (i < displayCount - 1) text += '\n';
     }
