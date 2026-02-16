@@ -1328,7 +1328,7 @@ async function sendWebhook(payload: WebhookPayload) {
  */
 function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, targets: ProfileInfo[]): string {
     const isFollow = event === 'FOLLOW';
-    const alertEmoji = isFollow ? '🚨 NEUER FOLLOW ALERT 🚨' : '👀 UNFOLLOW ALERT 👀';
+    const alertEmoji = isFollow ? '🚨 ⚽️ NEUER FOLLOW ALERT ⚽️ 🚨' : '👀 UNFOLLOW ALERT 👀';
     const actionEmoji = isFollow ? '✅' : '❌';
     const count = targets.length;
 
@@ -1343,19 +1343,13 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
     
     text += '\n';
 
-    // Max 5 Targets anzeigen
-    const displayCount = Math.min(targets.length, 5);
-    for (let i = 0; i < displayCount; i++) {
-        const target = targets[i];
+    // Zeige alle Targets an (Twitter-Limit beachten, meist passen bis zu 15)
+    for (const target of targets) {
         const verifiedBadge = target.isVerified ? ' 🔹' : '';
         text += `${actionEmoji} @${target.username}${verifiedBadge}\n`;
     }
 
-    if (targets.length > 5) {
-        text += `\n... und ${targets.length - 5} weitere`;
-    }
-
-    text += '\n\n#Bundesliga #Instagram #FollowerWatch ⚽️🚀';
+    text += '\n#Bundesliga #Instagram #FollowerWatch ⚽️🚀';
 
     return text.trim();
 }
