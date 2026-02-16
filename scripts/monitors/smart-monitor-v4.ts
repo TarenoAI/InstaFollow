@@ -1312,19 +1312,19 @@ async function sendWebhook(payload: WebhookPayload) {
  */
 function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, targets: ProfileInfo[]): string {
     const isFollow = event === 'FOLLOW';
-    const emoji = isFollow ? '✅' : '👀';
-    const actionEmoji = isFollow ? '➕' : '❌';
+    const headerEmoji = isFollow ? '⚽️' : '👀';
+    const actionEmoji = isFollow ? '➕' : '➖';
     const count = targets.length;
     const personDE = count === 1 ? 'Person' : 'Personen';
     const personEN = count === 1 ? 'person' : 'people';
 
     // Erste Zeile: Deutsch
-    const actionDE = isFollow ? `folgt ${count} neuen ${personDE}` : `entfolgte ${count} ${personDE}`;
-    let text = `${emoji} @${profile.username} ${actionDE}:`;
+    const actionDE = isFollow ? `folgt ${count} neuen ${personDE}` : `folgt ${count} ${personDE} nicht mehr`;
+    let text = `${headerEmoji} @${profile.username} ${actionDE}:`;
 
     // Zweite Zeile: Englisch
     const actionEN = isFollow ? `now follows ${count} ${personEN}` : `unfollowed ${count} ${personEN}`;
-    text += `\n${emoji} @${profile.username} ${actionEN}:`;
+    text += `\n${headerEmoji} @${profile.username} ${actionEN}:`;
 
     text += '\n\n';
 
@@ -1332,7 +1332,8 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
     const displayCount = Math.min(targets.length, 5);
     for (let i = 0; i < displayCount; i++) {
         const target = targets[i];
-        text += `${actionEmoji} @${target.username}\n`;
+        const verifiedEmoji = target.isVerified ? ' 🔹' : '';
+        text += `${actionEmoji} @${target.username}${verifiedEmoji}\n`;
         text += `🔗 instagram.com/${target.username}\n`;
         if (i < displayCount - 1) text += '\n';
     }
@@ -1341,7 +1342,7 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
         text += `\n... und ${targets.length - 5} weitere / ... and ${targets.length - 5} more`;
     }
 
-    text += '\n\n#Instagram #FollowerWatch #Bundesliga';
+    text += '\n\n#Bundesliga #Instagram #FollowerWatch ⚽️🚀';
 
     return text.trim();
 }
