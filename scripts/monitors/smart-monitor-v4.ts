@@ -335,43 +335,44 @@ async function dismissPopups(page: Page): Promise<boolean> {
     if (isBlocked) return true;
 
     const selectors = [
-        // Cookie consent
+        // Cookie consent (Highest Priority)
         'button:has-text("Alle akzeptieren")',
         'button:has-text("Allow all cookies")',
         'button:has-text("Accept All")',
+        'button:has-text("Erforderliche und optionale Cookies erlauben")',
+        'button:has-text("Nur erforderliche Cookies erlauben")',
+        
+        // Save login info popup
+        'button:has-text("Informationen speichern")',
+        'button:has-text("Save Info")',
+        'button:has-text("Jetzt speichern")',
+        
         // "Not Now" buttons  
         'button:has-text("Jetzt nicht")',
         'button:has-text("Not Now")',
         'button:has-text("Nicht jetzt")',
-        // Save login info popup
-        'button:has-text("Informationen speichern")',
-        'button:has-text("Save Info")',
-        'button:has-text("Informationen nicht speichern")',
-        'button:has-text("Not now")',
-        // Turn on notifications
+        'button:has-text("Abbrechen")',
+        
+        // Notifications
         'button:has-text("Nicht aktivieren")',
-        'button:has-text("Not Now")',
-        'button:has-text("Jetzt nicht")',
-        // Close buttons (X icons)
+        
+        // Generic Close buttons (X icons)
         '[aria-label="Schließen"]',
         '[aria-label="Close"]',
         'svg[aria-label="Schließen"]',
         'svg[aria-label="Close"]',
-        // Cancel/Dismiss
-        'button:has-text("Abbrechen")',
-        'button:has-text("Cancel")',
+        
         // RATE LIMIT POPUP - "Versuche es später noch einmal"
         'button:has-text("OK")',
         'button:has-text("Ok")',
         'button:has-text("Bestätigen")',
+        
         // "View profile in app" popup - X button at top right
         'div[role="dialog"] button[type="button"]',
         'div[role="dialog"] svg[aria-label="Schließen"]',
         'div[role="dialog"] svg[aria-label="Close"]',
-        // The X button specifically
         'button svg[aria-label="Schließen"]',
         'button svg[aria-label="Close"]',
-        // Problem melden link (nicht klicken, aber OK daneben)
     ];
 
     // Vorab-Check auf Rate Limit
