@@ -342,12 +342,14 @@ async function dismissPopups(page: Page): Promise<boolean> {
         'button:has-text("Erforderliche und optionale Cookies erlauben")',
         'button:has-text("Nur erforderliche Cookies erlauben")',
         'button:has-text("Alle Cookies erlauben")',
+        'button:has-text("Alle Cookie erlauben")',
         
         // 2. Save login info popup ("Info speichern")
         'button:has-text("Informationen speichern")',
         'button:has-text("Save Info")',
         'button:has-text("Jetzt speichern")',
         'button:has-text("Info speichern")',
+        'button:has-text("Anmeldeinformationen speichern")',
         
         // 3. Notifications ("Not now")
         'button:has-text("Nicht aktivieren")',
