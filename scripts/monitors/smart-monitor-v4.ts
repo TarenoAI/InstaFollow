@@ -1312,7 +1312,7 @@ async function sendWebhook(payload: WebhookPayload) {
  */
 function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, targets: ProfileInfo[]): string {
     const isFollow = event === 'FOLLOW';
-    const alertEmoji = isFollow ? '🚨 NEW FOLLOW ALERT 🚨' : '👀 UNFOLLOW ALERT 👀';
+    const alertEmoji = isFollow ? '🚨 NEUER FOLLOW ALERT 🚨' : '👀 UNFOLLOW ALERT 👀';
     const actionEmoji = isFollow ? '✅' : '❌';
     const count = targets.length;
 
@@ -1320,9 +1320,9 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
     text += `👤 @${profile.username}\n`;
     
     if (isFollow) {
-        text += count === 1 ? 'is now following:\n' : `is now following ${count} accounts:\n`;
+        text += count === 1 ? 'folgt jetzt neu:\n' : `folgt jetzt ${count} neuen Accounts:\n`;
     } else {
-        text += count === 1 ? 'unfollowed:\n' : `unfollowed ${count} accounts:\n`;
+        text += count === 1 ? 'folgt nicht mehr:\n' : `folgt ${count} Accounts nicht mehr:\n`;
     }
     
     text += '\n';
@@ -1333,11 +1333,10 @@ function formatTweetText(event: 'FOLLOW' | 'UNFOLLOW', profile: ProfileInfo, tar
         const target = targets[i];
         const verifiedBadge = target.isVerified ? ' 🔹' : '';
         text += `${actionEmoji} @${target.username}${verifiedBadge}\n`;
-        // text += `🔗 instagram.com/${target.username}\n`;
     }
 
     if (targets.length > 5) {
-        text += `\n... and ${targets.length - 5} more`;
+        text += `\n... und ${targets.length - 5} weitere`;
     }
 
     text += '\n\n#Bundesliga #Instagram #FollowerWatch ⚽️🚀';
