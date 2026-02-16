@@ -17,7 +17,8 @@ import { addToQueue } from '../lib/twitter-queue';
 import { getTwitterContext, closeTwitterContext, checkTwitterSession } from '../lib/twitter-auto-login';
 
 // === KONFIGURATION ===
-const SESSION_PATH = path.join(process.cwd(), 'data/sessions/playwright-session.json');
+const SESSION_PATH_1 = path.join(process.cwd(), 'data/sessions/playwright-session.json');
+const SESSION_PATH_2 = path.join(process.cwd(), 'data/sessions/instagram_2.json');
 const TWITTER_SESSION_PATH = path.join(process.cwd(), 'data/sessions/twitter-session.json');
 const SCREENSHOTS_DIR = path.join(process.cwd(), 'public/screenshots');
 const DEBUG_DIR = path.join(process.cwd(), 'public/debug');
@@ -26,10 +27,15 @@ const iPhone = devices['iPhone 13 Pro'];
 
 const LOCK_FILE = path.join(process.cwd(), '.monitor.lock');
 const RATE_LIMIT_FILE = path.join(process.cwd(), '.rate_limit.lock');
+const RATE_LIMIT_FILE_2 = path.join(process.cwd(), '.rate_limit_2.lock');
+let currentRateLimitLock = RATE_LIMIT_FILE;
 let globalRateLimited = false;
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 const TWITTER_USERNAME = process.env.TWITTER_USERNAME;
 const TWITTER_PASSWORD = process.env.TWITTER_PASSWORD;
+
+const BROWSER_PROFILE_DIR_1 = path.join(process.cwd(), 'data/browser-profiles/instagram');
+const BROWSER_PROFILE_DIR_2 = path.join(process.cwd(), 'data/browser-profiles/instagram_2');
 
 // Erstelle Ordner
 if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
@@ -304,7 +310,7 @@ async function checkForRateLimit(page: Page): Promise<boolean> {
             if (bodyText.includes(text)) {
                 console.log(`\n🚨 RATE LIMIT ERKANNT! Message: "${text}"`);
                 // Erstelle Lock-Datei für 2 Stunden Pause
-                fs.writeFileSync(RATE_LIMIT_FILE, Date.now().toString());
+                fs.writeFileSync(currentRateLimitLock, Date.now().toString());
                 globalRateLimited = true;
                 return true;
             }
@@ -374,7 +380,7 @@ async function dismissPopups(page: Page): Promise<boolean> {
 
                     if (popupText.includes('Versuche es später') || popupText.includes('Try again later')) {
                         console.log(`\n🚨 RATE LIMIT ERKANNT: Setze 2 Std. Pause und breche ab...`);
-                        fs.writeFileSync(RATE_LIMIT_FILE, Date.now().toString());
+                        fs.writeFileSync(currentRateLimitLock, Date.now().toString());
                         globalRateLimited = true;
                         await btn.click({ force: true });
                         await page.waitForTimeout(500);
@@ -1417,27 +1423,44 @@ async function main() {
     console.log(`🕵️ SMART MONITORING v4 - ${new Date().toLocaleString()}`);
     console.log('═'.repeat(60) + '\n');
 
-    // 🕒 1. RATE LIMIT COOLDOWN CHECK (2 Stunden)
-    if (fs.existsSync(RATE_LIMIT_FILE)) {
-        try {
-            const stats = fs.statSync(RATE_LIMIT_FILE);
-            const mtime = stats.mtimeMs;
-            const now = Date.now();
-            const diffHours = (now - mtime) / (1000 * 60 * 60);
+    // 🕒 1. ACCOUNT SELECTION & RATE LIMIT CHECK
+    const accounts = [
+        { id: 1, name: process.env.INSTAGRAM_USERNAME, pass: process.env.INSTAGRAM_PASSWORD, profile: BROWSER_PROFILE_DIR_1, session: SESSION_PATH_1, lock: RATE_LIMIT_FILE },
+        { id: 2, name: process.env.INSTAGRAM_USERNAME_2, pass: process.env.INSTAGRAM_PASSWORD_2, profile: BROWSER_PROFILE_DIR_2, session: SESSION_PATH_2, lock: RATE_LIMIT_FILE_2 }
+    ];
+
+    let activeAccount = null;
+    let skipReasons: string[] = [];
+
+    for (const acc of accounts) {
+        if (!acc.name) continue;
+
+        if (fs.existsSync(acc.lock)) {
+            const stats = fs.statSync(acc.lock);
+            const diffHours = (Date.now() - stats.mtimeMs) / (1000 * 60 * 60);
 
             if (diffHours < 1.5) {
                 const remaining = (1.5 - diffHours).toFixed(1);
-                console.log(`\n⏳ PAUSE AKTIV: Instagram blockiert uns noch (${remaining} Std. verbleibend).`);
-                console.log(`🚀 Wir warten bis die Sperre abläuft um den Account zu schützen.\n`);
-                return;
+                skipReasons.push(`Account ${acc.name} pausiert (${remaining} Std. verbleibend).`);
+                continue;
             } else {
-                console.log('✅ Cooldown abgelaufen. Lösche Sperre...');
-                fs.unlinkSync(RATE_LIMIT_FILE);
+                console.log(`✅ Cooldown für ${acc.name} abgelaufen. Lösche Sperre...`);
+                fs.unlinkSync(acc.lock);
             }
-        } catch (e) {
-            console.log('⚠️ Fehler beim Cooldown-Check:', e);
         }
+        activeAccount = acc;
+        break;
     }
+
+    if (!activeAccount) {
+        console.log('\n⏳ ALLE ACCOUNTS PAUSIERT:');
+        skipReasons.forEach(r => console.log(`   - ${r}`));
+        console.log(`🚀 Wir warten bis die Sperren ablaufen.\n`);
+        return;
+    }
+
+    console.log(`🚀 Aktiver Scraper-Account: @${activeAccount.name}`);
+    currentRateLimitLock = activeAccount.lock;
 
     const db = createClient({
         url: process.env.TURSO_DATABASE_URL!,
@@ -1452,16 +1475,15 @@ async function main() {
 
     // Nutze PERSISTENT CONTEXT für langlebige Sessions
     // Speichert alles: Cookies, LocalStorage, IndexedDB, Cache, etc.
-    const BROWSER_PROFILE_DIR = path.join(process.cwd(), 'data/browser-profiles/instagram');
 
     // Erstelle Profil-Ordner wenn nicht vorhanden
-    if (!fs.existsSync(BROWSER_PROFILE_DIR)) {
-        fs.mkdirSync(BROWSER_PROFILE_DIR, { recursive: true });
+    if (!fs.existsSync(activeAccount.profile)) {
+        fs.mkdirSync(activeAccount.profile, { recursive: true });
     }
 
     console.log('🌐 Starte Browser mit persistentem Profil...');
 
-    const context = await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, {
+    const context = await chromium.launchPersistentContext(activeAccount.profile, {
         headless: true,
         args: [
             '--no-sandbox',
@@ -2136,8 +2158,8 @@ async function main() {
         // Globaler Push am Ende
         await pushProgressToGit("final_sync");
 
-        await context.storageState({ path: SESSION_PATH });
-        console.log('💾 Instagram Session gespeichert');
+        await context.storageState({ path: activeAccount.session });
+        console.log(`💾 Instagram Session gespeichert (@${activeAccount.name})`);
 
     } catch (err: any) {
         console.error('\n❌ Fehler:', err.message);
