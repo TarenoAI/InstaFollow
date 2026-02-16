@@ -62,26 +62,30 @@ function resolveImagePath(imagePath: string): string | null {
 }
 
 function formatGroupedTweet(group: GroupedEvent): string {
-    const count = group.targets.length;
-    const personDE = count === 1 ? 'Person' : 'Personen';
-    const personEN = count === 1 ? 'person' : 'people';
-
     const isFollow = group.type === 'FOLLOW';
-    const emoji = isFollow ? '✅' : '👀';
-    const actionDE = isFollow ? `folgt ${count} neuen ${personDE}` : `entfolgte ${count} ${personDE}`;
-    const actionEN = isFollow ? `now follows ${count} ${personEN}` : `unfollowed ${count} ${personEN}`;
-    const actionEmoji = isFollow ? '➕' : '❌';
+    const alertEmoji = isFollow ? '🚨 ⚽️ NEUER FOLLOW ALERT ⚽️ 🚨' : '👀 UNFOLLOW ALERT 👀';
+    const actionEmoji = isFollow ? '✅' : '❌';
+    const count = group.targets.length;
 
-    const targetLines = group.targets.map(t => {
-        return `${actionEmoji} @${t.username}\n🔗 instagram.com/${t.username}`;
-    }).join('\n\n');
+    let text = `${alertEmoji}\n\n`;
+    text += `👤 @${group.monitoredUsername}\n`;
+    
+    if (isFollow) {
+        text += count === 1 ? 'folgt jetzt neu:\n' : `folgt jetzt ${count} neuen Accounts:\n`;
+    } else {
+        text += count === 1 ? 'folgt nicht mehr:\n' : `folgt ${count} Accounts nicht mehr:\n`;
+    }
+    
+    text += '\n';
 
-    return `${emoji} @${group.monitoredUsername} ${actionDE}:
-${emoji} @${group.monitoredUsername} ${actionEN}:
+    // Zeige Targets
+    for (const target of group.targets) {
+        text += `${actionEmoji} @${target.username}\n`;
+    }
 
-${targetLines}
+    text += '\n#Bundesliga #Instagram #FollowerWatch ⚽️🚀';
 
-#Instagram #FollowerWatch #Bundesliga`;
+    return text.trim();
 }
 
 async function postTweet(page: any, text: string, imagePath?: string | null): Promise<boolean> {
