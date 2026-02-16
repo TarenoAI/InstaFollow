@@ -301,10 +301,20 @@ async function checkForRateLimit(page: Page): Promise<boolean> {
         "Versuche es später noch einmal",
         "Try again later",
         "Handlungen auf Instagram ein",
-        "community zu schützen"
+        "community zu schützen",
+        "Wir haben eine ungewöhnliche Aktivität",
+        "We've detected unusual activity"
     ];
 
     try {
+        const currentUrl = page.url();
+        if (currentUrl.includes('checkpoint') || currentUrl.includes('challenge')) {
+            console.log(`\n🚨 CHALLENGE/CHECKPOINT ERKANNT! URL: ${currentUrl}`);
+            fs.writeFileSync(currentRateLimitLock, Date.now().toString());
+            globalRateLimited = true;
+            return true;
+        }
+
         const bodyText = await page.evaluate(() => document.body.innerText);
         for (const text of rateLimitTexts) {
             if (bodyText.includes(text)) {
@@ -1961,8 +1971,8 @@ async function main() {
                                 for (const target of addedProfiles) {
                                     await db.execute({
                                         sql: `INSERT INTO ChangeEvent (id, type, targetUsername, targetFullName, targetPicUrl, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
-                                              VALUES (?, 'FOLLOW', ?, ?, ?, ?, datetime('now'), 1, 1, ?)`,
-                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, target.fullName || null, target.profilePicUrl || null, changeScreenshotUrl, profileId]
+                                              VALUES (?, 'FOLLOW', ?, ?, ?, ?, datetime('now'), 1, ?, ?)`,
+                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, target.fullName || null, target.profilePicUrl || null, changeScreenshotUrl, tweetUrl ? 1 : 0, profileId]
                                     });
                                 }
                             }
@@ -2017,8 +2027,8 @@ async function main() {
                                 for (const target of removedProfiles) {
                                     await db.execute({
                                         sql: `INSERT INTO ChangeEvent (id, type, targetUsername, targetFullName, targetPicUrl, screenshotUrl, detectedAt, isConfirmed, processed, profileId) 
-                                              VALUES (?, 'UNFOLLOW', ?, ?, ?, ?, datetime('now'), 1, 1, ?)`,
-                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, target.fullName || null, target.profilePicUrl || null, changeScreenshotUrl, profileId]
+                                              VALUES (?, 'UNFOLLOW', ?, ?, ?, ?, datetime('now'), 1, ?, ?)`,
+                                        args: [`ce_${Date.now()}_${Math.random().toString(36).slice(2)}`, target.username, target.fullName || null, target.profilePicUrl || null, changeScreenshotUrl, tweetUrl ? 1 : 0, profileId]
                                     });
                                 }
                             }
