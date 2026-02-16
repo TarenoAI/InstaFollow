@@ -1743,6 +1743,13 @@ async function main() {
                 scrapeQuote = currentCount > 0 ? ((currentFollowing.length / currentCount) * 100).toFixed(1) : '100';
                 console.log(`   📈 Scraping-Quote: ${currentFollowing.length}/${currentCount} (${scrapeQuote}%)`);
 
+                // 🚨 SOFT RATE LIMIT DETECTION: 0% Result despite expectedCount > 0
+                if (currentFollowing.length === 0 && currentCount > 0) {
+                    console.log(`\n🚨 SOFT RATE LIMIT ERKANNT (0% Scrape)!`);
+                    fs.writeFileSync(currentRateLimitLock, Date.now().toString());
+                    globalRateLimited = true;
+                }
+
                 // ════════════════════════════════════════════════════════════
                 // 🔄 MERGE-BASIERTE BASELINE: Partielle Ergebnisse ergänzen
                 // ════════════════════════════════════════════════════════════
