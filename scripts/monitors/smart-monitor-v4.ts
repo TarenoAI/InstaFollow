@@ -335,26 +335,26 @@ async function dismissPopups(page: Page): Promise<boolean> {
     if (isBlocked) return true;
 
     const selectors = [
-        // Cookie consent (Highest Priority)
+        // 1. Cookie consent (Highest Priority)
         'button:has-text("Alle akzeptieren")',
         'button:has-text("Allow all cookies")',
         'button:has-text("Accept All")',
         'button:has-text("Erforderliche und optionale Cookies erlauben")',
         'button:has-text("Nur erforderliche Cookies erlauben")',
+        'button:has-text("Alle Cookies erlauben")',
         
-        // Save login info popup
+        // 2. Save login info popup ("Info speichern")
         'button:has-text("Informationen speichern")',
         'button:has-text("Save Info")',
         'button:has-text("Jetzt speichern")',
+        'button:has-text("Info speichern")',
         
-        // "Not Now" buttons  
+        // 3. Notifications ("Not now")
+        'button:has-text("Nicht aktivieren")',
         'button:has-text("Jetzt nicht")',
         'button:has-text("Not Now")',
         'button:has-text("Nicht jetzt")',
         'button:has-text("Abbrechen")',
-        
-        // Notifications
-        'button:has-text("Nicht aktivieren")',
         
         // Generic Close buttons (X icons)
         '[aria-label="Schließen"]',
@@ -362,12 +362,12 @@ async function dismissPopups(page: Page): Promise<boolean> {
         'svg[aria-label="Schließen"]',
         'svg[aria-label="Close"]',
         
-        // RATE LIMIT POPUP - "Versuche es später noch einmal"
+        // RATE LIMIT POPUP
         'button:has-text("OK")',
         'button:has-text("Ok")',
         'button:has-text("Bestätigen")',
         
-        // "View profile in app" popup - X button at top right
+        // Mobile / Dialog close buttons
         'div[role="dialog"] button[type="button"]',
         'div[role="dialog"] svg[aria-label="Schließen"]',
         'div[role="dialog"] svg[aria-label="Close"]',
